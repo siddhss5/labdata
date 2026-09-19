@@ -1,14 +1,14 @@
-- id: "jsmith"
-  name: "John Smith"
-  aliases: ["J. Smith", "John A. Smith"]
+- id: "aadams"
+  name: "Alice Adams"
+  aliases: ["A. Adams", "Alice A. Adams"]
   role: "pi"
   status: "current"
-  website: "https://jsmith.example.com"
+  website: "https://aadams.example.com"
   start_year: 2015
 
-- id: "jdoe"
-  name: "Jane Doe"
-  aliases: ["J. Doe", "J. A. Doe", "Jane A. Doe"]
+- id: "bbrown"
+  name: "Bob Brown"
+  aliases: ["B. Brown", "B. A. Brown", "Bob A. Brown"]
   role: "phd_student"
   status: "alumni"
   start_year: 2018

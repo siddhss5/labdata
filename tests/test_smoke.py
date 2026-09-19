@@ -34,7 +34,7 @@ def test_publication_dataclass():
         entry_type="article",
         year=2024,
         title="Test Paper",
-        authors=[Author(name="J. Doe"), Author(name="J. Smith")],
+        authors=[Author(name="B. Brown"), Author(name="A. Adams")],
         venue="Test Journal, 2024",
         category="Journal Papers",
         project_ids=["test_project"],
@@ -46,4 +46,4 @@ def test_publication_dataclass():
     d = pub.to_dict()
     assert d["title"] == "Test Paper"
     assert d["year"] == 2024
-    assert d["authors"][0]["name"] == "J. Doe"
+    assert d["authors"][0]["name"] == "B. Brown"

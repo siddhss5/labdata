@@ -27,26 +27,26 @@ class TestParseBibtexFile:
         entries = parse_bibtex_file(str(FIXTURES / "sample.bib"))
         assert len(entries) == 3
         ids = {e["ID"] for e in entries}
-        assert "smith2024robot" in ids
-        assert "doe2023planning" in ids
+        assert "adams2024robot" in ids
+        assert "brown2023planning" in ids
 
 
 class TestParseAuthorList:
     def test_single_author(self):
-        authors = parse_author_list("Smith, John")
+        authors = parse_author_list("Adams, Alice")
         assert len(authors) == 1
-        assert authors[0].name == "J. Smith"
+        assert authors[0].name == "A. Adams"
         assert authors[0].person_id is None
 
     def test_multiple_authors(self):
-        authors = parse_author_list("Smith, John and Doe, Jane A.")
+        authors = parse_author_list("Adams, Alice and Brown, Bob A.")
         assert len(authors) == 2
-        assert authors[0].name == "J. Smith"
-        assert "J." in authors[1].name
+        assert authors[0].name == "A. Adams"
+        assert "B." in authors[1].name
 
     def test_three_authors(self):
         authors = parse_author_list(
-            "Smith, John and Doe, Jane A. and M{\\\"u}ller, Hans"
+            "Adams, Alice and Brown, Bob A. and M{\\\"u}ller, Hans"
         )
         assert len(authors) == 3
         assert "Müller" in authors[2].name
@@ -63,22 +63,22 @@ class TestParseAuthorList:
 
 class TestFormatAuthorsString:
     def test_single(self):
-        assert format_authors_string([Author(name="J. Smith")]) == "J. Smith"
+        assert format_authors_string([Author(name="A. Adams")]) == "A. Adams"
 
     def test_two(self):
         result = format_authors_string([
-            Author(name="J. Smith"),
-            Author(name="J. Doe"),
+            Author(name="A. Adams"),
+            Author(name="B. Brown"),
         ])
-        assert result == "J. Smith and J. Doe"
+        assert result == "A. Adams and B. Brown"
 
     def test_three(self):
         result = format_authors_string([
-            Author(name="J. Smith"),
-            Author(name="J. Doe"),
+            Author(name="A. Adams"),
+            Author(name="B. Brown"),
             Author(name="H. Müller"),
         ])
-        assert result == "J. Smith, J. Doe, and H. Müller"
+        assert result == "A. Adams, B. Brown, and H. Müller"
 
 
 class TestFormatVenue:
@@ -205,19 +205,19 @@ class TestParseProjectIds:
 class TestEntryToPublication:
     def test_basic(self):
         entry = {
-            "ID": "smith2024",
+            "ID": "adams2024",
             "ENTRYTYPE": "article",
             "title": "A \\textbf{Great} Paper",
-            "author": "Smith, John",
+            "author": "Adams, Alice",
             "journal": "Test Journal",
             "year": "2024",
             "doi": "10.1234/test",
         }
         pub = entry_to_publication(entry, "Journal Papers")
-        assert pub.bib_id == "smith2024"
+        assert pub.bib_id == "adams2024"
         assert "**Great**" in pub.title
         assert len(pub.authors) == 1
-        assert pub.authors[0].name == "J. Smith"
+        assert pub.authors[0].name == "A. Adams"
         assert pub.year == 2024
         assert pub.category == "Journal Papers"
         assert pub.entry_type == "article"
