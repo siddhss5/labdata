@@ -14,6 +14,7 @@ lab:
 # Jekyll site settings (read by scripts/generate_site_config.py).
 # The site title and description come from lab.name and lab.description.
 site:
+  url: "https://siddhss5.github.io"
   baseurl: "/labdata"
 
 bib_dir: "examples/demo/bib"

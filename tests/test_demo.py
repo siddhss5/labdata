@@ -100,6 +100,7 @@ class TestGenerateSiteConfig:
         config = self._run(DEMO_CONFIG, tmp_path)
         assert config["title"] == "Example Lab"
         assert config["description"] == lab_config["lab"]["description"]
+        assert config["url"] == lab_config["site"]["url"]
         assert config["baseurl"] == lab_config["site"]["baseurl"]
 
     def test_values_follow_lab_yaml(self, tmp_path):
