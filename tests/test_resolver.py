@@ -23,19 +23,19 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 class TestNormalizeName:
     def test_basic(self):
-        assert normalize_name("J. Smith") == "j smith"
+        assert normalize_name("A. Adams") == "a adams"
 
     def test_accents(self):
         assert normalize_name("H. Müller") == "h muller"
 
     def test_periods(self):
-        assert normalize_name("J.A. Smith") == "ja smith"
+        assert normalize_name("A.J. Adams") == "aj adams"
 
     def test_whitespace(self):
-        assert normalize_name("  J.  Smith  ") == "j smith"
+        assert normalize_name("  A.  Adams  ") == "a adams"
 
     def test_superscript(self):
-        assert normalize_name("J. Smith<sup>*</sup>") == "j smith"
+        assert normalize_name("A. Adams<sup>*</sup>") == "a adams"
 
 
 class TestIsAbbreviated:
@@ -47,7 +47,7 @@ class TestIsAbbreviated:
         assert is_abbreviated("a j kim") is False
 
     def test_full_name(self):
-        assert is_abbreviated("john smith") is False
+        assert is_abbreviated("alice adams") is False
 
     def test_single_word(self):
         assert is_abbreviated("kim") is False
@@ -56,22 +56,22 @@ class TestIsAbbreviated:
 class TestBuildAliasIndex:
     def test_indexes_name_and_aliases(self):
         people = [
-            Person(id="jsmith", name="John Smith", aliases=["J. Smith"]),
+            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
         ]
         index = build_alias_index(people)
-        assert "john smith" in index
-        assert "j smith" in index
-        assert index["john smith"] == "jsmith"
-        assert index["j smith"] == "jsmith"
+        assert "alice adams" in index
+        assert "a adams" in index
+        assert index["alice adams"] == "aadams"
+        assert index["a adams"] == "aadams"
 
     def test_multiple_people(self):
         people = [
-            Person(id="jsmith", name="John Smith", aliases=["J. Smith"]),
-            Person(id="jdoe", name="Jane Doe", aliases=["J. Doe"]),
+            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
+            Person(id="bbrown", name="Bob Brown", aliases=["B. Brown"]),
         ]
         index = build_alias_index(people)
-        assert index["j smith"] == "jsmith"
-        assert index["j doe"] == "jdoe"
+        assert index["a adams"] == "aadams"
+        assert index["b brown"] == "bbrown"
 
     def test_collision_detection(self):
         """Ambiguous aliases shared by multiple people are excluded."""
@@ -113,13 +113,13 @@ class TestFuzzyMatch:
         assert fuzzy_match("H. Zhang", index) is None
 
     def test_close_match(self):
-        index = {"john smith": "jsmith"}
-        # "john a smith" is close to "john smith"
-        result = fuzzy_match("John A. Smith", index, threshold=0.75)
-        assert result == "jsmith"
+        index = {"alice adams": "aadams"}
+        # "alice a adams" is close to "alice adams"
+        result = fuzzy_match("Alice A. Adams", index, threshold=0.75)
+        assert result == "aadams"
 
     def test_no_match(self):
-        index = {"john smith": "jsmith"}
+        index = {"alice adams": "aadams"}
         result = fuzzy_match("Completely Different Name", index)
         assert result is None
 
@@ -138,16 +138,16 @@ class TestResolveAuthors:
 
     def test_exact_alias_match(self):
         people = [
-            Person(id="jsmith", name="John Smith", aliases=["J. Smith"]),
+            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
         ]
-        pub = self._make_pub(["J. Smith"])
+        pub = self._make_pub(["A. Adams"])
         unresolved = resolve_authors([pub], people)
-        assert pub.authors[0].person_id == "jsmith"
+        assert pub.authors[0].person_id == "aadams"
         assert unresolved == []
 
     def test_unresolved_external(self):
         people = [
-            Person(id="jsmith", name="John Smith", aliases=["J. Smith"]),
+            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
         ]
         pub = self._make_pub(["E. E. Jones"])
         unresolved = resolve_authors([pub], people)
@@ -156,18 +156,18 @@ class TestResolveAuthors:
 
     def test_mixed_resolved_and_unresolved(self):
         people = [
-            Person(id="jsmith", name="John Smith", aliases=["J. Smith"]),
-            Person(id="jdoe", name="Jane Doe", aliases=["J. A. Doe"]),
+            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
+            Person(id="bbrown", name="Bob Brown", aliases=["B. A. Brown"]),
         ]
-        pub = self._make_pub(["J. Smith", "E. External", "J. A. Doe"])
+        pub = self._make_pub(["A. Adams", "E. External", "B. A. Brown"])
         unresolved = resolve_authors([pub], people)
-        assert pub.authors[0].person_id == "jsmith"
+        assert pub.authors[0].person_id == "aadams"
         assert pub.authors[1].person_id is None
-        assert pub.authors[2].person_id == "jdoe"
+        assert pub.authors[2].person_id == "bbrown"
         assert "E. External" in unresolved
 
     def test_empty_people(self):
-        pub = self._make_pub(["J. Smith"])
+        pub = self._make_pub(["A. Adams"])
         unresolved = resolve_authors([pub], [])
         assert unresolved == []
         assert pub.authors[0].person_id is None
@@ -202,66 +202,66 @@ class TestResolveProjects:
 class TestComputeBacklinks:
     def test_people_backlinks(self):
         pub = Publication(
-            bib_id="smith2024",
+            bib_id="adams2024",
             title="Test",
-            authors=[Author(name="J. Smith", person_id="jsmith")],
+            authors=[Author(name="A. Adams", person_id="aadams")],
             year=2024,
             venue="Test",
             category="Test",
             entry_type="article",
         )
-        person = Person(id="jsmith", name="John Smith")
+        person = Person(id="aadams", name="Alice Adams")
         data = LabData(publications=[pub], people=[person], projects=[])
         compute_backlinks(data)
-        assert "smith2024" in person.publication_ids
+        assert "adams2024" in person.publication_ids
         assert person.publication_count == 1
 
     def test_project_backlinks(self):
         pub = Publication(
-            bib_id="smith2024",
+            bib_id="adams2024",
             title="Test",
-            authors=[Author(name="J. Smith", person_id="jsmith")],
+            authors=[Author(name="A. Adams", person_id="aadams")],
             year=2024,
             venue="Test",
             category="Test",
             entry_type="article",
             project_ids=["gardenbot"],
         )
-        person = Person(id="jsmith", name="John Smith")
+        person = Person(id="aadams", name="Alice Adams")
         project = Project(id="gardenbot", title="Robot Gardening")
         data = LabData(publications=[pub], people=[person], projects=[project])
         compute_backlinks(data)
-        assert "smith2024" in project.publication_ids
-        assert "jsmith" in project.people_ids
+        assert "adams2024" in project.publication_ids
+        assert "aadams" in project.people_ids
 
     def test_no_duplicate_backlinks(self):
         """Running compute_backlinks twice should not duplicate entries."""
         pub = Publication(
-            bib_id="smith2024",
+            bib_id="adams2024",
             title="Test",
-            authors=[Author(name="J. Smith", person_id="jsmith")],
+            authors=[Author(name="A. Adams", person_id="aadams")],
             year=2024,
             venue="Test",
             category="Test",
             entry_type="article",
         )
-        person = Person(id="jsmith", name="John Smith")
+        person = Person(id="aadams", name="Alice Adams")
         data = LabData(publications=[pub], people=[person], projects=[])
         compute_backlinks(data)
         compute_backlinks(data)
-        assert person.publication_ids.count("smith2024") == 1
+        assert person.publication_ids.count("adams2024") == 1
 
 
 class TestLoadPeople:
     def test_load_fixtures(self):
         people = load_people(str(FIXTURES / "people.yaml"))
         assert len(people) == 3
-        pi = next(p for p in people if p.id == "jsmith")
+        pi = next(p for p in people if p.id == "aadams")
         assert pi.role == "pi"
         assert pi.status == "current"
-        assert "J. Smith" in pi.aliases
+        assert "A. Adams" in pi.aliases
 
-        alumni = next(p for p in people if p.id == "jdoe")
+        alumni = next(p for p in people if p.id == "bbrown")
         assert alumni.status == "alumni"
         assert alumni.degree == "PhD"
         assert alumni.end_year == 2023
@@ -297,9 +297,9 @@ class TestAssembleEndToEnd:
         assert len(data.publications) == 3
 
         # Authors resolved for lab members
-        smith_pub = next(p for p in data.publications if p.bib_id == "smith2024robot")
-        smith_author = next(a for a in smith_pub.authors if "Smith" in a.name)
-        assert smith_author.person_id == "jsmith"
+        adams_pub = next(p for p in data.publications if p.bib_id == "adams2024robot")
+        adams_author = next(a for a in adams_pub.authors if "Adams" in a.name)
+        assert adams_author.person_id == "aadams"
 
         # External author NOT resolved
         jones_pub = next(p for p in data.publications if p.bib_id == "jones2023preprint")
@@ -307,16 +307,16 @@ class TestAssembleEndToEnd:
         assert jones_author.person_id is None
 
         # Projects resolved
-        assert "gardenbot" in smith_pub.project_ids
+        assert "gardenbot" in adams_pub.project_ids
 
         # Back-links computed
-        jsmith = next(p for p in data.people if p.id == "jsmith")
-        assert jsmith.publication_count > 0
-        assert "smith2024robot" in jsmith.publication_ids
+        aadams = next(p for p in data.people if p.id == "aadams")
+        assert aadams.publication_count > 0
+        assert "adams2024robot" in aadams.publication_ids
 
         rf = next(p for p in data.projects if p.id == "gardenbot")
         assert len(rf.publication_ids) > 0
-        assert "jsmith" in rf.people_ids
+        assert "aadams" in rf.people_ids
 
     def test_without_people_or_projects(self):
         """Should work with just bib files, no people/projects."""

@@ -13,10 +13,10 @@ from labdata.exporters import export_to_yaml, export_to_json
 def sample_data():
     """A small LabData instance for testing exports."""
     pub = Publication(
-        bib_id="smith2024robot",
+        bib_id="adams2024robot",
         title="Robot Gardening",
         authors=[
-            Author(name="J. Smith", person_id="jsmith"),
+            Author(name="A. Adams", person_id="aadams"),
             Author(name="E. External"),
         ],
         year=2024,
@@ -27,12 +27,12 @@ def sample_data():
         project_ids=["gardenbot"],
     )
     person = Person(
-        id="jsmith", name="John Smith", role="pi", status="current",
-        publication_count=1, publication_ids=["smith2024robot"],
+        id="aadams", name="Alice Adams", role="pi", status="current",
+        publication_count=1, publication_ids=["adams2024robot"],
     )
     project = Project(
         id="gardenbot", title="Robot-Assisted Gardening", status="active",
-        publication_ids=["smith2024robot"], people_ids=["jsmith"],
+        publication_ids=["adams2024robot"], people_ids=["aadams"],
     )
     return LabData(publications=[pub], people=[person], projects=[project])
 
@@ -49,9 +49,9 @@ class TestExportToYaml:
         with open(out, 'r') as f:
             loaded = yaml.safe_load(f)
         assert len(loaded["publications"]) == 1
-        assert loaded["publications"][0]["bib_id"] == "smith2024robot"
+        assert loaded["publications"][0]["bib_id"] == "adams2024robot"
         assert len(loaded["people"]) == 1
-        assert loaded["people"][0]["id"] == "jsmith"
+        assert loaded["people"][0]["id"] == "aadams"
         assert len(loaded["projects"]) == 1
         assert loaded["projects"][0]["id"] == "gardenbot"
 
@@ -66,8 +66,8 @@ class TestExportToYaml:
         with open(out, 'r') as f:
             loaded = yaml.safe_load(f)
         authors = loaded["publications"][0]["authors"]
-        assert authors[0]["name"] == "J. Smith"
-        assert authors[0]["person_id"] == "jsmith"
+        assert authors[0]["name"] == "A. Adams"
+        assert authors[0]["person_id"] == "aadams"
         assert authors[1]["name"] == "E. External"
         assert authors[1]["person_id"] is None
 
@@ -98,9 +98,9 @@ class TestExportToJson:
         with open(out, 'r') as f:
             loaded = json.load(f)
         assert len(loaded["publications"]) == 1
-        assert loaded["publications"][0]["bib_id"] == "smith2024robot"
+        assert loaded["publications"][0]["bib_id"] == "adams2024robot"
         assert loaded["people"][0]["publication_count"] == 1
-        assert loaded["projects"][0]["people_ids"] == ["jsmith"]
+        assert loaded["projects"][0]["people_ids"] == ["aadams"]
 
     def test_creates_parent_dirs(self, tmp_path, sample_data):
         out = str(tmp_path / "nested" / "dir" / "output.json")

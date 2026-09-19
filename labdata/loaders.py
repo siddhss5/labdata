@@ -17,9 +17,9 @@ def load_people(path: str) -> List[Person]:
     """Load people from a YAML file.
 
     Expected format (list of dicts):
-        - id: "jsmith"
-          name: "John Smith"
-          aliases: ["J. Smith", "J. A. Smith"]
+        - id: "aadams"
+          name: "Alice Adams"
+          aliases: ["A. Adams", "A. J. Adams"]
           role: "pi"
           status: "current"
           ...
