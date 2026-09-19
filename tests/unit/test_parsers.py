@@ -19,7 +19,7 @@ from labdata.parsers.bibtex import (
 from labdata.models import Author
 
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
 class TestParseBibtexFile:
@@ -215,13 +215,25 @@ class TestEntryToPublication:
         }
         pub = entry_to_publication(entry, "Journal Papers")
         assert pub.bib_id == "adams2024"
-        assert "**Great**" in pub.title
         assert len(pub.authors) == 1
         assert pub.authors[0].name == "A. Adams"
         assert pub.year == 2024
         assert pub.category == "Journal Papers"
         assert pub.entry_type == "article"
         assert pub.doi_url == "https://doi.org/10.1234/test"
+
+    @pytest.mark.xfail(strict=True, reason="#18")
+    def test_title_is_plain_text(self):
+        """Titles come out as plain text, without Markdown ``**`` for \\textbf."""
+        entry = {
+            "ID": "adams2024",
+            "ENTRYTYPE": "article",
+            "title": "A \\textbf{Great} Paper",
+            "author": "Adams, Alice",
+            "year": "2024",
+        }
+        pub = entry_to_publication(entry, "Journal Papers")
+        assert pub.title == "A Great Paper"
 
     def test_with_video_url(self):
         entry = {
