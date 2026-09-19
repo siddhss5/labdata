@@ -39,6 +39,10 @@ jobs:
       run: |
         uv sync --frozen --extra test
 
+    - name: Validate demo lab
+      run: |
+        uv run --frozen labdata --config examples/demo/lab.yaml --validate
+
     - name: Generate site data
       run: |
         uv run --frozen labdata --config examples/demo/lab.yaml --output site/_data/lab.yml

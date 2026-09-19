@@ -14,8 +14,8 @@ from .assembler import assemble
 from .exporters import export_to_yaml, export_to_json
 
 
-def main():
-    """Main CLI entry point."""
+def main(argv=None):
+    """Main CLI entry point. ``argv`` defaults to ``sys.argv[1:]``."""
     parser = argparse.ArgumentParser(
         description='Assemble academic lab data from BibTeX and YAML',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -56,7 +56,7 @@ Examples:
         help='Show unresolved author names, then exit'
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     # Validate arguments
     if not args.output and not args.validate and not args.unresolved:

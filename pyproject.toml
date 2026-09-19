@@ -2,7 +2,7 @@
 name = "labdata"
 version = "2.0.0"
 description = "Renderer-agnostic academic lab data assembler: BibTeX + YAML → structured data"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     "bibtexparser>=1.4,<2",
     "pyyaml"
@@ -28,3 +28,14 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["labdata*"]
+
+[tool.pytest.ini_options]
+addopts = "--cov --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["labdata"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 92
+precision = 2

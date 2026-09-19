@@ -8,6 +8,10 @@ env/
 data/pubs/
 *.egg-info/
 
+# Coverage data (pytest runs with coverage via pyproject.toml)
+.coverage
+.coverage.*
+
 # Generated site data (built by labdata CLI)
 site/_data/lab.yml
 
