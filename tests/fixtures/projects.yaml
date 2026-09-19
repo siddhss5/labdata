@@ -1,7 +1,7 @@
-- id: "robotfeeding"
-  title: "Robot-Assisted Feeding"
-  description: "Autonomous feeding systems for people with mobility impairments"
-  website: "https://robotfeeding.io"
+- id: "gardenbot"
+  title: "Robot-Assisted Gardening"
+  description: "Autonomous gardening systems for community gardens"
+  website: "https://gardenbot.example.org"
   status: "active"
 
 - id: "planning"

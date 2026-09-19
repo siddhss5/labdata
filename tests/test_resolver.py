@@ -40,17 +40,17 @@ class TestNormalizeName:
 
 class TestIsAbbreviated:
     def test_single_initial_surname(self):
-        assert is_abbreviated("s choudhury") is True
+        assert is_abbreviated("a kim") is True
         assert is_abbreviated("h zhang") is True
 
     def test_multi_initial(self):
-        assert is_abbreviated("s s srinivasa") is False
+        assert is_abbreviated("a j kim") is False
 
     def test_full_name(self):
         assert is_abbreviated("john smith") is False
 
     def test_single_word(self):
-        assert is_abbreviated("srinivasa") is False
+        assert is_abbreviated("kim") is False
 
 
 class TestBuildAliasIndex:
@@ -76,15 +76,34 @@ class TestBuildAliasIndex:
     def test_collision_detection(self):
         """Ambiguous aliases shared by multiple people are excluded."""
         people = [
-            Person(id="sanjiban", name="Sanjiban Choudhury", aliases=["S. Choudhury"]),
-            Person(id="shushman", name="Shushman Choudhury", aliases=["S. Choudhury"]),
+            Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
+            Person(id="alankim", name="Alan Kim", aliases=["A. Kim"]),
         ]
         index = build_alias_index(people)
-        # "s choudhury" is ambiguous — should NOT be in the index
-        assert "s choudhury" not in index
+        # "a kim" is ambiguous — should NOT be in the index
+        assert "a kim" not in index
         # Canonical names are still indexed (they're unique)
-        assert index["sanjiban choudhury"] == "sanjiban"
-        assert index["shushman choudhury"] == "shushman"
+        assert index["alex kim"] == "akim"
+        assert index["alan kim"] == "alankim"
+
+    @pytest.mark.xfail(strict=True, reason="#24")
+    def test_same_initial_collision_without_alias(self):
+        """An alias shared implicitly with another person's initials is ambiguous.
+
+        Alan Kim declares no aliases, but "A. Kim" fits him as well as Alex Kim,
+        so it must not resolve to Alex.
+        """
+        people = [
+            Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
+            Person(id="alankim", name="Alan Kim", aliases=[]),
+        ]
+        pub = Publication(
+            bib_id="kim2024", title="Test", authors=[Author(name="A. Kim")],
+            year=2024, venue="Test", category="Test", entry_type="article",
+        )
+        unresolved = resolve_authors([pub], people)
+        assert pub.authors[0].person_id is None
+        assert "A. Kim" in unresolved
 
 
 class TestFuzzyMatch:
@@ -168,14 +187,14 @@ class TestResolveProjects:
         )
 
     def test_valid_projects(self):
-        projects = [Project(id="robotfeeding", title="Robot Feeding")]
-        pub = self._make_pub(["robotfeeding"])
+        projects = [Project(id="gardenbot", title="Robot Gardening")]
+        pub = self._make_pub(["gardenbot"])
         unknown = resolve_projects([pub], projects)
         assert unknown == []
 
     def test_unknown_project(self):
-        projects = [Project(id="robotfeeding", title="Robot Feeding")]
-        pub = self._make_pub(["robotfeeding", "nonexistent"])
+        projects = [Project(id="gardenbot", title="Robot Gardening")]
+        pub = self._make_pub(["gardenbot", "nonexistent"])
         unknown = resolve_projects([pub], projects)
         assert "nonexistent" in unknown
 
@@ -206,10 +225,10 @@ class TestComputeBacklinks:
             venue="Test",
             category="Test",
             entry_type="article",
-            project_ids=["robotfeeding"],
+            project_ids=["gardenbot"],
         )
         person = Person(id="jsmith", name="John Smith")
-        project = Project(id="robotfeeding", title="Robot Feeding")
+        project = Project(id="gardenbot", title="Robot Gardening")
         data = LabData(publications=[pub], people=[person], projects=[project])
         compute_backlinks(data)
         assert "smith2024" in project.publication_ids
@@ -255,8 +274,8 @@ class TestLoadProjects:
     def test_load_fixtures(self):
         projects = load_projects(str(FIXTURES / "projects.yaml"))
         assert len(projects) == 2
-        rf = next(p for p in projects if p.id == "robotfeeding")
-        assert rf.title == "Robot-Assisted Feeding"
+        rf = next(p for p in projects if p.id == "gardenbot")
+        assert rf.title == "Robot-Assisted Gardening"
         assert rf.status == "active"
 
     def test_missing_file(self):
@@ -288,14 +307,14 @@ class TestAssembleEndToEnd:
         assert jones_author.person_id is None
 
         # Projects resolved
-        assert "robotfeeding" in smith_pub.project_ids
+        assert "gardenbot" in smith_pub.project_ids
 
         # Back-links computed
         jsmith = next(p for p in data.people if p.id == "jsmith")
         assert jsmith.publication_count > 0
         assert "smith2024robot" in jsmith.publication_ids
 
-        rf = next(p for p in data.projects if p.id == "robotfeeding")
+        rf = next(p for p in data.projects if p.id == "gardenbot")
         assert len(rf.publication_ids) > 0
         assert "jsmith" in rf.people_ids
 

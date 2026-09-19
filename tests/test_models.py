@@ -88,23 +88,23 @@ class TestPerson:
 
 class TestProject:
     def test_basic(self):
-        p = Project(id="robotfeeding", title="Robot-Assisted Feeding")
+        p = Project(id="gardenbot", title="Robot-Assisted Gardening")
         assert p.status == "active"
         assert p.publication_ids == []
         assert p.people_ids == []
 
     def test_to_dict(self):
         p = Project(
-            id="robotfeeding",
-            title="Robot-Assisted Feeding",
-            description="Autonomous feeding systems",
-            website="https://robotfeeding.io",
+            id="gardenbot",
+            title="Robot-Assisted Gardening",
+            description="Autonomous gardening systems",
+            website="https://gardenbot.example.org",
             status="active",
             publication_ids=["doe2024", "smith2023"],
             people_ids=["jdoe", "jsmith"],
         )
         d = p.to_dict()
-        assert d["id"] == "robotfeeding"
+        assert d["id"] == "gardenbot"
         assert len(d["publication_ids"]) == 2
         assert len(d["people_ids"]) == 2
 

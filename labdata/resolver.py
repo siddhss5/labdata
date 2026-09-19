@@ -22,8 +22,8 @@ from .models import Author, Publication, Person, Project, LabData
 # Default fuzzy match threshold (0.0 to 1.0)
 FUZZY_THRESHOLD = 0.85
 
-# Pattern for abbreviated names: single initial + surname (e.g., "S. Choudhury")
-# After normalization (no periods): "s choudhury", "h zhang", etc.
+# Pattern for abbreviated names: single initial + surname (e.g., "A. Kim")
+# After normalization (no periods): "a kim", "h zhang", etc.
 _ABBREVIATED_NAME_RE = re.compile(r'^[a-z] [a-z]+$')
 
 
@@ -52,7 +52,7 @@ def normalize_name(name: str) -> str:
 def is_abbreviated(name: str) -> bool:
     """Check if a normalized name is a single-initial abbreviation.
 
-    Returns True for names like "s choudhury" or "h zhang" — these have
+    Returns True for names like "a kim" or "h zhang" — these have
     too little information for reliable fuzzy matching.
     """
     return bool(_ABBREVIATED_NAME_RE.match(name))
