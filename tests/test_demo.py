@@ -8,6 +8,7 @@ import pytest
 import yaml
 
 from labdata.assembler import assemble
+from labdata.cli import main
 from labdata.config import LabDataConfig
 
 
@@ -24,13 +25,13 @@ def demo_result(monkeypatch):
 
 
 class TestDemoLab:
-    def test_validate_cli(self):
-        result = subprocess.run(
-            [sys.executable, "-m", "labdata.cli", "--config", DEMO_CONFIG, "--validate"],
-            capture_output=True, text=True, cwd=REPO_ROOT,
-        )
-        assert result.returncode == 0, result.stdout + result.stderr
-        assert "Validation passed" in result.stdout
+    def test_validate_cli(self, monkeypatch, capsys):
+        monkeypatch.chdir(REPO_ROOT)
+        main(["--config", DEMO_CONFIG, "--validate"])
+        out = capsys.readouterr().out
+        assert "Validation passed" in out
+        # External collaborators stay unresolved; that must not fail validation.
+        assert "Unresolved authors" in out
 
     def test_assembles(self, demo_result):
         data = demo_result.data
