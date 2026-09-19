@@ -1,11 +1,9 @@
 """Tests for the BibTeX parsing pipeline."""
 
-import pytest
 from pathlib import Path
 
 from labdata.parsers.bibtex import (
-    parse_bibtex_file,
-    parse_author_list,
+    _convert,
     format_authors_string,
     format_venue,
     extract_note,
@@ -13,52 +11,12 @@ from labdata.parsers.bibtex import (
     construct_doi_url,
     construct_arxiv_url,
     parse_project_ids,
-    entry_to_publication,
     parse_all_publications,
 )
 from labdata.models import Author
 
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
-
-
-class TestParseBibtexFile:
-    def test_parse_sample(self):
-        entries = parse_bibtex_file(str(FIXTURES / "sample.bib"))
-        assert len(entries) == 3
-        ids = {e["ID"] for e in entries}
-        assert "adams2024robot" in ids
-        assert "brown2023planning" in ids
-
-
-class TestParseAuthorList:
-    def test_single_author(self):
-        authors = parse_author_list("Adams, Alice")
-        assert len(authors) == 1
-        assert authors[0].name == "A. Adams"
-        assert authors[0].person_id is None
-
-    def test_multiple_authors(self):
-        authors = parse_author_list("Adams, Alice and Brown, Bob A.")
-        assert len(authors) == 2
-        assert authors[0].name == "A. Adams"
-        assert "B." in authors[1].name
-
-    def test_three_authors(self):
-        authors = parse_author_list(
-            "Adams, Alice and Brown, Bob A. and M{\\\"u}ller, Hans"
-        )
-        assert len(authors) == 3
-        assert "Müller" in authors[2].name
-
-    def test_empty_field(self):
-        assert parse_author_list("") == []
-        assert parse_author_list("   ") == []
-
-    def test_malformed_field(self):
-        # Should not crash, return something reasonable
-        authors = parse_author_list("Just A Name")
-        assert len(authors) >= 1
 
 
 class TestFormatAuthorsString:
@@ -130,9 +88,8 @@ class TestFormatVenue:
 
 class TestExtractNote:
     def test_with_note(self):
-        entry = {"note": "\\textbf{Best Paper Award}"}
-        result = extract_note(entry)
-        assert result == "**Best Paper Award**"
+        entry = {"note": "Best Paper Award."}
+        assert extract_note(entry) == "Best Paper Award"
 
     def test_no_note(self):
         assert extract_note({}) is None
@@ -202,53 +159,6 @@ class TestParseProjectIds:
         assert parse_project_ids({"project": ""}) == []
 
 
-class TestEntryToPublication:
-    def test_basic(self):
-        entry = {
-            "ID": "adams2024",
-            "ENTRYTYPE": "article",
-            "title": "A \\textbf{Great} Paper",
-            "author": "Adams, Alice",
-            "journal": "Test Journal",
-            "year": "2024",
-            "doi": "10.1234/test",
-        }
-        pub = entry_to_publication(entry, "Journal Papers")
-        assert pub.bib_id == "adams2024"
-        assert len(pub.authors) == 1
-        assert pub.authors[0].name == "A. Adams"
-        assert pub.year == 2024
-        assert pub.category == "Journal Papers"
-        assert pub.entry_type == "article"
-        assert pub.doi_url == "https://doi.org/10.1234/test"
-
-    @pytest.mark.xfail(strict=True, reason="#18")
-    def test_title_is_plain_text(self):
-        """Titles come out as plain text, without Markdown ``**`` for \\textbf."""
-        entry = {
-            "ID": "adams2024",
-            "ENTRYTYPE": "article",
-            "title": "A \\textbf{Great} Paper",
-            "author": "Adams, Alice",
-            "year": "2024",
-        }
-        pub = entry_to_publication(entry, "Journal Papers")
-        assert pub.title == "A Great Paper"
-
-    def test_with_video_url(self):
-        entry = {
-            "ID": "test2024",
-            "ENTRYTYPE": "misc",
-            "title": "Test",
-            "author": "Test, A.",
-            "year": "2024",
-            "url": "https://youtube.com/watch?v=abc",
-        }
-        pub = entry_to_publication(entry, "Other")
-        assert pub.video_url == "https://youtube.com/watch?v=abc"
-        assert pub.url is None  # Not duplicated
-
-
 class TestParseAllPublications:
     def test_parse_fixtures(self):
         bib_files = [
@@ -263,3 +173,31 @@ class TestParseAllPublications:
         assert pubs[0].year >= pubs[-1].year
         # Check first pub has structured authors
         assert all(isinstance(a, Author) for a in pubs[0].authors)
+
+
+class TestLatexFallback:
+    """A field pylatexenc cannot read costs that field's markup, never the entry."""
+
+    def test_keeps_the_raw_text_and_says_where(self, capsys):
+        value = r"Speed: {\verb"
+        assert _convert(value, "papers.bib:someone2024:title") == r"Speed: \verb"
+        assert "papers.bib:someone2024:title" in capsys.readouterr().err
+
+
+class TestCrossref:
+    """A crossref that points nowhere is reported; the entry is still read."""
+
+    def test_missing_parent_is_reported_and_the_entry_is_kept(self, tmp_path, capsys):
+        (tmp_path / "child.bib").write_text(
+            "@inproceedings{a-child,\n"
+            "  title    = {A Child Paper},\n"
+            "  author   = {Adams, Alice},\n"
+            "  year     = {2024},\n"
+            "  crossref = {no-such-parent}\n"
+            "}\n", encoding="utf-8")
+        pubs = parse_all_publications(
+            bib_dir=str(tmp_path),
+            bib_files=[{"name": "child.bib", "category": "Test Papers"}],
+        )
+        assert [p.bib_id for p in pubs] == ["a-child"]
+        assert "no-such-parent" in capsys.readouterr().err

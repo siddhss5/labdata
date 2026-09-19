@@ -4,7 +4,8 @@ version = "2.0.0"
 description = "Renderer-agnostic academic lab data assembler: BibTeX + YAML → structured data"
 requires-python = ">=3.10"
 dependencies = [
-    "bibtexparser>=1.4,<2",
+    "pybtex~=0.26",
+    "pylatexenc~=2.11",
     "pyyaml"
 ]
 
@@ -38,5 +39,5 @@ source = ["labdata"]
 branch = true
 
 [tool.coverage.report]
-fail_under = 92
+fail_under = 97
 precision = 2

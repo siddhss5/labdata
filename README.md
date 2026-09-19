@@ -108,7 +108,7 @@ Standard `.bib` files. labdata extracts the following standard BibTeX fields:
 
 | Field | Used for |
 |-------|----------|
-| `title` | Publication title (LaTeX converted to Markdown) |
+| `title` | Publication title (LaTeX converted to plain Unicode text; `$...$` math kept as TeX) |
 | `author` | Author list (auto-matched to lab members) |
 | `year` | Sorting and grouping |
 | `booktitle` / `journal` | Venue display |
@@ -218,7 +218,8 @@ The output is a single YAML/JSON file that works with Jekyll, Hugo, Flask, Eleve
 
 ## Dependencies
 
-- **bibtexparser** — BibTeX parsing
+- **pybtex** — BibTeX parsing
+- **pylatexenc** — LaTeX to Unicode text
 - **pyyaml** — YAML I/O
 
 No network calls. All processing is local and offline.

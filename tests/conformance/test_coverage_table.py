@@ -90,9 +90,28 @@ def imports(path):
                 yield alias.name, None
 
 
-def test_no_test_imports_bibtexparser():
+# The adapter of #23: the only place pybtex and pylatexenc may be imported.
+ADAPTER = {"labdata/parsers/bibtex.py", "labdata/parsers/latex.py"}
+PARSER_LIBRARIES = {"pybtex", "pylatexenc", "bibtexparser"}
+
+
+def test_no_test_imports_a_parser_library():
+    """Tests check labdata's output, never a parser library's objects."""
     offenders = [str(p.relative_to(TESTS_DIR)) for p in TESTS_DIR.rglob("*.py")
-                 if any(m.split(".")[0] == "bibtexparser" for m, _ in imports(p))]
+                 if any(m.split(".")[0] in PARSER_LIBRARIES for m, _ in imports(p))]
+    assert offenders == []
+
+
+def test_only_the_adapter_imports_a_parser_library():
+    """pybtex and pylatexenc stay behind the adapter, as #23 requires."""
+    offenders = []
+    for path in sorted((REPO_ROOT / "labdata").rglob("*.py")):
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        if relative in ADAPTER:
+            continue
+        for module, _ in imports(path):
+            if module.split(".")[0] in PARSER_LIBRARIES:
+                offenders.append(f"{relative}: {module}")
     assert offenders == []
 
 
