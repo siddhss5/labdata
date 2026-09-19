@@ -13,6 +13,11 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional, List
 
 
+# Version of the output format (see schema/output.schema.json). Bump it when
+# a change to to_dict() output could break a consumer.
+SCHEMA_VERSION = 1
+
+
 @dataclass
 class Author:
     """A resolved or unresolved author reference in a publication."""
@@ -178,6 +183,7 @@ class LabData:
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         d = {
+            'schema_version': SCHEMA_VERSION,
             'publications': [p.to_dict() for p in self.publications],
             'people': [p.to_dict() for p in self.people],
             'projects': [p.to_dict() for p in self.projects],
