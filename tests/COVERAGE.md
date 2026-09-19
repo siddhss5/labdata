@@ -47,6 +47,7 @@ the second definition is the one that reaches the output.
 | `structure.preamble` | `@preamble{"..."}` | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
 | `structure.uppercase` | `@ARTICLE` with `TITLE`, `AUTHOR`, `JOURNAL`, `YEAR` | Read exactly as the lower-case spelling is | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_quoted` | Field values in `"quotes"` | Read like braced values | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `structure.value_braced` | Field values in `{braces}`, including a doubly braced title | Read; the braces themselves never reach the output | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_numeric` | Unquoted numeric `year`, `volume`, `number` | Read like quoted values | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.crossref` | A child entry with `crossref` to a `@proceedings` parent | Missing fields come from the parent: the parent's year, and its title as the booktitle | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | xfail #23 |
 | `structure.bom_crlf` | A file with a UTF-8 BOM and CRLF line endings | Read normally; the BOM is not part of the first key, accents still decode | `tests/corpus/valid/encoding.bib` | `test_valid_corpus.py::test_structure` | pass |
@@ -111,6 +112,7 @@ field of the output.
 | `names.accent_utf8` | `Côté, Carol` in raw UTF-8 | Same output as the TeX spelling, resolved to the same person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.others` | `... and others` | The real authors are resolved; `others` is not emitted as an author | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #23 |
 | `names.equal_contribution` | `Brown, Bob$^{*}$ and Davis, Dave*` | The marker does not corrupt the name or block resolution | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.equal_contribution_marker` | `$^{*}$` and a trailing `*` on author names | The output records which authors are marked as contributing equally | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #46 |
 | `names.same_initial_alex` | `Kim, Alex`, who declares the alias `A. Kim` | Resolves to `akim` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.same_initial_alan` | `Kim, Alan`, who declares no alias | Resolves to `alankim`, not to the other Kim | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #24 |
 | `names.initials_ambiguous` | `Kim, A.`, which fits both Kims | Not resolved to either; listed for a human to resolve | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #24 |

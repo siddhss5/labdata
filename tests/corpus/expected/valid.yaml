@@ -1299,6 +1299,25 @@ publications:
   project_ids: []
   bibtex: "@article{struct-quoted,\n  year = {2019},\n  journal = {Journal of Fictional Robots},\n  author\
     \ = {Adams, Alice},\n  title = {A Quoted Title},\n}"
+- bib_id: struct-braced
+  title: A Braced Title
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2019
+  venue: '*Journal of Fictional Robots*, 2019'
+  category: Structure
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{struct-braced,\n  year = {2019},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {{A Braced Title}},\n}"
 - bib_id: struct-numeric
   title: A Numeric Year
   authors:
@@ -1417,7 +1436,7 @@ people:
   role: professor
   status: current
   website: https://example.org/people/aadams
-  publication_count: 54
+  publication_count: 55
   photo: images/aadams.jpg
   email: aadams@example.org
   start_year: 2015
@@ -1473,6 +1492,7 @@ people:
   - id-external-2019
   - struct-upper
   - struct-quoted
+  - struct-braced
   - struct-numeric
   - enc-second
   - struct-child
