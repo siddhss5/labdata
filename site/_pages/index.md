@@ -32,9 +32,9 @@ classes: wide
 
 ## Browse
 
-- [**Publications**]({{ site.baseurl }}/publications/) — Full list of papers with search, abstracts, and BibTeX
-- [**People**]({{ site.baseurl }}/people/) — Current members, alumni, and collaborators
-- [**Projects**]({{ site.baseurl }}/projects/) — Research projects with linked publications
+- [**Publications**]({{ '/publications/' | relative_url }}) — Full list of papers with search, abstracts, and BibTeX
+- [**People**]({{ '/people/' | relative_url }}) — Current members, alumni, and collaborators
+- [**Projects**]({{ '/projects/' | relative_url }}) — Research projects with linked publications
 
 ---
 
@@ -45,4 +45,4 @@ classes: wide
 {% include publication.html pub=pub %}
 {% endfor %}
 
-[View all {{ pubs.size }} publications &rarr;]({{ site.baseurl }}/publications/)
+[View all {{ pubs.size }} publications &rarr;]({{ '/publications/' | relative_url }})
