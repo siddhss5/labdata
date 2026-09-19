@@ -1,0 +1,3 @@
+# tests/corpus/valid/encoding.bib is a fixture whose BOM and CRLF line endings
+# are the thing under test, so git must never normalize them.
+tests/corpus/valid/encoding.bib -text

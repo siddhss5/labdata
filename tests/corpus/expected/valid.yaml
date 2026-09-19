@@ -1,0 +1,1627 @@
+# Expected output of tests/corpus/valid/, compared as parsed data by
+# tests/conformance/test_output_format.py. Regenerate with
+#   LABDATA_REGENERATE_EXPECTED=1 uv run pytest tests/conformance/test_output_format.py
+# and review the diff before committing.
+schema_version: 1
+publications:
+- bib_id: proj-single
+  title: One Project
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  - name: B. Brown
+    person_id: bbrown
+  year: 2024
+  venue: '*Proceedings of the Fictional Conference*, 2024'
+  category: Projects
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids:
+  - homebot
+  bibtex: "@inproceedings{proj-single,\n  project = {homebot},\n  year = {2024},\n  booktitle = {Proceedings\
+    \ of the Fictional Conference},\n  author = {Adams, Alice and Brown, Bob},\n  title = {One Project},\n\
+    }"
+- bib_id: proj-multiple
+  title: Two Projects
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  - name: C. Côté
+    person_id: ccote
+  year: 2024
+  venue: '*Proceedings of the Fictional Conference*, 2024'
+  category: Projects
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids:
+  - homebot
+  - sharedarm
+  bibtex: "@inproceedings{proj-multiple,\n  project = {homebot, sharedarm},\n  year = {2024},\n  booktitle\
+    \ = {Proceedings of the Fictional Conference},\n  author = {Adams, Alice and C{\\^o}t{\\'e}, Carol},\n\
+    \  title = {Two Projects},\n}"
+- bib_id: proj-none
+  title: No Project
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2024
+  venue: '*Proceedings of the Fictional Conference*, 2024'
+  category: Projects
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{proj-none,\n  year = {2024},\n  booktitle = {Proceedings of the Fictional Conference},\n\
+    \  author = {Adams, Alice},\n  title = {No Project},\n}"
+- bib_id: proj-keywords
+  title: Project in Keywords
+  authors:
+  - name: D. Davis
+    person_id: ddavis
+  year: 2024
+  venue: '*Proceedings of the Fictional Conference*, 2024'
+  category: Projects
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{proj-keywords,\n  keywords = {project:sharedarm, manipulation},\n  year = {2024},\n\
+    \  booktitle = {Proceedings of the Fictional Conference},\n  author = {Davis, Dave},\n  title = {Project\
+    \ in Keywords},\n}"
+- bib_id: id-external-2023
+  title: External Coauthors, Later
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  - name: Q. Quinn
+    person_id: null
+  year: 2023
+  venue: '*Journal of Fictional Robots*, 2023'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{id-external-2023,\n  year = {2023},\n  journal = {Journal of Fictional Robots},\n\
+    \  author = {Adams, Alice and Quinn, Quentin},\n  title = {External Coauthors, Later},\n}"
+- bib_id: link-doi-bare
+  title: Bare DOI
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*Journal of Fictional Robots*, 2023'
+  category: Links
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: https://doi.org/10.5555/corpus.0001
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{link-doi-bare,\n  doi = {10.5555/corpus.0001},\n  year = {2023},\n  journal = {Journal\
+    \ of Fictional Robots},\n  author = {Adams, Alice},\n  title = {Bare DOI},\n}"
+- bib_id: link-doi-url
+  title: DOI Given as a URL
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*Journal of Fictional Robots*, 2023'
+  category: Links
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: https://doi.org/10.5555/corpus.0002
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{link-doi-url,\n  doi = {https://doi.org/10.5555/corpus.0002},\n  year = {2023},\n\
+    \  journal = {Journal of Fictional Robots},\n  author = {Adams, Alice},\n  title = {DOI Given as a\
+    \ URL},\n}"
+- bib_id: link-arxiv-prefix
+  title: arXiv with archivePrefix
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*arXiv:2401.00001*, 2023'
+  category: Links
+  entry_type: misc
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: https://arxiv.org/abs/2401.00001
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@misc{link-arxiv-prefix,\n  year = {2023},\n  archiveprefix = {arXiv},\n  eprint = {2401.00001},\n\
+    \  author = {Adams, Alice},\n  title = {arXiv with archivePrefix},\n}"
+- bib_id: link-arxiv-bare
+  title: arXiv without archivePrefix
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*arXiv:2401.00002*, 2023'
+  category: Links
+  entry_type: misc
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: https://arxiv.org/abs/2401.00002
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@misc{link-arxiv-bare,\n  year = {2023},\n  eprint = {2401.00002},\n  author = {Adams, Alice},\n\
+    \  title = {arXiv without archivePrefix},\n}"
+- bib_id: link-youtube
+  title: A YouTube Video
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*Proceedings of the Fictional Conference*, 2023'
+  category: Links
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: https://www.youtube.com/watch?v=corpus00001
+  project_ids: []
+  bibtex: "@inproceedings{link-youtube,\n  url = {https://www.youtube.com/watch?v=corpus00001},\n  year\
+    \ = {2023},\n  booktitle = {Proceedings of the Fictional Conference},\n  author = {Adams, Alice},\n\
+    \  title = {A YouTube Video},\n}"
+- bib_id: link-vimeo
+  title: A Vimeo Video
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*Proceedings of the Fictional Conference*, 2023'
+  category: Links
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: https://vimeo.com/000000001
+  project_ids: []
+  bibtex: "@inproceedings{link-vimeo,\n  url = {https://vimeo.com/000000001},\n  year = {2023},\n  booktitle\
+    \ = {Proceedings of the Fictional Conference},\n  author = {Adams, Alice},\n  title = {A Vimeo Video},\n\
+    }"
+- bib_id: link-url
+  title: A Plain Web Link
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*Proceedings of the Fictional Conference*, 2023'
+  category: Links
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: https://example.org/papers/link-url
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{link-url,\n  url = {https://example.org/papers/link-url},\n  year = {2023},\n\
+    \  booktitle = {Proceedings of the Fictional Conference},\n  author = {Adams, Alice},\n  title = {A\
+    \ Plain Web Link},\n}"
+- bib_id: present
+  title: A Paper Whose PDF Is Present
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*Proceedings of the Fictional Conference*, 2023'
+  category: Links
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: pdfs/present.pdf
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{present,\n  year = {2023},\n  booktitle = {Proceedings of the Fictional Conference},\n\
+    \  author = {Adams, Alice},\n  title = {A Paper Whose PDF Is Present},\n}"
+- bib_id: missing
+  title: A Paper Whose PDF Is Missing
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*Proceedings of the Fictional Conference*, 2023'
+  category: Links
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{missing,\n  year = {2023},\n  booktitle = {Proceedings of the Fictional Conference},\n\
+    \  author = {Adams, Alice},\n  title = {A Paper Whose PDF Is Missing},\n}"
+- bib_id: link-note-award
+  title: A Note with a Link and an Award
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*Proceedings of the Fictional Conference*, 2023'
+  category: Links
+  entry_type: inproceedings
+  abstract: null
+  note: '[Website](https://example.org/papers/award), Best Paper Award Finalist'
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{link-note-award,\n  note = {\\href{https://example.org/papers/award}{Website},\
+    \ Best Paper Award Finalist},\n  year = {2023},\n  booktitle = {Proceedings of the Fictional Conference},\n\
+    \  author = {Adams, Alice},\n  title = {A Note with a Link and an Award},\n}"
+- bib_id: name-last-first
+  title: Last, First Form
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-last-first,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n \
+    \ author = {Adams, Alice},\n  title = {Last, First Form},\n}"
+- bib_id: name-first-last
+  title: First Last Form
+  authors:
+  - name: B. Brown
+    person_id: bbrown
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-first-last,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n \
+    \ author = {Bob Brown},\n  title = {First Last Form},\n}"
+- bib_id: name-particle-de
+  title: Particle in First Last Form
+  authors:
+  - name: R. d. la Cruz
+    person_id: rdelacruz
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-particle-de,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n\
+    \  author = {Rupert de la Cruz},\n  title = {Particle in First Last Form},\n}"
+- bib_id: name-suffix
+  title: Name with a Suffix
+  authors:
+  - name: J. J. Smith
+    person_id: null
+  - name: A. Adams
+    person_id: aadams
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-suffix,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Smith, Jr., John and Adams, Alice},\n  title = {Name with a Suffix},\n}"
+- bib_id: name-corporate
+  title: Report of a Consortium
+  authors:
+  - name: '{Example Robotics Consortium}'
+    person_id: null
+  year: 2022
+  venue: '2022'
+  category: Names
+  entry_type: misc
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@misc{name-corporate,\n  year = {2022},\n  author = {{Example Robotics Consortium}},\n  title\
+    \ = {Report of a Consortium},\n}"
+- bib_id: name-corporate-amp
+  title: Report of a Research Group
+  authors:
+  - name: '{AT\&T Research}'
+    person_id: null
+  - name: A. Adams
+    person_id: aadams
+  year: 2022
+  venue: '2022'
+  category: Names
+  entry_type: misc
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@misc{name-corporate-amp,\n  year = {2022},\n  author = {{AT\\&T Research} and Adams, Alice},\n\
+    \  title = {Report of a Research Group},\n}"
+- bib_id: name-hyphen
+  title: Hyphenated Given Name
+  authors:
+  - name: G. Green
+    person_id: null
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-hyphen,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Green, Grace-Ann},\n  title = {Hyphenated Given Name},\n}"
+- bib_id: name-accent-tex
+  title: Accents Written in TeX
+  authors:
+  - name: C. Côté
+    person_id: ccote
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-accent-tex,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n \
+    \ author = {C{\\^o}t{\\'e}, Carol},\n  title = {Accents Written in TeX},\n}"
+- bib_id: name-accent-utf8
+  title: Accents Written in UTF-8
+  authors:
+  - name: C. Côté
+    person_id: ccote
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-accent-utf8,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n\
+    \  author = {Côté, Carol},\n  title = {Accents Written in UTF-8},\n}"
+- bib_id: name-others
+  title: Truncated Author List
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  - name: B. Brown
+    person_id: bbrown
+  - name: others
+    person_id: null
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-others,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice and Brown, Bob and others},\n  title = {Truncated Author List},\n}"
+- bib_id: name-equal
+  title: Equal Contribution Markers
+  authors:
+  - name: B. Brown
+    person_id: bbrown
+  - name: D. Davis
+    person_id: ddavis
+  - name: A. Adams
+    person_id: aadams
+  year: 2022
+  venue: '*Proceedings of the Fictional Conference*, 2022'
+  category: Names
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{name-equal,\n  year = {2022},\n  booktitle = {Proceedings of the Fictional Conference},\n\
+    \  author = {Brown, Bob$^{*}$ and Davis, Dave* and Adams, Alice},\n  title = {Equal Contribution Markers},\n\
+    }"
+- bib_id: name-kim-alex
+  title: Full Name of the Kim with an Alias
+  authors:
+  - name: A. Kim
+    person_id: akim
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-kim-alex,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Kim, Alex},\n  title = {Full Name of the Kim with an Alias},\n}"
+- bib_id: name-kim-alan
+  title: Full Name of the Kim without an Alias
+  authors:
+  - name: A. Kim
+    person_id: akim
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-kim-alan,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Kim, Alan},\n  title = {Full Name of the Kim without an Alias},\n}"
+- bib_id: name-kim-initial
+  title: Initials Only
+  authors:
+  - name: A. Kim
+    person_id: akim
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-kim-initial,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n\
+    \  author = {Kim, A.},\n  title = {Initials Only},\n}"
+- bib_id: id-full-name
+  title: Member Without Aliases
+  authors:
+  - name: F. Fischer
+    person_id: null
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{id-full-name,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Fischer, Frank},\n  title = {Member Without Aliases},\n}"
+- bib_id: id-normalized
+  title: Case and Punctuation
+  authors:
+  - name: D. DAVIS
+    person_id: ddavis
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{id-normalized,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {DAVIS, D},\n  title = {Case and Punctuation},\n}"
+- bib_id: id-fuzzy
+  title: Near Miss
+  authors:
+  - name: D. M. Davis
+    person_id: ddavis
+  year: 2022
+  venue: '*Journal of Fictional Robots*, 2022'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{id-fuzzy,\n  year = {2022},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Davis, Dave M.},\n  title = {Near Miss},\n}"
+- bib_id: str-repeat
+  title: Last Definition Wins
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Robotics Venue*, 2021'
+  category: Strings
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{str-repeat,\n  year = {2021},\n  booktitle = {Robotics Venue},\n  author = {Adams,\
+    \ Alice},\n  title = {Last Definition Wins},\n}"
+- bib_id: str-concat
+  title: Joined Title
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Proceedings of the Fictional Conference*, 2021'
+  category: Strings
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{str-concat,\n  year = {2021},\n  booktitle = {Proceedings of the Fictional Conference},\n\
+    \  author = {Adams, Alice},\n  title = {Joined Title},\n}"
+- bib_id: tex-textbf
+  title: A **Bold** Claim
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-textbf,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {A \\textbf{Bold} Claim},\n}"
+- bib_id: tex-nested
+  title: '**a B** c and *d **e** f*'
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-nested,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {\\textbf{a {B} c} and \\emph{d \\textbf{e} f}},\n}"
+- bib_id: tex-accent
+  title: Café Robots in München
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-accent,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {Caf{\\'e} Robots in M{\\\"u}nchen},\n}"
+- bib_id: tex-caron
+  title: Ha\v cek on \v c
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-caron,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {Ha{\\v c}ek on {\\v c}},\n}"
+- bib_id: tex-dotless
+  title: Mar\'ı a's Robot
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-dotless,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {Mar\\'\\i a's Robot},\n}"
+- bib_id: tex-amp
+  title: Pick \& Place
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-amp,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author =\
+    \ {Adams, Alice},\n  title = {Pick \\& Place},\n}"
+- bib_id: tex-percent
+  title: A 50\% Speedup
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-percent,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {A 50\\% Speedup},\n}"
+- bib_id: tex-underscore
+  title: The robot\_arm Package
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-underscore,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {The robot\\_arm Package},\n}"
+- bib_id: tex-endash
+  title: Pages 1--10
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-endash,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {Pages 1--10},\n}"
+- bib_id: tex-emdash
+  title: Robots---and People
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-emdash,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {Robots---and People},\n}"
+- bib_id: tex-quotes
+  title: The ``Tidy'' Robot
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-quotes,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {The ``Tidy'' Robot},\n}"
+- bib_id: tex-rrt
+  title: Faster RRT* Planning
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-rrt,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author =\
+    \ {Adams, Alice},\n  title = {Faster {RRT}* Planning},\n}"
+- bib_id: tex-bit
+  title: BIT* in Clutter
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-bit,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author =\
+    \ {Adams, Alice},\n  title = {BIT* in Clutter},\n}"
+- bib_id: tex-bit-braced
+  title: BIT* Revisited
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-bit-braced,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {{BIT*} Revisited},\n}"
+- bib_id: tex-math
+  title: Planning in $O(n \log n)$ Time
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-math,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {Planning in $O(n \\log n)$ Time},\n}"
+- bib_id: tex-html
+  title: When a < b > c & "d" isn't 'e'
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-html,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {When a < b > c & \"d\" isn't 'e'},\n}"
+- bib_id: tex-markdown
+  title: 'Not [a link](x), not `code`, not # heading, not *emphasis*'
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-markdown,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {Not [a link](x), not `code`, not # heading, not *emphasis*},\n}"
+- bib_id: tex-unicode
+  title: Robots 机器人 and Émoji 🤖
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-unicode,\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {Robots 机器人 and Émoji \U0001F916},\n}"
+- bib_id: tex-abstract
+  title: An Abstract with Markup
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: Caf{\'e} robots run in $O(n)$ time and are \emph{very} tidy.
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-abstract,\n  abstract = {Caf{\\'e} robots run in $O(n)$ time and are \\emph{very}\
+    \ tidy.},\n  year = {2021},\n  journal = {Journal of Fictional Robots},\n  author = {Adams, Alice},\n\
+    \  title = {An Abstract with Markup},\n}"
+- bib_id: tex-note-href
+  title: A Note with a Link
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Journal of Fictional Robots*, 2021'
+  category: LaTeX
+  entry_type: article
+  abstract: null
+  note: Code at [our site](https://example.org/code)
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{tex-note-href,\n  note = {Code at \\href{https://example.org/code}{our site}},\n \
+    \ year = {2021},\n  journal = {Journal of Fictional Robots},\n  author = {Adams, Alice},\n  title\
+    \ = {A Note with a Link},\n}"
+- bib_id: str-journal
+  title: Macro Journal
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2020
+  venue: '*Journal of Fictional Robots Letters*, 2020'
+  category: Strings
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{str-journal,\n  year = {2020},\n  journal = {Journal of Fictional Robots Letters},\n\
+    \  author = {Adams, Alice},\n  title = {Macro Journal},\n}"
+- bib_id: type-article
+  title: An Article
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  - name: B. Brown
+    person_id: bbrown
+  year: 2020
+  venue: '*Journal of Fictional Robots*, 12(3), 2020'
+  category: Structure
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{type-article,\n  year = {2020},\n  publisher = {Fictional Press},\n  pages = {1--10},\n\
+    \  number = {3},\n  volume = {12},\n  journal = {Journal of Fictional Robots},\n  author = {Adams,\
+    \ Alice and Brown, Bob},\n  title = {An Article},\n}"
+- bib_id: type-inproceedings
+  title: A Conference Paper
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2020
+  venue: '*Proceedings of the Fictional Conference*, 2020'
+  category: Structure
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{type-inproceedings,\n  year = {2020},\n  booktitle = {Proceedings of the {Fictional}\
+    \ Conference},\n  author = {Adams, Alice},\n  title = {A Conference Paper},\n}"
+- bib_id: type-phdthesis
+  title: A Doctoral Thesis
+  authors:
+  - name: E. Evans
+    person_id: eevans
+  year: 2020
+  venue: PhD thesis, Example University, 2020
+  category: Structure
+  entry_type: phdthesis
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@phdthesis{type-phdthesis,\n  year = {2020},\n  school = {Example University},\n  author =\
+    \ {Evans, Erin},\n  title = {A Doctoral Thesis},\n}"
+- bib_id: type-mastersthesis
+  title: A Masters Thesis
+  authors:
+  - name: D. Davis
+    person_id: ddavis
+  year: 2020
+  venue: Masters thesis, Example University, 2020
+  category: Structure
+  entry_type: mastersthesis
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@mastersthesis{type-mastersthesis,\n  year = {2020},\n  school = {Example University},\n  author\
+    \ = {Davis, Dave},\n  title = {A Masters Thesis},\n}"
+- bib_id: type-techreport
+  title: A Technical Report
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2020
+  venue: Technical Report EU-TR-7, Example University, 2020
+  category: Structure
+  entry_type: techreport
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@techreport{type-techreport,\n  year = {2020},\n  number = {EU-TR-7},\n  type = {Technical\
+    \ Report},\n  institution = {Example University},\n  author = {Adams, Alice},\n  title = {A Technical\
+    \ Report},\n}"
+- bib_id: type-techreport-plain
+  title: A Plain Technical Report
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2020
+  venue: Technical Report, Example University, 2020
+  category: Structure
+  entry_type: techreport
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@techreport{type-techreport-plain,\n  year = {2020},\n  institution = {Example University},\n\
+    \  author = {Adams, Alice},\n  title = {A Plain Technical Report},\n}"
+- bib_id: type-misc-arxiv
+  title: A Preprint
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2020
+  venue: '*arXiv:2401.00007*, 2020'
+  category: Structure
+  entry_type: misc
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: https://arxiv.org/abs/2401.00007
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@misc{type-misc-arxiv,\n  year = {2020},\n  archiveprefix = {arXiv},\n  eprint = {2401.00007},\n\
+    \  author = {Adams, Alice},\n  title = {A Preprint},\n}"
+- bib_id: type-misc
+  title: A Miscellaneous Item
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2020
+  venue: '2020'
+  category: Structure
+  entry_type: misc
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@misc{type-misc,\n  year = {2020},\n  author = {Adams, Alice},\n  title = {A Miscellaneous\
+    \ Item},\n}"
+- bib_id: id-external-2019
+  title: External Coauthors, Earlier
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  - name: Q. Quinn
+    person_id: null
+  - name: R. Ross
+    person_id: null
+  year: 2019
+  venue: '*Journal of Fictional Robots*, 2019'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{id-external-2019,\n  year = {2019},\n  journal = {Journal of Fictional Robots},\n\
+    \  author = {Adams, Alice and Quinn, Quentin and Ross, Rachel},\n  title = {External Coauthors, Earlier},\n\
+    }"
+- bib_id: struct-upper
+  title: Upper-Case Type and Fields
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2019
+  venue: '*Journal of Fictional Robots*, 2019'
+  category: Structure
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{struct-upper,\n  year = {2019},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {Upper-Case Type and Fields},\n}"
+- bib_id: struct-quoted
+  title: A Quoted Title
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2019
+  venue: '*Journal of Fictional Robots*, 2019'
+  category: Structure
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{struct-quoted,\n  year = {2019},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {A Quoted Title},\n}"
+- bib_id: struct-numeric
+  title: A Numeric Year
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2019
+  venue: '*Journal of Fictional Robots*, 7(2), 2019'
+  category: Structure
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{struct-numeric,\n  year = {2019},\n  number = {2},\n  volume = {7},\n  journal = {Journal\
+    \ of Fictional Robots},\n  author = {Adams, Alice},\n  title = {A Numeric Year},\n}"
+- bib_id: enc-bom-crlf
+  title: Byte Order Mark and CRLF
+  authors:
+  - name: C. Côté
+    person_id: ccote
+  year: 2019
+  venue: '*Journal of Fictional Robots*, 2019'
+  category: Encoding
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{enc-bom-crlf,\n  year = {2019},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {C{\\^o}t{\\'e}, Carol},\n  title = {Byte Order Mark and CRLF},\n}"
+- bib_id: enc-second
+  title: Second Entry After CRLF
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2019
+  venue: '*Journal of Fictional Robots*, 2019'
+  category: Encoding
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{enc-second,\n  year = {2019},\n  journal = {Journal of Fictional Robots},\n  author\
+    \ = {Adams, Alice},\n  title = {Second Entry After CRLF},\n}"
+- bib_id: name-particle-van
+  title: Particle in Last, First Form
+  authors:
+  - name: V. van den Berg
+    person_id: vvandenberg
+  year: 2018
+  venue: '*Journal of Fictional Robots*, 2018'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{name-particle-van,\n  year = {2018},\n  journal = {Journal of Fictional Robots},\n\
+    \  author = {van den Berg, Victor},\n  title = {Particle in Last, First Form},\n}"
+- bib_id: struct-parent
+  title: Proceedings of the Fictional Workshop
+  authors: []
+  year: 2018
+  venue: '2018'
+  category: Structure
+  entry_type: proceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@proceedings{struct-parent,\n  year = {2018},\n  booktitle = {Proceedings of the Fictional\
+    \ Workshop},\n  title = {Proceedings of the Fictional Workshop},\n}"
+- bib_id: struct-child
+  title: A Child Paper
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 0
+  venue: ''
+  category: Structure
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{struct-child,\n  crossref = {struct-parent},\n  author = {Adams, Alice},\n \
+    \ title = {A Child Paper},\n}"
+people:
+- id: aadams
+  name: Alice Adams
+  role: professor
+  status: current
+  website: https://example.org/people/aadams
+  publication_count: 54
+  photo: images/aadams.jpg
+  email: aadams@example.org
+  start_year: 2015
+  publication_ids:
+  - proj-single
+  - proj-multiple
+  - proj-none
+  - id-external-2023
+  - link-doi-bare
+  - link-doi-url
+  - link-arxiv-prefix
+  - link-arxiv-bare
+  - link-youtube
+  - link-vimeo
+  - link-url
+  - present
+  - missing
+  - link-note-award
+  - name-last-first
+  - name-suffix
+  - name-corporate-amp
+  - name-others
+  - name-equal
+  - str-repeat
+  - str-concat
+  - tex-textbf
+  - tex-nested
+  - tex-accent
+  - tex-caron
+  - tex-dotless
+  - tex-amp
+  - tex-percent
+  - tex-underscore
+  - tex-endash
+  - tex-emdash
+  - tex-quotes
+  - tex-rrt
+  - tex-bit
+  - tex-bit-braced
+  - tex-math
+  - tex-html
+  - tex-markdown
+  - tex-unicode
+  - tex-abstract
+  - tex-note-href
+  - str-journal
+  - type-article
+  - type-inproceedings
+  - type-techreport
+  - type-techreport-plain
+  - type-misc-arxiv
+  - type-misc
+  - id-external-2019
+  - struct-upper
+  - struct-quoted
+  - struct-numeric
+  - enc-second
+  - struct-child
+- id: bbrown
+  name: Bob Brown
+  role: phd_student
+  status: current
+  website: null
+  publication_count: 5
+  co_advisor: Peggy Park
+  start_year: 2021
+  publication_ids:
+  - proj-single
+  - name-first-last
+  - name-others
+  - name-equal
+  - type-article
+- id: ccote
+  name: Carol Côté
+  role: phd_student
+  status: current
+  website: null
+  publication_count: 4
+  publication_ids:
+  - proj-multiple
+  - name-accent-tex
+  - name-accent-utf8
+  - enc-bom-crlf
+- id: ddavis
+  name: Dave Davis
+  role: ms_student
+  status: current
+  website: null
+  publication_count: 5
+  publication_ids:
+  - proj-keywords
+  - name-equal
+  - id-normalized
+  - id-fuzzy
+  - type-mastersthesis
+- id: eevans
+  name: Erin Evans
+  role: phd_student
+  status: alumni
+  website: null
+  publication_count: 1
+  start_year: 2014
+  end_year: 2020
+  degree: PhD
+  thesis_title: Learning to Tidy
+  current_position: Research Scientist, Example Robotics Inc.
+  publication_ids:
+  - type-phdthesis
+- id: ffischer
+  name: Frank Fischer
+  role: postdoc
+  status: current
+  website: null
+  publication_count: 0
+- id: ggreen
+  name: Grace-Ann Green
+  role: phd_student
+  status: current
+  website: null
+  publication_count: 0
+- id: vvandenberg
+  name: Victor van den Berg
+  role: postdoc
+  status: alumni
+  website: null
+  publication_count: 1
+  start_year: 2016
+  end_year: 2018
+  publication_ids:
+  - name-particle-van
+- id: rdelacruz
+  name: Rupert de la Cruz
+  role: ms_student
+  status: current
+  website: null
+  publication_count: 1
+  publication_ids:
+  - name-particle-de
+- id: akim
+  name: Alex Kim
+  role: phd_student
+  status: current
+  website: null
+  publication_count: 3
+  publication_ids:
+  - name-kim-alex
+  - name-kim-alan
+  - name-kim-initial
+- id: alankim
+  name: Alan Kim
+  role: phd_student
+  status: current
+  website: null
+  publication_count: 0
+projects:
+- id: homebot
+  title: Household Manipulation
+  description: Robots that tidy up a fictional kitchen.
+  website: https://example.org/projects/homebot
+  status: active
+  publication_ids:
+  - proj-single
+  - proj-multiple
+  people_ids:
+  - aadams
+  - bbrown
+  - ccote
+- id: sharedarm
+  title: Shared Control
+  description: Sharing control of a fictional assistive arm.
+  website: null
+  status: completed
+  publication_ids:
+  - proj-multiple
+  people_ids:
+  - aadams
+  - ccote
+collaborators:
+- name: Q. Quinn
+  publication_count: 2
+  last_year: 2023
+- name: F. Fischer
+  publication_count: 1
+  last_year: 2022
+- name: G. Green
+  publication_count: 1
+  last_year: 2022
+- name: J. J. Smith
+  publication_count: 1
+  last_year: 2022
+- name: others
+  publication_count: 1
+  last_year: 2022
+- name: '{AT\&T Research}'
+  publication_count: 1
+  last_year: 2022
+- name: '{Example Robotics Consortium}'
+  publication_count: 1
+  last_year: 2022
+- name: R. Ross
+  publication_count: 1
+  last_year: 2019
+lab:
+  name: Corpus Lab
+  description: A fictional lab used only by the labdata conformance tests.
+  university: Example University
+  website: https://example.org/corpus

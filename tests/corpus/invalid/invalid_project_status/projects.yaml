@@ -1,0 +1,7 @@
+- id: "homebot"
+  title: "Household Manipulation"
+  status: "active"
+
+- id: "sharedarm"
+  title: "Shared Control"
+  status: "sometimes"

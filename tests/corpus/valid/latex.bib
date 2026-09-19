@@ -1,0 +1,168 @@
+% Fictional LaTeX and text cases for tests/COVERAGE.md.
+% Titles, abstracts and notes should come out as plain Unicode text, with
+% $...$ math kept as TeX for KaTeX/MathJax.
+
+% CASE latex.textbf
+% CASE output.publication.title
+@article{tex-textbf,
+  title   = {A \textbf{Bold} Claim},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.nested
+@article{tex-nested,
+  title   = {\textbf{a {B} c} and \emph{d \textbf{e} f}},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.accent_braced
+@article{tex-accent,
+  title   = {Caf{\'e} Robots in M{\"u}nchen},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.caron_space
+@article{tex-caron,
+  title   = {Ha{\v c}ek on {\v c}},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.dotless_i
+@article{tex-dotless,
+  title   = {Mar\'\i a's Robot},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.ampersand
+@article{tex-amp,
+  title   = {Pick \& Place},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.percent
+@article{tex-percent,
+  title   = {A 50\% Speedup},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.underscore
+@article{tex-underscore,
+  title   = {The robot\_arm Package},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.endash
+@article{tex-endash,
+  title   = {Pages 1--10},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.emdash
+@article{tex-emdash,
+  title   = {Robots---and People},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.quotes
+@article{tex-quotes,
+  title   = {The ``Tidy'' Robot},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.star_braced
+@article{tex-rrt,
+  title   = {Faster {RRT}* Planning},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.star_plain
+@article{tex-bit,
+  title   = {BIT* in Clutter},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.star_braced_whole
+@article{tex-bit-braced,
+  title   = {{BIT*} Revisited},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.math
+@article{tex-math,
+  title   = {Planning in $O(n \log n)$ Time},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.html_special
+@article{tex-html,
+  title   = {When a < b > c & "d" isn't 'e'},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.markdown_punctuation
+@article{tex-markdown,
+  title   = {Not [a link](x), not `code`, not # heading, not *emphasis*},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.unicode_raw
+@article{tex-unicode,
+  title   = {Robots 机器人 and Émoji 🤖},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021}
+}
+
+% CASE latex.abstract
+% CASE output.publication.abstract
+@article{tex-abstract,
+  title    = {An Abstract with Markup},
+  author   = {Adams, Alice},
+  journal  = {Journal of Fictional Robots},
+  year     = {2021},
+  abstract = {Caf{\'e} robots run in $O(n)$ time and are \emph{very} tidy.}
+}
+
+% CASE latex.note_href
+% CASE output.publication.note
+@article{tex-note-href,
+  title   = {A Note with a Link},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2021},
+  note    = {Code at \href{https://example.org/code}{our site}}
+}

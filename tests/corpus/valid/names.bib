@@ -1,0 +1,163 @@
+% Fictional author-name cases for tests/COVERAGE.md.
+
+% CASE names.last_first
+% CASE output.publication.authors
+@article{name-last-first,
+  title   = {Last, First Form},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.first_last
+@article{name-first-last,
+  title   = {First Last Form},
+  author  = {Bob Brown},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.particle_last_first
+@article{name-particle-van,
+  title   = {Particle in Last, First Form},
+  author  = {van den Berg, Victor},
+  journal = {Journal of Fictional Robots},
+  year    = {2018}
+}
+
+% CASE names.particle_first_last
+@article{name-particle-de,
+  title   = {Particle in First Last Form},
+  author  = {Rupert de la Cruz},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.suffix
+@article{name-suffix,
+  title   = {Name with a Suffix},
+  author  = {Smith, Jr., John and Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.corporate
+@misc{name-corporate,
+  title  = {Report of a Consortium},
+  author = {{Example Robotics Consortium}},
+  year   = {2022}
+}
+
+% CASE names.corporate_escaped
+@misc{name-corporate-amp,
+  title  = {Report of a Research Group},
+  author = {{AT\&T Research} and Adams, Alice},
+  year   = {2022}
+}
+
+% CASE names.hyphenated
+@article{name-hyphen,
+  title   = {Hyphenated Given Name},
+  author  = {Green, Grace-Ann},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.accent_tex
+@article{name-accent-tex,
+  title   = {Accents Written in TeX},
+  author  = {C{\^o}t{\'e}, Carol},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.accent_utf8
+@article{name-accent-utf8,
+  title   = {Accents Written in UTF-8},
+  author  = {Côté, Carol},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.others
+@article{name-others,
+  title   = {Truncated Author List},
+  author  = {Adams, Alice and Brown, Bob and others},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.equal_contribution
+@inproceedings{name-equal,
+  title     = {Equal Contribution Markers},
+  author    = {Brown, Bob$^{*}$ and Davis, Dave* and Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
+% CASE names.same_initial_alex
+@article{name-kim-alex,
+  title   = {Full Name of the Kim with an Alias},
+  author  = {Kim, Alex},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.same_initial_alan
+@article{name-kim-alan,
+  title   = {Full Name of the Kim without an Alias},
+  author  = {Kim, Alan},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.initials_ambiguous
+@article{name-kim-initial,
+  title   = {Initials Only},
+  author  = {Kim, A.},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE identity.full_name
+@article{id-full-name,
+  title   = {Member Without Aliases},
+  author  = {Fischer, Frank},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE identity.normalized
+@article{id-normalized,
+  title   = {Case and Punctuation},
+  author  = {DAVIS, D},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE identity.fuzzy
+@article{id-fuzzy,
+  title   = {Near Miss},
+  author  = {Davis, Dave M.},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE identity.external
+% CASE output.collaborator.name
+% CASE output.collaborator.publication_count
+% CASE output.collaborator.last_year
+% CASE output.collaborators.order
+@article{id-external-2023,
+  title   = {External Coauthors, Later},
+  author  = {Adams, Alice and Quinn, Quentin},
+  journal = {Journal of Fictional Robots},
+  year    = {2023}
+}
+
+@article{id-external-2019,
+  title   = {External Coauthors, Earlier},
+  author  = {Adams, Alice and Quinn, Quentin and Ross, Rachel},
+  journal = {Journal of Fictional Robots},
+  year    = {2019}
+}

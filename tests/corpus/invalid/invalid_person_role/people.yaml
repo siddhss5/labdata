@@ -1,0 +1,10 @@
+- id: "aadams"
+  name: "Alice Adams"
+  aliases: ["A. Adams"]
+  role: "professor"
+  status: "current"
+
+- id: "bbrown"
+  name: "Bob Brown"
+  role: "wizard"
+  status: "current"

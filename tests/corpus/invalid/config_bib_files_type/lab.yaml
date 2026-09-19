@@ -1,0 +1,6 @@
+# CASE config.bib_files.wrong_type
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files: "ok.bib"
+people_file: "people.yaml"
+projects_file: "projects.yaml"

@@ -1,0 +1,99 @@
+# Fictional lab members for the conformance corpus (see tests/COVERAGE.md).
+
+# CASE output.person.id
+# CASE output.person.name
+# CASE output.person.role
+# CASE output.person.status
+# CASE output.person.website
+# CASE output.person.photo
+# CASE output.person.email
+# CASE output.person.start_year
+# CASE output.person.publication_count
+# CASE output.person.publication_ids
+# CASE identity.alias
+- id: "aadams"
+  name: "Alice Adams"
+  aliases: ["A. Adams"]
+  role: "professor"
+  status: "current"
+  photo: "images/aadams.jpg"
+  website: "https://example.org/people/aadams"
+  email: "aadams@example.org"
+  start_year: 2015
+
+# CASE output.person.co_advisor
+- id: "bbrown"
+  name: "Bob Brown"
+  aliases: ["B. Brown"]
+  role: "phd_student"
+  status: "current"
+  co_advisor: "Peggy Park"
+  start_year: 2021
+
+# The same person written with TeX accents and in UTF-8 in names.bib.
+- id: "ccote"
+  name: "Carol Côté"
+  aliases: ["C. Côté"]
+  role: "phd_student"
+  status: "current"
+
+- id: "ddavis"
+  name: "Dave Davis"
+  aliases: ["D. Davis"]
+  role: "ms_student"
+  status: "current"
+
+# CASE output.person.end_year
+# CASE output.person.degree
+# CASE output.person.thesis_title
+# CASE output.person.current_position
+- id: "eevans"
+  name: "Erin Evans"
+  aliases: ["E. Evans"]
+  role: "phd_student"
+  status: "alumni"
+  start_year: 2014
+  end_year: 2020
+  degree: "PhD"
+  thesis_title: "Learning to Tidy"
+  current_position: "Research Scientist, Example Robotics Inc."
+
+# No aliases: only a full-name match can find Frank.
+- id: "ffischer"
+  name: "Frank Fischer"
+  role: "postdoc"
+  status: "current"
+
+# Hyphenated given name.
+- id: "ggreen"
+  name: "Grace-Ann Green"
+  aliases: ["G.-A. Green"]
+  role: "phd_student"
+  status: "current"
+
+# Surname particles.
+- id: "vvandenberg"
+  name: "Victor van den Berg"
+  aliases: ["V. van den Berg"]
+  role: "postdoc"
+  status: "alumni"
+  start_year: 2016
+  end_year: 2018
+
+- id: "rdelacruz"
+  name: "Rupert de la Cruz"
+  aliases: ["R. de la Cruz"]
+  role: "ms_student"
+  status: "current"
+
+# Same initial and surname: Alex declares "A. Kim", Alan declares nothing.
+- id: "akim"
+  name: "Alex Kim"
+  aliases: ["A. Kim"]
+  role: "phd_student"
+  status: "current"
+
+- id: "alankim"
+  name: "Alan Kim"
+  role: "phd_student"
+  status: "current"

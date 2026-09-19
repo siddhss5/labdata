@@ -1,0 +1,8 @@
+# CASE structure.missing_booktitle
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "nobooktitle.bib"
+    category: "Papers"
+people_file: "people.yaml"
+projects_file: "projects.yaml"

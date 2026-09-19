@@ -1,0 +1,133 @@
+% Fictional BibTeX structure and entry-type cases for tests/COVERAGE.md.
+
+% CASE structure.comment_lines
+% A plain comment line, which is not an entry.
+
+% CASE structure.comment_entry
+@comment{This is not a publication: @article{fake, title = {Hidden}}}
+
+% CASE structure.preamble
+@preamble{"\newcommand{\noopsort}[1]{}"}
+
+% CASE structure.uppercase
+@ARTICLE{struct-upper,
+  TITLE   = {Upper-Case Type and Fields},
+  AUTHOR  = {Adams, Alice},
+  JOURNAL = {Journal of Fictional Robots},
+  YEAR    = {2019}
+}
+
+% CASE structure.value_quoted
+@article{struct-quoted,
+  title   = "A Quoted Title",
+  author  = "Adams, Alice",
+  journal = "Journal of Fictional Robots",
+  year    = "2019"
+}
+
+% CASE structure.value_numeric
+@article{struct-numeric,
+  title   = {A Numeric Year},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  volume  = 7,
+  number  = 2,
+  year    = 2019
+}
+
+% CASE structure.crossref
+@inproceedings{struct-child,
+  title    = {A Child Paper},
+  author   = {Adams, Alice},
+  crossref = {struct-parent}
+}
+
+@proceedings{struct-parent,
+  title     = {Proceedings of the Fictional Workshop},
+  booktitle = {Proceedings of the Fictional Workshop},
+  year      = {2018}
+}
+
+% CASE types.article
+% CASE fields.journal
+% CASE fields.volume
+% CASE fields.number
+% CASE output.publication.venue
+% CASE output.publication.year
+% CASE output.publication.entry_type
+% CASE output.publication.bib_id
+% CASE output.publication.bibtex
+% CASE fields.unread
+@article{type-article,
+  title     = {An Article},
+  author    = {Adams, Alice and Brown, Bob},
+  journal   = {Journal of Fictional Robots},
+  volume    = {12},
+  number    = {3},
+  pages     = {1--10},
+  publisher = {Fictional Press},
+  year      = {2020}
+}
+
+% CASE types.inproceedings
+% CASE fields.booktitle
+@inproceedings{type-inproceedings,
+  title     = {A Conference Paper},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the {Fictional} Conference},
+  year      = {2020}
+}
+
+% CASE types.phdthesis
+% CASE fields.school
+@phdthesis{type-phdthesis,
+  title  = {A Doctoral Thesis},
+  author = {Evans, Erin},
+  school = {Example University},
+  year   = {2020}
+}
+
+% CASE types.mastersthesis
+@mastersthesis{type-mastersthesis,
+  title  = {A Masters Thesis},
+  author = {Davis, Dave},
+  school = {Example University},
+  year   = {2020}
+}
+
+% CASE types.techreport
+% CASE fields.institution
+% CASE fields.type
+@techreport{type-techreport,
+  title       = {A Technical Report},
+  author      = {Adams, Alice},
+  institution = {Example University},
+  type        = {Technical Report},
+  number      = {EU-TR-7},
+  year        = {2020}
+}
+
+% CASE types.techreport_default
+@techreport{type-techreport-plain,
+  title       = {A Plain Technical Report},
+  author      = {Adams, Alice},
+  institution = {Example University},
+  year        = {2020}
+}
+
+% CASE types.misc_arxiv
+% CASE fields.eprint
+@misc{type-misc-arxiv,
+  title         = {A Preprint},
+  author        = {Adams, Alice},
+  eprint        = {2401.00007},
+  archivePrefix = {arXiv},
+  year          = {2020}
+}
+
+% CASE types.misc
+@misc{type-misc,
+  title  = {A Miscellaneous Item},
+  author = {Adams, Alice},
+  year   = {2020}
+}

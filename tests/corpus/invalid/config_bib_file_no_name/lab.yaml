@@ -1,0 +1,7 @@
+# CASE config.bib_files.name_missing
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - category: "Papers"
+people_file: "people.yaml"
+projects_file: "projects.yaml"
