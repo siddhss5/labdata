@@ -9,7 +9,7 @@ wording or at parser-library messages.
 import pytest
 import yaml
 
-from .support import EXPECTED, INVALID, export, run_labdata
+from .support import EXPECTED, INVALID, covers, export, run_labdata
 
 with open(EXPECTED / "diagnostics.yaml", encoding="utf-8") as f:
     DIAGNOSTICS = yaml.safe_load(f)
@@ -65,6 +65,16 @@ def test_kept(tmp_path, case_id, spec):
     keys = [p["bib_id"] for p in data["publications"]]
     missing = [k for k in spec["kept"] if k not in keys]
     assert not missing, f"entries dropped: {missing}"
+
+
+@covers("latex.unknown_macro", xfail="#23")
+def test_unknown_macro_keeps_its_text(tmp_path):
+    """The macro's argument survives and no raw LaTeX reaches the output."""
+    run, data = export(INVALID / DIAGNOSTICS["latex.unknown_macro"]["dir"], tmp_path)
+    assert run.crash is None, run.crash
+    title = next(p["title"] for p in data["publications"] if p["bib_id"] == "unknown-macro")
+    assert "Strange" in title
+    assert "\\" not in title, title
 
 
 def test_spec_is_well_formed():

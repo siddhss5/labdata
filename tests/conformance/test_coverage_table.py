@@ -1,151 +1,67 @@
 """Meta-tests: tests/COVERAGE.md, the corpus and the tests agree.
 
-Every row of the supported-cases table must have
-- fixture data: a ``CASE <id>`` marker in the fixture file the row names
-  (``% CASE <id>`` in a .bib file, ``# CASE <id>`` in a YAML file). The one
-  fixture outside tests/corpus/, the demo, only has to exist;
-- an assertion: the row's test module names the ID in ``case()`` or
-  ``covers()``, or, for test_invalid_corpus.py, in expected/diagnostics.yaml;
-- a status that matches the tests: ``pass``, or ``xfail #N`` listing every
-  issue that the ID's xfail markers point to.
-
-And every CASE marker and every ID a test names must have a row.
+The rules are in coverage_check.py, driven here against the real tree and in
+test_coverage_check.py against synthetic ones that prove each rule bites.
 """
 
 import ast
 import re
 from pathlib import Path
 
-import yaml
+import pytest
 
 import labdata
 
+from .coverage_check import read_table, validate
 from .support import CORPUS, EXPECTED, REPO_ROOT, TESTS_DIR
 
 COVERAGE = TESTS_DIR / "COVERAGE.md"
 CONFORMANCE = Path(__file__).parent
-ID_RE = re.compile(r"^[a-z0-9_]+(\.[a-z0-9_]+)+$")
-ROW_RE = re.compile(r"^\|\s*`([^`]+)`\s*\|")
-MARKER_RE = re.compile(r"^\s*[%#]\s*CASE\s+(\S+)\s*$", re.MULTILINE)
-ISSUE_RE = re.compile(r"#\d+")
+DIAGNOSTICS = EXPECTED / "diagnostics.yaml"
 
 
-def table_rows():
-    rows = []
-    for line in COVERAGE.read_text(encoding="utf-8").splitlines():
-        if not ROW_RE.match(line):
-            continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        assert len(cells) == 6, f"expected 6 cells: {line}"
-        case_id, _input, expected, fixture, test, status = (c.strip("`") for c in cells)
-        rows.append({"id": case_id, "expected": expected, "fixture": fixture,
-                     "test": test, "status": status})
-    return rows
+@pytest.fixture(scope="module")
+def problems():
+    return validate(COVERAGE, CORPUS, CONFORMANCE, REPO_ROOT, DIAGNOSTICS)
 
 
-def code_cases():
-    """{module file name: {case id: set of xfail issues}} from case()/covers() calls."""
-    found = {}
-    for path in sorted(CONFORMANCE.glob("test_*.py")):
-        ids = found.setdefault(path.name, {})
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-                    and node.func.id in ("case", "covers")):
-                continue
-            xfail = {kw.value.value for kw in node.keywords
-                     if kw.arg == "xfail" and isinstance(kw.value, ast.Constant)}
-            args = node.args[:1] if node.func.id == "case" else node.args
-            for arg in args:
-                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                    ids.setdefault(arg.value, set()).update(xfail)
-    with open(EXPECTED / "diagnostics.yaml", encoding="utf-8") as f:
-        diagnostics = yaml.safe_load(f)
-    found["test_invalid_corpus.py"] = {
-        case_id: set(spec.get("xfail", {}).values()) for case_id, spec in diagnostics.items()
-    }
-    return found
+def of(problems, category):
+    return "\n".join(str(p) for p in problems if p.category == category)
 
 
-def corpus_markers():
-    """{case id: set of repo-relative fixture paths that mark it}."""
-    markers = {}
-    for path in sorted(CORPUS.rglob("*")):
-        if not path.is_file() or path.suffix not in (".bib", ".yaml") or EXPECTED in path.parents:
-            continue
-        text = path.read_bytes().decode("utf-8-sig")
-        for case_id in MARKER_RE.findall(text):
-            markers.setdefault(case_id, set()).add(path.relative_to(REPO_ROOT).as_posix())
-    return markers
+def test_table_is_populated():
+    rows = read_table(COVERAGE)
+    assert len(rows) > 100
 
 
-def test_ids_are_unique_and_well_formed():
-    ids = [row["id"] for row in table_rows()]
-    assert len(ids) > 100
-    assert len(ids) == len(set(ids)), sorted({i for i in ids if ids.count(i) > 1})
-    assert [i for i in ids if not ID_RE.match(i)] == []
+def test_ids_are_unique_and_well_formed(problems):
+    assert of(problems, "id") == ""
 
 
-def test_every_row_has_fixture_data():
-    markers = corpus_markers()
-    missing = []
-    for row in table_rows():
-        fixture = REPO_ROOT / row["fixture"]
-        if CORPUS in fixture.parents:
-            ok = row["fixture"] in markers.get(row["id"], set())
-        else:
-            ok = fixture.is_file()
-        if not ok:
-            missing.append(f"{row['id']} (fixture {row['fixture']})")
-    assert missing == [], "rows without a CASE marker in their fixture file:\n" + "\n".join(missing)
+def test_every_row_has_fixture_data(problems):
+    """Each row's fixture marks its case with `% CASE <id>`."""
+    assert of(problems, "fixture") == ""
 
 
-def test_every_row_has_an_assertion():
-    cases = code_cases()
-    problems = []
-    for row in table_rows():
-        module, _, function = row["test"].partition("::")
-        path = CONFORMANCE / module
-        if not path.is_file():
-            problems.append(f"{row['id']}: no test module {module}")
-            continue
-        defined = {n.name for n in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
-                   if isinstance(n, ast.FunctionDef)}
-        if function not in defined:
-            problems.append(f"{row['id']}: no test {row['test']}")
-        if row["id"] not in cases.get(module, {}):
-            problems.append(f"{row['id']}: {module} does not name this case")
-    assert problems == [], "\n".join(problems)
+def test_every_row_has_an_assertion(problems):
+    """The test each row names exists, checks that case, and asserts something."""
+    assert of(problems, "assertion") == ""
 
 
-def test_status_matches_xfail_markers():
-    cases = code_cases()
-    problems = []
-    for row in table_rows():
-        issues = set().union(*(ids.get(row["id"], set()) for ids in cases.values()))
-        if issues:
-            if not row["status"].startswith("xfail") or \
-                    set(ISSUE_RE.findall(row["status"])) != issues:
-                problems.append(f"{row['id']}: status {row['status']!r}, tests xfail "
-                                f"{sorted(issues)}")
-        elif row["status"] != "pass":
-            problems.append(f"{row['id']}: status {row['status']!r}, but no test is xfailed")
-    assert problems == [], "\n".join(problems)
+def test_status_matches_xfail_markers(problems):
+    assert of(problems, "status") == ""
+
+
+def test_no_orphan_cases(problems):
+    """Every CASE marker and every case a test names has a row."""
+    assert of(problems, "orphan") == ""
 
 
 def test_unsupported_input_is_never_silently_ignored():
     """Rows for unsupported or invalid input expect a warning or an error."""
-    for row in table_rows():
-        if row["test"].startswith("test_invalid_corpus.py"):
-            assert re.search(r"\b(warning|error)\b", row["expected"], re.I), row["id"]
-
-
-def test_no_orphan_cases():
-    """Every CASE marker and every case a test names has a row in the table."""
-    ids = {row["id"] for row in table_rows()}
-    named = set(corpus_markers())
-    for module_ids in code_cases().values():
-        named |= set(module_ids)
-    assert sorted(named - ids) == []
+    for row in read_table(COVERAGE):
+        if row.test.startswith("test_invalid_corpus.py"):
+            assert re.search(r"\b(warning|error)\b", row.expected, re.I), row.id
 
 
 # --- Test-suite hygiene (acceptance criteria of #43) ------------------------

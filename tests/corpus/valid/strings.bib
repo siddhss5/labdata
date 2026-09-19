@@ -1,8 +1,12 @@
 % Fictional @string cases for tests/COVERAGE.md.
 %
 % Rule: when an @string macro is defined more than once, the LAST definition
-% wins, as in BibTeX. rss, cfx and jfx are each defined twice below.
+% wins, as in BibTeX. rss, cfx and jfx are each defined twice below, and
+% jrl exactly once.
 % CASE strings.redefined_report
+% CASE strings.defined_once
+
+@string{jrl = "Journal of Fictional Robots"}
 
 @string{rss = "Old Robotics Venue"}
 @string{cfx = "Old Conference"}
@@ -27,6 +31,14 @@
   author    = {Adams, Alice},
   booktitle = "Proceedings of the " # cfx,
   year      = {2021}
+}
+
+% CASE strings.defined_once
+@article{str-once,
+  title   = {Defined Exactly Once},
+  author  = {Adams, Alice},
+  journal = jrl,
+  year    = {2020}
 }
 
 % CASE strings.macro_journal

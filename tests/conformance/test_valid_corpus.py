@@ -26,6 +26,8 @@ STRINGS = [
          AllOf(Contains("Proceedings of the Fictional Conference"), Excludes("Old"))),
     case("strings.macro_journal", "str-journal", "venue",
          Contains("Journal of Fictional Robots Letters")),
+    case("strings.defined_once", "str-once", "venue",
+         Contains("Journal of Fictional Robots")),
 ]
 
 
@@ -40,6 +42,14 @@ def test_redefined_strings_reported_once(valid_validate):
     lines = valid_validate.output.splitlines()
     summary = [line for line in lines if all(m in line for m in ("rss", "cfx", "jfx"))]
     assert len(summary) == 1, valid_validate.output
+
+
+@covers("strings.defined_once")
+def test_macro_defined_once_is_not_reported(valid_validate, valid_export):
+    """A macro defined exactly once is used, and nothing is said about it."""
+    run, _ = valid_export
+    for output in (valid_validate.output, run.output):
+        assert "jrl" not in output, output
 
 
 # --- Names and identity ------------------------------------------------------
@@ -281,11 +291,10 @@ OUTPUT_FIELDS = [
     case("output.lab", "", "", "", "lab.name", "Corpus Lab"),
     case("output.publication.bib_id", "publications", "bib_id", "type-article", "bib_id",
          "type-article"),
-    case("output.publication.title", "publications", "bib_id", "type-article", "title",
-         "An Article"),
-    case("output.publication.authors", "publications", "bib_id", "type-article", "authors",
-         [{"name": "A. Adams", "person_id": "aadams"},
-          {"name": "B. Brown", "person_id": "bbrown"}]),
+    case("output.publication.title", "publications", "bib_id", "tex-unicode", "title",
+         "Robots 机器人 and Émoji 🤖"),
+    case("output.publication.authors", "publications", "bib_id", "name-last-first", "authors",
+         [{"name": "A. Adams", "person_id": "aadams"}]),
     case("output.publication.year", "publications", "bib_id", "type-article", "year", 2020),
     case("output.publication.venue", "publications", "bib_id", "type-article", "venue",
          Contains("Journal of Fictional Robots")),

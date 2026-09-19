@@ -164,7 +164,7 @@ def test_cli_output_creates_parent_dirs(tmp_path, valid_output):
     assert str(len(valid_output["publications"])) in run.stdout
 
 
-@covers("cli.validate", "diag.validation_passed", "diag.unresolved_authors")
+@covers("cli.validate", "diag.unresolved_authors")
 def test_cli_validate(valid_validate, valid_output):
     assert valid_validate.crash is None
     assert valid_validate.code == 0, valid_validate.output
@@ -172,6 +172,22 @@ def test_cli_validate(valid_validate, valid_output):
     for section in ("publications", "people", "projects"):
         assert str(len(valid_output[section])) in valid_validate.stdout
     assert "Q. Quinn" in valid_validate.stdout
+
+
+@covers("diag.validation_passed")
+def test_cli_validate_closes_with_a_summary_line(valid_validate, valid_output):
+    """A passing --validate ends with a line of its own, after the counts.
+
+    Checked by shape rather than by wording: the closing line is not indented
+    like a listed name, and is not one of the count lines.
+    """
+    assert valid_validate.code == 0, valid_validate.output
+    lines = [line for line in valid_validate.stdout.splitlines() if line.strip()]
+    counts = {str(len(valid_output[s])) for s in ("publications", "people", "projects")}
+    closing = lines[-1]
+    assert not closing.startswith(" "), closing
+    assert not any(count in closing for count in counts), closing
+    assert closing not in lines[:-1], closing
 
 
 @covers("cli.unresolved", "diag.unresolved_authors")
@@ -186,9 +202,12 @@ def test_cli_unresolved(valid_unresolved, valid_output):
 
 @covers("cli.unresolved_none", "diag.all_resolved")
 def test_cli_unresolved_none(tmp_path):
-    """Every author resolves: nothing is listed."""
+    """Every author resolves: labdata says so in one line and lists nobody."""
     variant = write_variant(tmp_path, bib_files=[{"name": "encoding.bib", "category": "E"}])
     run = run_labdata(["--config", variant, "--unresolved"], VALID)
     assert run.code == 0 and run.crash is None, run.output
+    lines = [line for line in run.stdout.splitlines() if line.strip()]
+    assert len(lines) == 1, run.stdout
+    assert not lines[0].startswith(" "), run.stdout
     for name in ("Adams", "Côté"):
         assert name not in run.stdout
