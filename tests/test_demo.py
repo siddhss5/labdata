@@ -67,9 +67,20 @@ class TestDemoLab:
         assert any(p.video_url for p in pubs)
         assert any(p.note and "Award" in p.note for p in pubs)
         assert any(len(p.project_ids) > 1 for p in pubs)
-        assert any("$^{*}$" in (p.bibtex or "") for p in pubs)
         assert len({p.entry_type for p in pubs}) >= 5
         assert len({p.year for p in pubs}) >= 5
+
+    def test_bib_input_has_equal_contribution_markers(self):
+        """The demo .bib input marks equal contribution with $^{*}$.
+
+        This only checks the input: labdata currently deletes the markers,
+        and keeping and rendering them is #46.
+        """
+        bib_text = "".join(
+            path.read_text(encoding="utf-8")
+            for path in (REPO_ROOT / "examples/demo/bib").glob("*.bib")
+        )
+        assert "$^{*}$" in bib_text
 
 
 class TestGenerateSiteConfig:
