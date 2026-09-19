@@ -2,6 +2,12 @@
 
 Minimal examples showing how to use labdata from the command line and from Python.
 
+All examples use the fictional **Example Lab** in [`demo/`](demo/): three BibTeX files,
+`people.yaml` and `projects.yaml`. Its people, publications and projects, and their
+example.org, DOI, arXiv and video links, are invented. Only `site.url` and `site.baseurl`
+in `demo/lab.yaml` are real: they are where the demo is deployed.
+Run the commands below from this `examples/` directory.
+
 ## Command Line
 
 ```bash
@@ -32,8 +38,11 @@ See `basic_usage.py` for a more complete example that inspects the assembled dat
 
 ## Configuration
 
-See `config.yaml` for an annotated example of the configuration format.
+See `config.yaml` for an annotated example of the configuration format. It points at
+the files in `demo/`. [`demo/lab.yaml`](demo/lab.yaml) configures the same lab with paths
+relative to the repository root, plus the `site` settings used to build the demo site.
 
 ## Jekyll Site
 
 For a complete Jekyll site that renders labdata output, see the [`site/`](../site/) directory.
+The live demo site is built from `demo/lab.yaml`.

@@ -31,7 +31,7 @@
     {% endif %}
     {% if include.pub.project_ids.size > 0 %}
       {% for pid in include.pub.project_ids %}
-        <a href="{{ site.baseurl }}/projects/#{{ pid }}" class="btn btn--info btn--small" style="margin: 0.1em;">{{ pid }}</a>
+        <a href="{{ '/projects/' | relative_url }}#{{ pid }}" class="btn btn--info btn--small" style="margin: 0.1em;">{{ pid }}</a>
       {% endfor %}
     {% endif %}
   </div>

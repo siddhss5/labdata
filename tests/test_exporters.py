@@ -14,7 +14,7 @@ def sample_data():
     """A small LabData instance for testing exports."""
     pub = Publication(
         bib_id="smith2024robot",
-        title="Robot Feeding",
+        title="Robot Gardening",
         authors=[
             Author(name="J. Smith", person_id="jsmith"),
             Author(name="E. External"),
@@ -24,14 +24,14 @@ def sample_data():
         category="Conference Papers",
         entry_type="inproceedings",
         doi_url="https://doi.org/10.1234/test",
-        project_ids=["robotfeeding"],
+        project_ids=["gardenbot"],
     )
     person = Person(
         id="jsmith", name="John Smith", role="pi", status="current",
         publication_count=1, publication_ids=["smith2024robot"],
     )
     project = Project(
-        id="robotfeeding", title="Robot-Assisted Feeding", status="active",
+        id="gardenbot", title="Robot-Assisted Gardening", status="active",
         publication_ids=["smith2024robot"], people_ids=["jsmith"],
     )
     return LabData(publications=[pub], people=[person], projects=[project])
@@ -53,7 +53,7 @@ class TestExportToYaml:
         assert len(loaded["people"]) == 1
         assert loaded["people"][0]["id"] == "jsmith"
         assert len(loaded["projects"]) == 1
-        assert loaded["projects"][0]["id"] == "robotfeeding"
+        assert loaded["projects"][0]["id"] == "gardenbot"
 
     def test_creates_parent_dirs(self, tmp_path, sample_data):
         out = str(tmp_path / "nested" / "dir" / "output.yml")

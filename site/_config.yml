@@ -1,11 +1,9 @@
 remote_theme: "mmistakes/minimal-mistakes"
 minimal_mistakes_skin: "default"
 
-title: "Personal Robotics Lab"
-description: "Academic lab website powered by labdata"
-
-# GitHub Pages base URL — set to repo name if deploying as project site
-baseurl: "/labdata"
+# title, description, url and baseurl come from lab.yaml via
+# _config.generated.yml (see scripts/generate_site_config.py). Build with:
+#   bundle exec jekyll build --config _config.yml,_config.generated.yml
 
 plugins:
   - jekyll-include-cache

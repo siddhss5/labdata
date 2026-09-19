@@ -15,4 +15,8 @@ site/_data/lab.yml
 site/_site/
 site/.jekyll-cache/
 site/.jekyll-metadata
-Gemfile.lock
+# Generated Jekyll config (scripts/generate_site_config.py)
+site/_config.generated.yml
+
+# Site build output
+_site/

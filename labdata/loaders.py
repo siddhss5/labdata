@@ -17,9 +17,9 @@ def load_people(path: str) -> List[Person]:
     """Load people from a YAML file.
 
     Expected format (list of dicts):
-        - id: "srinivasa"
-          name: "Siddhartha Srinivasa"
-          aliases: ["S. Srinivasa", "S. S. Srinivasa"]
+        - id: "jsmith"
+          name: "John Smith"
+          aliases: ["J. Smith", "J. A. Smith"]
           role: "pi"
           status: "current"
           ...
@@ -60,10 +60,10 @@ def load_projects(path: str) -> List[Project]:
     """Load projects from a YAML file.
 
     Expected format (list of dicts):
-        - id: "robotfeeding"
-          title: "Robot-Assisted Feeding"
-          description: "Autonomous feeding systems"
-          website: "https://robotfeeding.io"
+        - id: "gardenbot"
+          title: "Robot-Assisted Gardening"
+          description: "Autonomous gardening systems"
+          website: "https://gardenbot.example.org"
           status: "active"
     """
     if not Path(path).exists():

@@ -25,7 +25,7 @@ classes: wide
 {% else %}
   <span class="btn btn--secondary btn--small">{{ project.status | capitalize }}</span>
 {% endif %}
-<a href="{{ site.baseurl }}/projects/#{{ project.id }}" class="btn btn--info btn--small">{{ project.id }}</a>
+<a href="{{ '/projects/' | relative_url }}#{{ project.id }}" class="btn btn--info btn--small">{{ project.id }}</a>
 
 {% if project.description %}
 <p style="margin-top: 0.8em;">{{ project.description }}</p>

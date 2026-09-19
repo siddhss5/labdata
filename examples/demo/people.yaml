@@ -1,0 +1,104 @@
+# PI
+- id: "aquinn"
+  name: "Avery Quinn"
+  aliases: ["A. Quinn", "A. J. Quinn"]
+  role: "professor"
+  status: "current"
+  website: "https://example.org/people/aquinn"
+  email: "aquinn@example.org"
+  start_year: 2015
+
+# Current PhD students
+- id: "praman"
+  name: "Priya Raman"
+  aliases: ["P. Raman"]
+  role: "phd_student"
+  status: "current"
+  website: "https://example.org/people/praman"
+  co_advisor: "Nadia Haddad"
+  start_year: 2021
+
+- id: "dmorales"
+  name: "Diego Morales"
+  aliases: ["D. Morales"]
+  role: "phd_student"
+  status: "current"
+  start_year: 2022
+
+- id: "mtanaka"
+  name: "Mei Tanaka"
+  aliases: ["M. Tanaka"]
+  role: "phd_student"
+  status: "current"
+  website: "https://example.org/people/mtanaka"
+  start_year: 2023
+
+- id: "tferreira"
+  name: "Tomás Ferreira"
+  aliases: ["T. Ferreira"]
+  role: "phd_student"
+  status: "current"
+  start_year: 2024
+
+# Current MS students
+- id: "lnovak"
+  name: "Lena Novak"
+  aliases: ["L. Novak"]
+  role: "ms_student"
+  status: "current"
+  start_year: 2024
+
+- id: "kasante"
+  name: "Kwame Asante"
+  aliases: ["K. Asante"]
+  role: "ms_student"
+  status: "current"
+  start_year: 2024
+
+# Alumni: postdocs
+- id: "hweber"
+  name: "Hannah Weber"
+  aliases: ["H. Weber"]
+  role: "postdoc"
+  status: "alumni"
+  website: "https://example.org/people/hweber"
+  start_year: 2018
+  end_year: 2021
+  current_position: "Assistant Professor, Example State University"
+
+# Alumni: PhD students
+- id: "riyer"
+  name: "Ravi Iyer"
+  aliases: ["R. Iyer"]
+  role: "phd_student"
+  status: "alumni"
+  start_year: 2016
+  end_year: 2022
+  degree: "PhD"
+  thesis_title: "Learning Grasp Affordances from Play"
+  current_position: "Research Scientist, Example Robotics Inc."
+
+- id: "slindqvist"
+  name: "Sofia Lindqvist"
+  aliases: ["S. Lindqvist"]
+  role: "phd_student"
+  status: "alumni"
+  website: "https://example.org/people/slindqvist"
+  co_advisor: "Isabel Duarte"
+  start_year: 2017
+  end_year: 2023
+  degree: "PhD"
+  thesis_title: "Shared Autonomy with Uncertain Intent"
+  current_position: "Assistant Professor, Example Institute of Technology"
+
+# Alumni: MS students
+- id: "ebrooks"
+  name: "Ethan Brooks"
+  aliases: ["E. Brooks"]
+  role: "ms_student"
+  status: "alumni"
+  start_year: 2019
+  end_year: 2021
+  degree: "MS"
+  thesis_title: "Terrain-Aware Gait Selection for Quadrupeds"
+  current_position: "Software Engineer, Example Automation"

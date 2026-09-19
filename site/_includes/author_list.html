@@ -1,1 +1,1 @@
-{% for author in include.authors %}{% if author.person_id %}<a href="{{ site.baseurl }}/people/#{{ author.person_id }}">{{ author.name }}</a>{% else %}{{ author.name }}{% endif %}{% unless forloop.last %}, {% endunless %}{% endfor %}
+{% for author in include.authors %}{% if author.person_id %}<a href="{{ '/people/' | relative_url }}#{{ author.person_id }}">{{ author.name }}</a>{% else %}{{ author.name }}{% endif %}{% unless forloop.last %}, {% endunless %}{% endfor %}

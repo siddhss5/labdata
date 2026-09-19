@@ -1,0 +1,16 @@
+- id: "homebot"
+  title: "Household Manipulation"
+  description: "Robots that tidy up, fetch things and put them away in real homes, learning from demonstrations and play."
+  website: "https://example.org/projects/homebot"
+  status: "active"
+
+- id: "sharedcontrol"
+  title: "Shared Autonomy"
+  description: "Blending a person's input with robot autonomy so that assistive arms are easier to control."
+  website: "https://example.org/projects/sharedcontrol"
+  status: "active"
+
+- id: "legged"
+  title: "Legged Locomotion"
+  description: "Terrain-aware walking and stair climbing for low-cost quadruped robots."
+  status: "completed"

@@ -185,16 +185,16 @@ class TestConstructArxivUrl:
 
 class TestParseProjectIds:
     def test_single(self):
-        assert parse_project_ids({"project": "robotfeeding"}) == ["robotfeeding"]
+        assert parse_project_ids({"project": "gardenbot"}) == ["gardenbot"]
 
     def test_multiple(self):
-        assert parse_project_ids({"project": "robotfeeding, planning"}) == [
-            "robotfeeding", "planning"
+        assert parse_project_ids({"project": "gardenbot, planning"}) == [
+            "gardenbot", "planning"
         ]
 
     def test_braces(self):
-        assert parse_project_ids({"project": "{robotfeeding, planning}"}) == [
-            "robotfeeding", "planning"
+        assert parse_project_ids({"project": "{gardenbot, planning}"}) == [
+            "gardenbot", "planning"
         ]
 
     def test_empty(self):
