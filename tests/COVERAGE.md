@@ -26,13 +26,18 @@ and `test_coverage_check.py` drives them against tiny synthetic tables to
 prove each one still bites. `xfail` markers are `strict=True`, so a case turns
 red once the linked issue is fixed and the marker is stale.
 
-An assertion counts when it can be reached and is not made of literals alone,
-whether the test makes it itself or through a helper it defines or imports; a
-parametrized test must also read the values its table supplies, and a
-diagnostics check must say which tokens it looks for. What no checker can
-decide is whether an assertion is *about the right thing*: a test that asserts
-something true but beside the point still passes, and only review catches
-that.
+An assertion counts when it can run — not after a `return`, not in an
+`if False:` branch, not only inside a nested `def` — and is not syntactically
+literal-only, whether the test makes it itself or through a helper it defines
+or imports by name. A parametrized test must also read the values its table
+supplies, and a diagnostics check must say which tokens it looks for.
+
+Two things no checker settles. Whether an assertion is *about the right
+thing*: a test that asserts something true but beside the point still passes,
+and only review catches that. And anything the literal check cannot see
+syntactically: `assert bool(True)` passes because it contains a call, and a
+test that parks its parameters in `_` and asserts something unrelated
+satisfies the parameter check.
 
 A case can also be checked by tests other than the one its row names; the
 status column reports `xfail` when any of them is xfailed.

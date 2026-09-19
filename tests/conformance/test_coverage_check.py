@@ -134,6 +134,55 @@ def test_rejects_a_helper_call_after_an_unconditional_return(tmp_path):
     ) == ["assertion"]
 
 
+def test_rejects_a_body_in_a_statically_false_branch(tmp_path):
+    """`if False:` around the whole test: nothing in it runs."""
+    body = "    if False:\n        assert read_entry(bib_key) == expected\n"
+    assert categories(tmp_path, body=body) == ["assertion"]
+
+
+def test_accepts_a_body_in_a_statically_true_branch(tmp_path):
+    """`if True:` is not dead code, so the assertion still counts."""
+    body = "    if True:\n        assert read_entry(bib_key) == expected\n"
+    assert validate(**build(tmp_path, body=body)) == []
+
+
+def test_rejects_an_assertion_in_an_uncalled_nested_function(tmp_path):
+    """A nested def is a definition, not something the test runs."""
+    body = ("    def never_called():\n"
+            "        assert read_entry(bib_key) == expected\n")
+    assert categories(tmp_path, body=body) == ["assertion"]
+
+
+def test_rejects_a_module_qualified_helper_call(tmp_path):
+    """Documented limit: only plain calls to imported or local helpers count.
+
+    A call through a module object is outside the form the validator reads, so
+    it carries no assertion rather than being trusted.
+    """
+    assert categories(
+        tmp_path,
+        preamble=PREAMBLE + "from . import other_helpers\n",
+        body="    other_helpers.check_entry(bib_key, expected)\n",
+        extra_modules={"other_helpers.py": """
+            def check_entry(key, expected):
+                assert key == expected
+        """},
+    ) == ["assertion"]
+
+
+def test_accepts_an_aliased_import_of_an_asserting_helper(tmp_path):
+    """`from .other import check_entry as check` still carries the assertion."""
+    assert validate(**build(
+        tmp_path,
+        preamble=PREAMBLE + "from .other_helpers import check_entry as check\n",
+        body="    check(bib_key, expected)\n",
+        extra_modules={"other_helpers.py": """
+            def check_entry(key, expected):
+                assert key == expected
+        """},
+    )) == []
+
+
 def test_rejects_an_unused_parametrize_table(tmp_path):
     """A table naming the case, attached to a test that never reads its values."""
     assert categories(
@@ -168,6 +217,19 @@ def test_accepts_an_assert_from_an_imported_helper(tmp_path):
                 assert key == expected
         '''},
     )) == []
+
+
+def test_rejects_a_parameter_read_only_in_dead_code(tmp_path):
+    """A reference to the parametrized value after a return is not a read."""
+    assert categories(
+        tmp_path,
+        preamble=PREAMBLE + '\nimport pytest\n\nROWS = [case("names.demo", "demo", "2024")]\n',
+        decorator='@pytest.mark.parametrize("case_id, bib_key, expected", ROWS)',
+        signature="case_id, bib_key, expected",
+        body=('    assert read_entry(bib_key) == "2024"\n'
+              '    return\n'
+              '    print(expected)\n'),
+    ) == ["assertion"]
 
 
 def test_rejects_an_empty_diagnostics_token_list(tmp_path):

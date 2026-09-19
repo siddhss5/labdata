@@ -10,30 +10,47 @@ A row of the table is valid when
 - its fixture marks the case with ``% CASE <id>`` (``# CASE <id>`` in YAML),
   or, for a fixture outside the corpus, simply exists;
 - the test it names exists, is bound to that case ID, and carries an
-  effective assertion: a reachable ``assert`` over something other than
-  literals, or a call to a helper in the same module (or one it imports) that
-  carries one. A parametrized test must also read the values its table
-  supplies, so a table cannot be attached to a function that ignores it;
+  effective assertion: an ``assert`` that can run, over something other than
+  a literal expression, made by the test or by a helper it defines or imports
+  by name. A parametrized test must also read the values its table supplies
+  where they can run, so a table cannot be attached to a function that
+  ignores it;
 - its status agrees with the ``xfail`` markers the tests attach to the case.
 
 A case ID is bound to a test function by a ``case()`` or ``covers()`` call in
 that function or its decorators, including through a parametrize table, or, for
 the invalid corpus, by naming a check that expected/diagnostics.yaml lists.
 
-What this cannot do: decide whether an assertion is *meaningful*. It rejects
-the forms that are decidable — a constant or literal-only test, an assertion
-after an unconditional ``return``/``raise``/``continue``/``break``, an
-assertion inherited from a same-named function in an unrelated module, a
-parametrize table whose values the test never reads, and an empty token list
-in expected/diagnostics.yaml — and nothing beyond that. A test that asserts
-something true but irrelevant still passes, and only review catches it.
+What it rejects, all of it decidable from the source: a test whose only
+assertions are syntactically literal-only (``assert True``, ``assert 1``,
+``assert 2 + 2 == 4``); one that can never run, because it follows an
+unconditional ``return``/``raise``/``continue``/``break``, sits in a
+statically false branch (``if False:``), or is only inside a nested ``def``
+or ``class``, which is a definition rather than something the test runs; an
+assertion inherited from a same-named function in a module the test does not
+import; a parametrize table whose values the test never reads where they can
+run; and an empty token list in expected/diagnostics.yaml.
+
+What it cannot do:
+
+- decide whether an assertion is *about the right thing*. A test that asserts
+  something true but beside the point, or a weaker property than its row
+  claims, still passes. Only review catches that;
+- see through anything but literal syntax. The literal check is syntactic, so
+  ``assert bool(True)`` passes because it contains a call, and a test that
+  assigns its parameters to ``_`` and then asserts something unrelated
+  satisfies the parameter check;
+- read helpers reached any other way than a plain call to a local or imported
+  name. A call through a module object (``helpers.check(...)``) or into a
+  nested ``def`` carries no assertion here — that is the accepted form, not an
+  oversight, and test_coverage_check.py pins both.
 """
 
 import ast
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 import yaml
 
@@ -153,7 +170,29 @@ def _params_checks(node: ast.AST):
 TERMINATORS = (ast.Return, ast.Raise, ast.Continue, ast.Break)
 
 
-def _bodies(stmt: ast.stmt):
+DEFINITIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+
+
+def _constant_truth(test: Optional[ast.expr]) -> Optional[bool]:
+    """True/False for a test that is a literal, None when it is not decidable."""
+    if test is None:
+        return None
+    try:
+        return bool(ast.literal_eval(test))
+    except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+        return None
+
+
+def _live_blocks(stmt: ast.stmt):
+    """The blocks of a statement that can run, with constant tests decided."""
+    if isinstance(stmt, (ast.If, ast.While)):
+        truth = _constant_truth(stmt.test)
+        if truth is True:          # `if True:` / `while True:`: the else arm cannot run
+            yield stmt.body
+            return
+        if truth is False:         # `if False:` / `while False:`: only the else arm can
+            yield stmt.orelse
+            return
     for name in ("body", "orelse", "finalbody"):
         block = getattr(stmt, name, None)
         if isinstance(block, list):
@@ -163,10 +202,18 @@ def _bodies(stmt: ast.stmt):
 
 
 def _reachable(body: List[ast.stmt]):
-    """Statements that can run: anything after a terminator in a block cannot."""
+    """Statements that can run with the test.
+
+    Anything after a terminator in a block cannot, nor can the body of a
+    statically false branch. A nested ``def`` or ``class`` is a definition,
+    not a statement that runs, so its body is not part of the test: a helper
+    has to be a module-level function to carry an assertion.
+    """
     for stmt in body:
         yield stmt
-        for block in _bodies(stmt):
+        if isinstance(stmt, DEFINITIONS):
+            continue
+        for block in _live_blocks(stmt):
             yield from _reachable(block)
         if isinstance(stmt, TERMINATORS):
             return
@@ -201,15 +248,19 @@ def _asserts_something(fn: ast.FunctionDef) -> bool:
                for stmt in _reachable(fn.body))
 
 
-def _import_map(tree: ast.Module, modules: Set[str]) -> Dict[str, str]:
-    """{imported name: module file} for imports of other files in the test dir."""
+def _import_map(tree: ast.Module, modules: Set[str]) -> Dict[str, Tuple[str, str]]:
+    """{local name: (module file, name there)} for imports within the test dir.
+
+    ``from .support import assert_field as check`` binds ``check`` to
+    ``support.py::assert_field``.
+    """
     imported = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module:
             target = f"{node.module.split('.')[-1]}.py"
             if target in modules:
                 for alias in node.names:
-                    imported[alias.asname or alias.name] = target
+                    imported[alias.asname or alias.name] = (target, alias.name)
     return imported
 
 
@@ -226,12 +277,14 @@ def _parametrized_names(fn: ast.FunctionDef) -> List[List[str]]:
 
 
 def _reads_parameters(fn: ast.FunctionDef) -> bool:
-    """Every parametrized value the table supplies is read by the test.
+    """Every parametrized value the table supplies is read where it can run.
 
     ``case_id`` is a label, so a test that ignores it is fine; ignoring the
-    input or the expectation is not.
+    input or the expectation is not, and a reference in dead code is not a
+    read.
     """
-    used = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+    used = {n.id for stmt in _reachable(fn.body) for n in _own_expressions(stmt)
+            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
     for argnames in _parametrized_names(fn):
         wanted = [n for n in argnames if n != "case_id"] or argnames
         if not set(wanted) <= used:
@@ -270,7 +323,11 @@ def read_tests(tests_dir: Path, diagnostics: Optional[Path] = None) -> Dict[str,
         if own in defined:
             return own
         target = imports[module].get(name)
-        return f"{target}::{name}" if target and f"{target}::{name}" in defined else None
+        if target:
+            key = f"{target[0]}::{target[1]}"
+            if key in defined:
+                return key
+        return None
 
     asserts = dict(direct)
     for _ in range(len(asserts) + 1):
