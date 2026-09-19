@@ -39,7 +39,9 @@ TEXT_FIELDS = frozenset({
 OTHERS = "others"
 
 _STRING_DEFINITION = re.compile(r'@string\s*[{(]\s*([^\s=,{}()"]+)\s*=', re.IGNORECASE)
-_COMMENT_COMMAND = re.compile(r'@comment[ \t]*(?=[{(])', re.IGNORECASE)
+
+_NAME_CHARS = re.compile(r'[A-Za-z0-9_]*')
+_DELIMITERS = {"{": "}", "(": ")"}
 
 
 def _warn(message: str) -> None:
@@ -53,6 +55,25 @@ def _warn(message: str) -> None:
 
 # --- Reading the files -------------------------------------------------------
 
+def _end_of_group(text: str, start: int) -> Optional[int]:
+    """The index just past the delimiter matching the one at ``start``.
+
+    ``None`` when it never closes, which is the caller's signal to leave the
+    text exactly as it is.
+    """
+    opening = text[start]
+    closing = _DELIMITERS[opening]
+    depth = 0
+    for i in range(start, len(text)):
+        if text[i] == opening:
+            depth += 1
+        elif text[i] == closing:
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return None
+
+
 def _blank_comment_blocks(text: str) -> str:
     """Blank out ``@comment{...}`` bodies, keeping the line structure.
 
@@ -60,30 +81,50 @@ def _blank_comment_blocks(text: str) -> str:
     written inside one is a real entry to it. labdata treats a commented-out
     entry as commented out. Blanking rather than deleting keeps the line
     numbers in the parser's messages honest.
+
+    The scan walks the file the way BibTeX reads it, so that only a real
+    command is taken for one: a ``%`` comment runs to the end of its line, and
+    any other ``@command{...}`` is stepped over whole rather than looked
+    inside. Nothing is blanked unless its group closes, so no input can make
+    this remove more than one balanced ``@comment`` group — and never a valid
+    entry outside one.
     """
-    out = list(text)
-    position = 0
-    while True:
-        match = _COMMENT_COMMAND.search(text, position)
-        if not match:
-            return "".join(out)
-        opening = text[match.end()]
-        closing = "}" if opening == "{" else ")"
-        depth = 0
-        end = match.end()
-        while end < len(text):
-            if text[end] == opening:
-                depth += 1
-            elif text[end] == closing:
-                depth -= 1
-                if depth == 0:
-                    end += 1
-                    break
-            end += 1
-        for i in range(match.start(), min(end, len(text))):
-            if out[i] != "\n":
-                out[i] = " "
-        position = end
+    out: Optional[List[str]] = None
+    i, end_of_text = 0, len(text)
+    while i < end_of_text:
+        character = text[i]
+        if character == "%":
+            newline = text.find("\n", i)
+            i = end_of_text if newline == -1 else newline + 1
+            continue
+        if character != "@":
+            i += 1
+            continue
+
+        name_end = _NAME_CHARS.match(text, i + 1).end()
+        body = name_end
+        while body < end_of_text and text[body].isspace():
+            body += 1
+        if body >= end_of_text or text[body] not in _DELIMITERS:
+            i = name_end
+            continue
+
+        group_end = _end_of_group(text, body)
+        if text[i + 1:name_end].lower() != "comment":
+            # Some other command: step over its body so that an @comment
+            # written inside a field value is not mistaken for a command.
+            i = group_end if group_end is not None else name_end
+            continue
+        if group_end is None:
+            i = name_end          # never closes: leave it to the parser
+            continue
+
+        out = list(text) if out is None else out
+        for position in range(i, group_end):
+            if out[position] != "\n":
+                out[position] = " "
+        i = group_end
+    return text if out is None else "".join(out)
 
 
 def _redefined_macros(text: str) -> List[str]:
@@ -151,30 +192,71 @@ def _is_others(person: Person) -> bool:
             and [name.lower() for name in person.last_names] == [OTHERS])
 
 
-def format_person(person: Person, where: str) -> str:
-    """Format one pybtex Person for display: ``F. M. van Last, Jr.``
+def _is_literal(person: Person) -> bool:
+    """A corporate author: one brace-protected unit, with no given name."""
+    return (not person.first_names and not person.middle_names
+            and not person.prelast_names and not person.lineage_names
+            and len(person.last_names) == 1
+            and person.last_names[0].startswith("{")
+            and person.last_names[0].endswith("}"))
 
-    A name with no given part — a corporate author written ``{Some Lab}`` —
-    keeps its full form, because there is nothing to abbreviate.
+
+def person_name_parts(person: Person, where: str) -> Dict[str, Optional[str]]:
+    """One pybtex Person as the parts BibTeX split it into, converted to text.
+
+    ``given``, ``von``, ``family`` and ``suffix`` are BibTeX's four parts; a
+    corporate name comes back as ``literal`` instead, with the other four
+    unset. An empty part is ``None`` rather than ``""``, so the output says
+    "this name has no such part" rather than "it is blank".
     """
-    given = [_initials(_convert(part, where))
-             for part in person.first_names + person.middle_names]
-    surname = " ".join(_convert(part, where)
-                       for part in person.prelast_names + person.last_names)
-    name = " ".join([part for part in [*given, surname] if part])
-    lineage = " ".join(_convert(part, where) for part in person.lineage_names)
-    return f"{name}, {lineage}" if lineage else name
+    def text(parts) -> Optional[str]:
+        joined = " ".join(_convert(part, where) for part in parts).strip()
+        return joined or None
+
+    if _is_literal(person):
+        return {"given": None, "von": None, "family": None, "suffix": None,
+                "literal": text(person.last_names)}
+    return {
+        "given": text(person.first_names + person.middle_names),
+        "von": text(person.prelast_names),
+        "family": text(person.last_names),
+        "suffix": text(person.lineage_names),
+        "literal": None,
+    }
+
+
+def format_name(parts: Dict[str, Optional[str]]) -> str:
+    """The display form of a name, derived from its parts: ``F. M. van Last, Jr.``
+
+    A corporate name keeps its full form, because there is nothing to
+    abbreviate.
+    """
+    if parts["literal"]:
+        return parts["literal"]
+    given = parts["given"] or ""
+    initials = " ".join(_initials(part) for part in given.split())
+    name = " ".join(part for part in (initials, parts["von"], parts["family"]) if part)
+    suffix = parts["suffix"]
+    return f"{name}, {suffix}" if suffix and name else (name or suffix or "")
 
 
 def parse_author_list(entry: Entry, where: str) -> List[Author]:
-    """The entry's authors, in source order, with person_id unresolved."""
+    """The entry's authors, in source order, with person_id unresolved.
+
+    Each author carries the parts BibTeX split its name into as well as the
+    display form. Matching on those parts is #24; the resolver still reads
+    only the display name.
+    """
+    persons = list(entry.persons.get("author", []))
+    if persons and _is_others(persons[-1]):
+        persons.pop()             # a terminal "and others" is BibTeX's et al.
+
     authors = []
-    for person in entry.persons.get("author", []):
-        if _is_others(person):
-            continue
-        name = format_person(person, where)
+    for person in persons:
+        parts = person_name_parts(person, where)
+        name = format_name(parts)
         if name:
-            authors.append(Author(name=name))
+            authors.append(Author(name=name, **parts))
     return authors
 
 

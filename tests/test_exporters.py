@@ -113,5 +113,5 @@ class TestExportToJson:
         export_to_json(data, out)
         with open(out, 'r') as f:
             loaded = json.load(f)
-        assert loaded == {"schema_version": 1, "publications": [], "people": [],
+        assert loaded == {"schema_version": 2, "publications": [], "people": [],
                           "projects": [], "collaborators": []}

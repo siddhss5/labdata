@@ -103,6 +103,33 @@ def test_names(valid_output, case_id, bib_key, path, expected):
     check_publication(valid_output, bib_key, path, expected)
 
 
+# The parts BibTeX split each name into, carried through to the output rather
+# than collapsed into the display string. Matching on them is #24.
+
+NAME_PARTS = [
+    case("names.structured", "name-suffix", "authors.0.given", "John"),
+    case("names.structured", "name-suffix", "authors.0.von", None),
+    case("names.structured", "name-suffix", "authors.0.family", "Smith"),
+    case("names.structured", "name-suffix", "authors.0.suffix", "Jr."),
+    case("names.structured", "name-suffix", "authors.0.literal", None),
+    case("names.structured", "name-particle-van", "authors.0.given", "Victor"),
+    case("names.structured", "name-particle-van", "authors.0.von", "van den"),
+    case("names.structured", "name-particle-van", "authors.0.family", "Berg"),
+    case("names.structured", "name-hyphen", "authors.0.given", "Grace-Ann"),
+    case("names.structured", "name-hyphen", "authors.0.family", "Green"),
+    case("names.structured", "name-corporate", "authors.0.literal",
+         "Example Robotics Consortium"),
+    case("names.structured", "name-corporate", "authors.0.given", None),
+    case("names.structured", "name-corporate", "authors.0.family", None),
+]
+
+
+@pytest.mark.parametrize("case_id, bib_key, path, expected", NAME_PARTS)
+def test_name_parts(valid_output, case_id, bib_key, path, expected):
+    """The structured parts survive on the author, not only the display name."""
+    check_publication(valid_output, bib_key, path, expected)
+
+
 @covers("names.initials_ambiguous", xfail="#24", owns=("name-kim-initial",))
 def test_ambiguous_initials_listed(valid_unresolved):
     """An initials-only name that fits two members is listed for a human to resolve."""
@@ -235,7 +262,8 @@ def test_structure(valid_output, case_id, bib_key, path, expected):
     check_publication(valid_output, bib_key, path, expected)
 
 
-@covers("structure.comment_lines", "structure.comment_entry", "structure.preamble")
+@covers("structure.comment_lines", "structure.comment_entry", "structure.preamble",
+        "structure.comment_mentions_command")
 def test_comments_and_preamble_are_not_publications(valid_output):
     structure = {p["bib_id"] for p in valid_output["publications"]
                  if p["category"] == "Structure"}
@@ -243,6 +271,9 @@ def test_comments_and_preamble_are_not_publications(valid_output):
     assert {"struct-upper", "type-article", "type-misc"} <= structure
     # The @article inside @comment{...} is not a publication.
     assert "fake" not in structure
+    # A % comment line that only mentions @comment{ is prose, not a command:
+    # the entry after it is read like any other.
+    assert "struct-comment-prose" in structure
     assert not [p for p in valid_output["publications"]
                 if p["entry_type"] in ("comment", "preamble", "string")]
 
@@ -285,14 +316,15 @@ def test_project_backlinks(valid_output):
 # (case_id, section, lookup key, lookup value, field path, expected)
 
 OUTPUT_FIELDS = [
-    case("output.schema_version", "", "", "", "schema_version", 1),
+    case("output.schema_version", "", "", "", "schema_version", 2),
     case("output.lab", "", "", "", "lab.name", "Corpus Lab"),
     case("output.publication.bib_id", "publications", "bib_id", "type-article", "bib_id",
          "type-article"),
     case("output.publication.title", "publications", "bib_id", "tex-unicode", "title",
          "Robots 机器人 and Émoji 🤖"),
     case("output.publication.authors", "publications", "bib_id", "name-last-first", "authors",
-         [{"name": "A. Adams", "person_id": "aadams"}]),
+         [{"name": "A. Adams", "person_id": "aadams", "given": "Alice", "von": None,
+           "family": "Adams", "suffix": None, "literal": None}]),
     case("output.publication.year", "publications", "bib_id", "type-article", "year", 2020),
     case("output.publication.venue", "publications", "bib_id", "type-article", "venue",
          Contains("Journal of Fictional Robots")),

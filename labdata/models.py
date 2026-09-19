@@ -15,14 +15,41 @@ from typing import Dict, Optional, List
 
 # Version of the output format (see schema/output.schema.json). Bump it when
 # a change to to_dict() output could break a consumer.
-SCHEMA_VERSION = 1
+#
+# 2: authors carry their structured name parts (#23). The schema is closed,
+#    so a consumer validating against version 1 would reject the new keys.
+SCHEMA_VERSION = 2
 
 
 @dataclass
 class Author:
-    """A resolved or unresolved author reference in a publication."""
+    """A resolved or unresolved author reference in a publication.
+
+    ``name`` is the display form. The four parts below it are the name as
+    BibTeX splits it, kept rather than collapsed so that later work has the
+    structure to go on and not only a display string. ``literal`` holds a
+    corporate name written as one brace-protected unit, such as
+    ``{Example Robotics Consortium}``, where the other parts do not apply.
+    """
     name: str
     person_id: Optional[str] = None
+    given: Optional[str] = None
+    von: Optional[str] = None
+    family: Optional[str] = None
+    suffix: Optional[str] = None
+    literal: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization."""
+        return {
+            'name': self.name,
+            'person_id': self.person_id,
+            'given': self.given,
+            'von': self.von,
+            'family': self.family,
+            'suffix': self.suffix,
+            'literal': self.literal,
+        }
 
 
 @dataclass
@@ -52,10 +79,7 @@ class Publication:
         d = {
             'bib_id': self.bib_id,
             'title': self.title,
-            'authors': [
-                {'name': a.name, 'person_id': a.person_id}
-                for a in self.authors
-            ],
+            'authors': [a.to_dict() for a in self.authors],
             'year': self.year,
             'venue': self.venue,
             'category': self.category,

@@ -4,7 +4,7 @@
 # file says which they are and why the rest is left out. Regenerate with
 #   LABDATA_REGENERATE_EXPECTED=1 uv run pytest tests/conformance/test_output_format.py
 # and review the diff before committing.
-schema_version: 1
+schema_version: 2
 lab:
   name: Corpus Lab
   description: A fictional lab used only by the labdata conformance tests.
@@ -16,6 +16,11 @@ publications:
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   year: 2021
   venue: '*Robotics Venue*, 2021'
   category: Strings
@@ -35,8 +40,18 @@ publications:
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   - name: B. Brown
     person_id: bbrown
+    given: Bob
+    von: null
+    family: Brown
+    suffix: null
+    literal: null
   year: 2020
   venue: '*Journal of Fictional Robots*, 12(3), 2020'
   category: Structure
@@ -57,6 +72,11 @@ publications:
   authors:
   - name: E. Evans
     person_id: eevans
+    given: Erin
+    von: null
+    family: Evans
+    suffix: null
+    literal: null
   year: 2020
   venue: PhD thesis, Example University, 2020
   category: Structure
@@ -76,6 +96,11 @@ publications:
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   year: 2023
   venue: '*Journal of Fictional Robots*, 2023'
   category: Links
@@ -95,6 +120,11 @@ publications:
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   year: 2023
   venue: '*Proceedings of the Fictional Conference*, 2023'
   category: Links
@@ -115,6 +145,11 @@ publications:
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   year: 2023
   venue: '*Proceedings of the Fictional Conference*, 2023'
   category: Links
@@ -134,8 +169,18 @@ publications:
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   - name: C. Côté
     person_id: ccote
+    given: Carol
+    von: null
+    family: Côté
+    suffix: null
+    literal: null
   year: 2024
   venue: '*Proceedings of the Fictional Conference*, 2024'
   category: Projects
@@ -158,8 +203,18 @@ publications:
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   - name: Q. Quinn
     person_id: null
+    given: Quentin
+    von: null
+    family: Quinn
+    suffix: null
+    literal: null
   year: 2023
   venue: '*Journal of Fictional Robots*, 2023'
   category: Names

@@ -1,5 +1,6 @@
 """Tests for the BibTeX parsing pipeline."""
 
+import pytest
 from pathlib import Path
 
 from labdata.parsers.bibtex import (
@@ -201,3 +202,52 @@ class TestCrossref:
         )
         assert [p.bib_id for p in pubs] == ["a-child"]
         assert "no-such-parent" in capsys.readouterr().err
+
+
+KEPT_ENTRY = ("@article{kept,\n"
+              "  title   = {A Fictional Title},\n"
+              "  author  = {Adams, Alice},\n"
+              "  journal = {Journal of Fictional Robots},\n"
+              "  year    = {2024}\n"
+              "}\n")
+
+# Inputs around the @comment preprocessing. None of them may cost an entry:
+# the scan only blanks a balanced @comment group found where a command can be.
+COMMENT_HAZARDS = [
+    ("a % comment line that mentions the command",
+     "% Documentation mentions @comment{ syntax here\n" + KEPT_ENTRY),
+    ("an @comment that never closes",
+     "@comment{never closes\n" + KEPT_ENTRY),
+    ("an @comment written inside a field value",
+     "@article{host, title = {Using @comment{ safely}, year = {2024}}\n" + KEPT_ENTRY),
+    ("an @ that starts no command",
+     "@ not a command at all\n" + KEPT_ENTRY),
+    ("a bare @ at the end of the file", KEPT_ENTRY + "\n@"),
+    ("@comment spelled with space before its brace",
+     "@comment {@article{hidden, title = {H}}}\n" + KEPT_ENTRY),
+]
+
+
+class TestCommentPreprocessing:
+    """No input may make the @comment scan drop a valid entry."""
+
+    @pytest.mark.parametrize("label, source",
+                             COMMENT_HAZARDS,
+                             ids=[label for label, _ in COMMENT_HAZARDS])
+    def test_entry_survives(self, tmp_path, label, source):
+        (tmp_path / "hazard.bib").write_text(source, encoding="utf-8")
+        pubs = parse_all_publications(
+            bib_dir=str(tmp_path),
+            bib_files=[{"name": "hazard.bib", "category": "Test Papers"}],
+        )
+        assert "kept" in [p.bib_id for p in pubs], label
+
+    def test_a_commented_out_entry_stays_commented_out(self, tmp_path):
+        (tmp_path / "commented.bib").write_text(
+            "@comment{not a publication: @article{hidden, title = {H}}}\n" + KEPT_ENTRY,
+            encoding="utf-8")
+        pubs = parse_all_publications(
+            bib_dir=str(tmp_path),
+            bib_files=[{"name": "commented.bib", "category": "Test Papers"}],
+        )
+        assert [p.bib_id for p in pubs] == ["kept"]

@@ -9,7 +9,7 @@
   "properties": {
     "schema_version": {
       "description": "Version of this output format. Bumped when a change could break a consumer.",
-      "const": 1
+      "const": 2
     },
     "lab": {
       "description": "The lab section of lab.yaml, copied through unchanged.",
@@ -40,14 +40,35 @@
       "items": { "type": "string", "minLength": 1 }
     },
     "author": {
+      "description": "One author of a publication: the display name, the parts BibTeX split it into, and the person it resolved to.",
       "type": "object",
-      "required": ["name", "person_id"],
+      "required": ["name", "person_id", "given", "von", "family", "suffix", "literal"],
       "additionalProperties": false,
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "person_id": {
           "description": "The id of the matching person in people.yaml, or null.",
           "type": ["string", "null"]
+        },
+        "given": {
+          "description": "Given and middle names, unabbreviated. Null for a corporate author.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "von": {
+          "description": "Surname particles such as `van den`. Null when the name has none.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "family": {
+          "description": "The surname, without particles or suffix. Null for a corporate author.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "suffix": {
+          "description": "A lineage suffix such as `Jr.`. Null when the name has none.",
+          "$ref": "#/$defs/optionalString"
+        },
+        "literal": {
+          "description": "A corporate name written as one brace-protected unit. Null for a personal name, where the four parts above apply instead.",
+          "$ref": "#/$defs/optionalString"
         }
       }
     },

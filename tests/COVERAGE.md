@@ -44,11 +44,12 @@ A case can also be checked by tests other than the one its row names; the
 status column reports `xfail` when any of them is xfailed.
 
 Cases that fail today are not fixed here (that is the linked issue's job):
-#18 (LaTeX to plain text), #20 (unverified PDF links), #21 (one `@string`
-summary), #22 (`--unresolved` with no people file), #24 (structured-name
-matching), #26 (precise diagnostics), #27 (explicit link and award fields),
-#28 (`keywords` project tags), #46 (equal-contribution markers in the
-output).
+#20 (unverified PDF links), #21 (one `@string` summary), #22 (`--unresolved`
+with no people file), #24 (structured-name matching), #26 (precise
+diagnostics), #27 (explicit link and award fields), #28 (`keywords` project
+tags), #46 (equal-contribution markers in the output). #18 is still open for
+the template side — `| escape`, attribute-safe escaping and the checks on
+rendered output — but every LaTeX-to-text row below passes.
 
 ## `@string` macros and BibTeX structure
 Rule: when a macro is defined more than once, **the last definition wins**, as
@@ -67,6 +68,7 @@ the second definition is the one that reaches the output.
 | `structure.comment_lines` | A `%` comment line between entries | Ignored; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
 | `structure.comment_entry` | `@comment{...}` wrapping something that looks like an entry | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
 | `structure.preamble` | `@preamble{"..."}` | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
+| `structure.comment_mentions_command` | A `%` comment line whose prose contains `@comment{` | Ignored; it is not read as a command, and the entry after it is read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
 | `structure.uppercase` | `@ARTICLE` with `TITLE`, `AUTHOR`, `JOURNAL`, `YEAR` | Read exactly as the lower-case spelling is | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_quoted` | Field values in `"quotes"` | Read like braced values | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_braced` | Field values in `{braces}`, including a doubly braced title | Read; the braces themselves never reach the output | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
@@ -130,6 +132,7 @@ field of the output.
 | `names.corporate` | `{Example Robotics Consortium}` | Kept as one name, without its braces, and not abbreviated | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.corporate_escaped` | `{AT\&T Research}` | Kept as one name, with `\&` decoded to `&` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.hyphenated` | `Green, Grace-Ann` | Both halves of the given name are kept: `G.-A. Green` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.structured` | Any author name | The parts BibTeX split it into — given, von, family, suffix, or literal for a corporate name — reach the output beside the display name | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_name_parts` | pass |
 | `names.accent_tex` | `C{\^o}t{\'e}, Carol` | Name `C. Côté`, resolved to the person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.accent_utf8` | `Côté, Carol` in raw UTF-8 | Same output as the TeX spelling, resolved to the same person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.others` | `... and others` | The real authors are resolved; `others` is not emitted as an author | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
@@ -297,7 +300,7 @@ as a whole. The structure is defined by
 | `output.lab` | A `lab:` section in the config | Copied through to `lab` | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.bib_id` | The citation key | `bib_id` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.title` | `title` | `title`, as plain text | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.authors` | `author` | `authors`: a list of `{name, person_id}`, in source order | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.publication.authors` | `author` | `authors`: a list of `{name, person_id, given, von, family, suffix, literal}`, in source order | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.year` | `year` | `year`, as an integer | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.venue` | The venue fields for the entry type | `venue`, the formatted venue string | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.category` | The `bib_files` category of the file the entry came from | `category` | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
