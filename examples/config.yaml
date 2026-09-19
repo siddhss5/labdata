@@ -1,10 +1,23 @@
 # Example configuration file for labdata
 #
 # This file tells labdata where to find your BibTeX files,
-# people, and projects.
+# people, and projects. It points at the fictional Example Lab in demo/,
+# so run it from this directory:
+#   labdata --config config.yaml --validate
+#
+# Paths are relative to the directory you run labdata from.
+# demo/lab.yaml is the same lab configured from the repository root.
+
+# Lab information (optional), shown on the site's landing page
+lab:
+  name: "Example Lab"
+  description: "We build robots that help around the home and work alongside people."
+  university: "Example University"
+  department: "Department of Computer Science"
+  website: "https://example.org"
 
 # Directory containing your BibTeX files
-bib_dir: "data/bib"
+bib_dir: "demo/bib"
 
 # List of BibTeX files to process
 bib_files:
@@ -14,14 +27,14 @@ bib_files:
   - name: "conference.bib"
     category: "Conference Papers"
 
-  - name: "misc.bib"
+  - name: "other.bib"
     category: "Other Papers"
 
-# Base URL for PDF files (optional)
-pdf_base_url: "https://your-site.com/publications"
+# Base URL for PDF files (optional); <bib_id>.pdf is appended
+pdf_base_url: "https://example.org/publications"
 
 # Path to people YAML file (optional)
-people_file: "data/people.yaml"
+people_file: "demo/people.yaml"
 
 # Path to projects YAML file (optional)
-projects_file: "data/projects.yaml"
+projects_file: "demo/projects.yaml"
