@@ -35,8 +35,8 @@ class TestDemoLab:
     def test_assembles(self, demo_result):
         data = demo_result.data
         assert data.lab["name"] == "Example Lab"
-        assert len(data.publications) >= 12
-        assert len(data.projects) >= 2
+        assert 13 <= len(data.publications) <= 17
+        assert 2 <= len(data.projects) <= 3
         assert demo_result.unknown_projects == []
 
     def test_every_person_is_linked_to_a_publication(self, demo_result):

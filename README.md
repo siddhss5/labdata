@@ -94,7 +94,7 @@ Which file owns which setting:
 | Theme, plugins and page layout | `site/_config.yml` |
 | Navigation menu | `site/_data/navigation.yml` |
 
-`scripts/generate_site_config.py` writes the `lab.yaml` values to `site/_config.generated.yml`, and Jekyll layers that file over `site/_config.yml`. Both files are generated at build time and are not committed.
+`scripts/generate_site_config.py` writes the `lab.yaml` values to `site/_config.generated.yml`, and Jekyll layers that file over the committed base config, `site/_config.yml`. `site/_config.generated.yml` and `site/_data/lab.yml` are generated at build time and are not committed.
 
 ### 5. Deploy
 
