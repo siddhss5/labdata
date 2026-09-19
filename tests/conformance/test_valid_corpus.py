@@ -105,7 +105,7 @@ def test_names(valid_output, case_id, bib_key, path, expected):
     check_publication(valid_output, bib_key, path, expected)
 
 
-@covers("names.initials_ambiguous", xfail="#24")
+@covers("names.initials_ambiguous", xfail="#24", owns=("name-kim-initial",))
 def test_ambiguous_initials_listed(valid_unresolved):
     """An initials-only name that fits two members is listed for a human to resolve."""
     assert "A. Kim" in valid_unresolved.stdout

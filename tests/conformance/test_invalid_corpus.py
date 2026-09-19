@@ -67,7 +67,7 @@ def test_kept(tmp_path, case_id, spec):
     assert not missing, f"entries dropped: {missing}"
 
 
-@covers("latex.unknown_macro", xfail="#23")
+@covers("latex.unknown_macro", xfail="#23", owns=("unknown-macro",))
 def test_unknown_macro_keeps_its_text(tmp_path):
     """The macro's argument survives and no raw LaTeX reaches the output."""
     run, data = export(INVALID / DIAGNOSTICS["latex.unknown_macro"]["dir"], tmp_path)

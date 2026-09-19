@@ -16,7 +16,7 @@ import pytest
 import yaml
 
 from .support import (
-    EXPECTED, REPO_ROOT, SCHEMA_PATH, VALID, covers, export, item, xfailed_strings,
+    EXPECTED, REPO_ROOT, SCHEMA_PATH, VALID, covers, export, item, xfail_owned_entries,
 )
 
 DEMO_CONFIG = "examples/demo/lab.yaml"
@@ -134,12 +134,14 @@ def select(data):
 def test_snapshot_avoids_xfailed_cases(valid_output):
     """Nothing in the snapshot is owned by an open issue's xfail.
 
-    A publication named by an xfailed case, and anything whose value is
-    derived from one, stays out: otherwise a fix would break the snapshot and
-    the tempting way out would be to re-record the behavior the xfail rejects.
+    Ownership is declared by the xfailed case() and covers() calls themselves
+    (support.XFAIL_OWNERSHIP). A publication an open issue owns, and anything
+    whose value is derived from one, stays out: otherwise a fix would break
+    the snapshot and the tempting way out would be to re-record the behavior
+    the xfail rejects.
     """
     bib_ids = {p["bib_id"] for p in valid_output["publications"]}
-    excluded = bib_ids & set(xfailed_strings())
+    excluded = bib_ids & xfail_owned_entries()
     assert excluded, "expected some xfailed entries to exclude"
 
     chosen = select(valid_output)

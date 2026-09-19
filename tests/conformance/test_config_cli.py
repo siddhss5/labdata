@@ -86,7 +86,7 @@ def test_config_projects_file_missing(tmp_path):
 
 # --- Links that depend on config --------------------------------------------
 
-@covers("links.pdf.remote_guess", xfail="#20")
+@covers("links.pdf.remote_guess", xfail="#20", owns=("missing",))
 def test_remote_pdf_url_not_guessed(tmp_path):
     """A remote pdf_base_url gives a PDF link only for papers known to have a PDF."""
     variant = write_variant(tmp_path, pdf_base_url="https://example.org/pdfs")

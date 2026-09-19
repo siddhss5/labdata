@@ -10,14 +10,14 @@ in a parameter table or ``covers()`` on a test function. The meta-test in
 test_coverage_table.py reads those calls to match tests to table rows.
 """
 
-import ast
 import contextlib
+import importlib
 import io
 import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, Iterable, List, Optional, Set
 
 import pytest
 import yaml
@@ -38,17 +38,41 @@ def _xfail_marks(xfail):
     return [pytest.mark.xfail(strict=True, reason=xfail)] if xfail else []
 
 
-def case(case_id, *values, xfail=None):
+# Corpus entries whose values an open issue owns, declared by the xfailed
+# case()/covers() calls below: {case id: {bib key}}. The snapshot in
+# test_output_format.py reads this to stay off output a fix will change.
+XFAIL_OWNERSHIP: Dict[str, Set[str]] = {}
+
+
+def _record_ownership(case_ids: Iterable[str], owns: Iterable[str]):
+    for case_id in case_ids:
+        XFAIL_OWNERSHIP.setdefault(case_id, set()).update(owns)
+
+
+def case(case_id, *values, xfail=None, owns=None):
     """One row of a parameter table: a case ID, then the test's values.
 
-    ``xfail="#N"`` marks the row as failing until issue #N is fixed.
+    ``xfail="#N"`` marks the row as failing until issue #N is fixed. An
+    xfailed row owns the corpus entry it checks, which is ``values[0]`` in the
+    per-entry tables; ``owns`` states it explicitly for any other shape.
     """
+    if xfail:
+        if owns is None:
+            owns = [values[0]] if values and isinstance(values[0], str) else []
+        _record_ownership([case_id], owns)
     label = ":".join([case_id] + [str(v) for v in values[:2]])
     return pytest.param(case_id, *values, id=label, marks=_xfail_marks(xfail))
 
 
-def covers(*case_ids, xfail=None):
-    """Decorate a test that checks the given case IDs."""
+def covers(*case_ids, xfail=None, owns=()):
+    """Decorate a test that checks the given case IDs.
+
+    ``owns`` names the corpus entries whose values issue ``xfail`` will
+    change; unlike a table row, a covers() test has no entry to infer.
+    """
+    if xfail:
+        _record_ownership(case_ids, owns)
+
     def decorate(func):
         for mark in _xfail_marks(xfail):
             func = mark(func)
@@ -124,24 +148,19 @@ def write_variant(tmp_path: Path, **changes) -> Path:
     return path
 
 
-def xfailed_strings() -> List[str]:
-    """Every string named by an xfailed ``case()`` or ``covers()`` call.
+def xfail_owned_entries() -> Set[str]:
+    """Every corpus entry an open issue's xfail owns.
 
-    Used to keep the snapshot in test_output_format.py off the output that an
-    open issue still owns: intersected with the corpus's bib keys, this is the
-    list of entries whose values a fix is expected to change.
+    Imports the test modules first, so the answer does not depend on which of
+    them pytest happens to have collected. Entries of the invalid corpus are
+    declared the same way; they simply never appear in the valid output.
     """
-    found: List[str] = []
-    for path in sorted(Path(__file__).parent.glob("test_*.py")):
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-                    and node.func.id in ("case", "covers")):
-                continue
-            if not any(kw.arg == "xfail" for kw in node.keywords):
-                continue
-            found += [a.value for a in node.args
-                      if isinstance(a, ast.Constant) and isinstance(a.value, str)]
-    return found
+    for name in ("test_valid_corpus", "test_config_cli", "test_invalid_corpus"):
+        importlib.import_module(f"{__package__}.{name}")
+    owned: Set[str] = set()
+    for entries in XFAIL_OWNERSHIP.values():
+        owned |= entries
+    return owned
 
 
 # --- Looking things up in the output ---------------------------------------
