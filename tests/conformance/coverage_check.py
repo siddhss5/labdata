@@ -2,48 +2,46 @@
 
 It takes the table, the corpus and the test directory as arguments, so it can
 be driven against the real tree (test_coverage_table.py) and against tiny
-synthetic trees that prove it rejects what it claims to reject
-(test_coverage_check.py).
+synthetic trees that pin what it does (test_coverage_check.py).
 
 A row of the table is valid when
 
 - its fixture marks the case with ``% CASE <id>`` (``# CASE <id>`` in YAML),
   or, for a fixture outside the corpus, simply exists;
 - the test it names exists, is bound to that case ID, and carries an
-  effective assertion: an ``assert`` that can run, over something other than
-  a literal expression, made by the test or by a helper it defines or imports
-  by name. A parametrized test must also read the values its table supplies
-  where they can run, so a table cannot be attached to a function that
-  ignores it;
+  assertion its body runs: an ``assert`` over more than a literal expression,
+  made by the test or by a helper it defines or imports by name. A
+  parametrized test must also read the values its table supplies, so a table
+  cannot be attached to a function that ignores it;
 - its status agrees with the ``xfail`` markers the tests attach to the case.
 
 A case ID is bound to a test function by a ``case()`` or ``covers()`` call in
 that function or its decorators, including through a parametrize table, or, for
 the invalid corpus, by naming a check that expected/diagnostics.yaml lists.
 
-What it rejects, all of it decidable from the source: a test whose only
-assertions are syntactically literal-only (``assert True``, ``assert 1``,
-``assert 2 + 2 == 4``); one that can never run, because it follows an
-unconditional ``return``/``raise``/``continue``/``break``, sits in a
-statically false branch (``if False:``), or is only inside a nested ``def``
-or ``class``, which is a definition rather than something the test runs; an
-assertion inherited from a same-named function in a module the test does not
-import; a parametrize table whose values the test never reads where they can
-run; and an empty token list in expected/diagnostics.yaml.
+What this catches, and where it stops.
 
-What it cannot do:
+It catches the honest mistake: a row added to the table with no fixture
+entry, a row whose test does not exist or checks a different case, and a
+bound test that runs no assertion — the body that never got written, the
+helper that was emptied out, the parametrize table wired to a function that
+ignores its values, the diagnostics check that names no token to look for.
 
-- decide whether an assertion is *about the right thing*. A test that asserts
-  something true but beside the point, or a weaker property than its row
-  claims, still passes. Only review catches that;
-- see through anything but literal syntax. The literal check is syntactic, so
-  ``assert bool(True)`` passes because it contains a call, and a test that
-  assigns its parameters to ``_`` and then asserts something unrelated
-  satisfies the parameter check;
-- read helpers reached any other way than a plain call to a local or imported
-  name. A call through a module object (``helpers.check(...)``) or into a
-  nested ``def`` carries no assertion here — that is the accepted form, not an
-  oversight, and test_coverage_check.py pins both.
+It reads ordinary test code and assumes it was written in good faith. It is
+not a defence against a test arranged to look as though it establishes
+something while never running one of its assertions, and it does not try to
+become one: the tests in this repository are written to find bugs, not to
+get past this file.
+
+It also cannot decide whether an assertion is *about the right thing*. A test
+that asserts something true but beside the point, or a weaker property than
+its row claims, passes here; only review catches that.
+
+Helpers are read one way: a plain call to a function defined in the same
+module or imported from another by name. An assertion reached any other way,
+such as through a module object, does not count towards the calling test.
+That is the accepted form for these tests rather than an oversight, and
+test_coverage_check.py pins it.
 """
 
 import ast
@@ -184,7 +182,7 @@ def _constant_truth(test: Optional[ast.expr]) -> Optional[bool]:
 
 
 def _live_blocks(stmt: ast.stmt):
-    """The blocks of a statement that can run, with constant tests decided."""
+    """The blocks of a statement to read, with a constant if/while decided."""
     if isinstance(stmt, (ast.If, ast.While)):
         truth = _constant_truth(stmt.test)
         if truth is True:          # `if True:` / `while True:`: the else arm cannot run
@@ -202,12 +200,14 @@ def _live_blocks(stmt: ast.stmt):
 
 
 def _reachable(body: List[ast.stmt]):
-    """Statements that can run with the test.
+    """The statements of a test body, as this file reads ordinary test code.
 
-    Anything after a terminator in a block cannot, nor can the body of a
-    statically false branch. A nested ``def`` or ``class`` is a definition,
-    not a statement that runs, so its body is not part of the test: a helper
-    has to be a module-level function to carry an assertion.
+    It skips what plainly does not run with the test: statements after a
+    terminator in the same block, the body of a constant-false branch, and
+    the body of a nested ``def`` or ``class``, which is a definition rather
+    than a statement that runs. A helper therefore has to be a module-level
+    function to carry an assertion. This is a reading of straightforward
+    code, not a decision procedure for reachability.
     """
     for stmt in body:
         yield stmt
@@ -230,7 +230,7 @@ def _own_expressions(stmt: ast.stmt):
 
 
 def _called_names(fn: ast.FunctionDef) -> Set[str]:
-    """Plain function calls that can run: a call in dead code carries nothing."""
+    """Plain function calls in the statements this file reads as running."""
     return {sub.func.id for stmt in _reachable(fn.body)
             for sub in _own_expressions(stmt)
             if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name)}
@@ -277,11 +277,11 @@ def _parametrized_names(fn: ast.FunctionDef) -> List[List[str]]:
 
 
 def _reads_parameters(fn: ast.FunctionDef) -> bool:
-    """Every parametrized value the table supplies is read where it can run.
+    """Every parametrized value the table supplies is read by the test.
 
     ``case_id`` is a label, so a test that ignores it is fine; ignoring the
-    input or the expectation is not, and a reference in dead code is not a
-    read.
+    input or the expectation is not. The references counted are those in the
+    statements this file reads as running.
     """
     used = {n.id for stmt in _reachable(fn.body) for n in _own_expressions(stmt)
             if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}

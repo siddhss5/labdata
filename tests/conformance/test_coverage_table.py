@@ -1,7 +1,8 @@
 """Meta-tests: tests/COVERAGE.md, the corpus and the tests agree.
 
 The rules are in coverage_check.py, driven here against the real tree and in
-test_coverage_check.py against synthetic ones that prove each rule bites.
+test_coverage_check.py against synthetic ones that pin each of them. That
+file's docstring says what the rules catch and where they stop.
 """
 
 import ast
@@ -44,7 +45,11 @@ def test_every_row_has_fixture_data(problems):
 
 
 def test_every_row_has_an_assertion(problems):
-    """The test each row names exists, checks that case, and asserts something."""
+    """The test each row names exists, checks that case, and asserts something.
+
+    Honest mistakes — a missing test, one wired to another case, a body that
+    was never written — not a test built to look past the check.
+    """
     assert of(problems, "assertion") == ""
 
 

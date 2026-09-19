@@ -4,9 +4,9 @@ Each test builds a tiny tree — one table row, one fixture, one test module —
 in tmp_path, breaks exactly one thing, and checks that the validator says so.
 Without these, the meta-test could quietly stop enforcing anything.
 
-The validator only rejects what static analysis can decide. These controls
-pin that list down; see coverage_check's docstring for what stays out of
-reach (an assertion that is real but checks the wrong thing).
+These controls pin the behavior the validator has today. They are not a
+claim that it catches every way a test could fail to establish something:
+see coverage_check's docstring for what it is for and where it stops.
 """
 
 import textwrap
@@ -126,7 +126,7 @@ def test_rejects_an_assertion_after_an_unconditional_return(tmp_path):
 
 
 def test_rejects_a_helper_call_after_an_unconditional_return(tmp_path):
-    """A dead call cannot donate the assertion inside the helper either."""
+    """A call the validator reads as not running donates no assertion."""
     assert categories(
         tmp_path,
         preamble=PREAMBLE + "\ndef check_entry(key, expected):\n    assert read_entry(key) == expected\n",
@@ -135,26 +135,26 @@ def test_rejects_a_helper_call_after_an_unconditional_return(tmp_path):
 
 
 def test_rejects_a_body_in_a_statically_false_branch(tmp_path):
-    """`if False:` around the whole test: nothing in it runs."""
+    """A body the validator reads as not running carries no assertion."""
     body = "    if False:\n        assert read_entry(bib_key) == expected\n"
     assert categories(tmp_path, body=body) == ["assertion"]
 
 
 def test_accepts_a_body_in_a_statically_true_branch(tmp_path):
-    """`if True:` is not dead code, so the assertion still counts."""
+    """A guarded body the validator does read as running still counts."""
     body = "    if True:\n        assert read_entry(bib_key) == expected\n"
     assert validate(**build(tmp_path, body=body)) == []
 
 
 def test_rejects_an_assertion_in_an_uncalled_nested_function(tmp_path):
-    """A nested def is a definition, not something the test runs."""
+    """A nested def is a definition; only module-level helpers carry asserts."""
     body = ("    def never_called():\n"
             "        assert read_entry(bib_key) == expected\n")
     assert categories(tmp_path, body=body) == ["assertion"]
 
 
 def test_rejects_a_module_qualified_helper_call(tmp_path):
-    """Documented limit: only plain calls to imported or local helpers count.
+    """The accepted form: a plain call to a local or imported helper.
 
     A call through a module object is outside the form the validator reads, so
     it carries no assertion rather than being trusted.
@@ -220,7 +220,7 @@ def test_accepts_an_assert_from_an_imported_helper(tmp_path):
 
 
 def test_rejects_a_parameter_read_only_in_dead_code(tmp_path):
-    """A reference to the parametrized value after a return is not a read."""
+    """A reference the validator reads as not running is not a read."""
     assert categories(
         tmp_path,
         preamble=PREAMBLE + '\nimport pytest\n\nROWS = [case("names.demo", "demo", "2024")]\n',

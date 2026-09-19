@@ -19,25 +19,26 @@ Input labdata does not support has a row too, and its expected behavior is a
 warning or an error. Silently ignoring an input is never correct.
 
 `tests/conformance/test_coverage_table.py` fails if a row's fixture has no
-`CASE` marker, if the test it names does not check that case, if that test
-carries no effective assertion, or if its status disagrees with the `xfail`
-markers in the tests. The rules live in `tests/conformance/coverage_check.py`,
-and `test_coverage_check.py` drives them against tiny synthetic tables to
-prove each one still bites. `xfail` markers are `strict=True`, so a case turns
-red once the linked issue is fixed and the marker is stale.
+`CASE` marker, if the test it names does not exist or checks a different
+case, if that test runs no assertion, or if its status disagrees with the
+`xfail` markers in the tests. The rules live in
+`tests/conformance/coverage_check.py`, and `test_coverage_check.py` drives
+them against tiny synthetic tables to pin each one. `xfail` markers are
+`strict=True`, so a case turns red once the linked issue is fixed and the
+marker is stale.
 
-An assertion counts when it can run — not after a `return`, not in an
-`if False:` branch, not only inside a nested `def` — and is not syntactically
-literal-only, whether the test makes it itself or through a helper it defines
-or imports by name. A parametrized test must also read the values its table
-supplies, and a diagnostics check must say which tokens it looks for.
+What that catches is the honest mistake: a row added here with no fixture
+entry, a row whose test does not exist or was wired to another case, a body
+that never got written, a helper that was emptied out, a parametrize table
+attached to a function that ignores its values, a diagnostics check that
+names no token to look for. The checker reads ordinary test code and assumes
+it was written in good faith; it is not a defence against a test arranged to
+look as though it establishes something while never running an assertion,
+and it does not try to be one.
 
-Two things no checker settles. Whether an assertion is *about the right
-thing*: a test that asserts something true but beside the point still passes,
-and only review catches that. And anything the literal check cannot see
-syntactically: `assert bool(True)` passes because it contains a call, and a
-test that parks its parameters in `_` and asserts something unrelated
-satisfies the parameter check.
+What no checker settles is whether an assertion is *about the right thing*: a
+test that asserts something true but beside the point, or a weaker property
+than its row claims, passes here. Only review catches that.
 
 A case can also be checked by tests other than the one its row names; the
 status column reports `xfail` when any of them is xfailed.
