@@ -1,75 +1,75 @@
 # PI
-- id: "aquinn"
-  name: "Avery Quinn"
-  aliases: ["A. Quinn", "A. J. Quinn"]
+- id: "aadams"
+  name: "Alice Adams"
+  aliases: ["A. Adams", "A. J. Adams"]
   role: "professor"
   status: "current"
-  website: "https://example.org/people/aquinn"
-  email: "aquinn@example.org"
+  website: "https://example.org/people/aadams"
+  email: "aadams@example.org"
   start_year: 2015
 
 # Current PhD students
-- id: "praman"
-  name: "Priya Raman"
-  aliases: ["P. Raman"]
+- id: "bbrown"
+  name: "Bob Brown"
+  aliases: ["B. Brown"]
   role: "phd_student"
   status: "current"
-  website: "https://example.org/people/praman"
-  co_advisor: "Nadia Haddad"
+  website: "https://example.org/people/bbrown"
+  co_advisor: "Peggy Park"
   start_year: 2021
 
-- id: "dmorales"
-  name: "Diego Morales"
-  aliases: ["D. Morales"]
+- id: "ccote"
+  name: "Carol Côté"
+  aliases: ["C. Côté"]
   role: "phd_student"
   status: "current"
   start_year: 2022
 
-- id: "mtanaka"
-  name: "Mei Tanaka"
-  aliases: ["M. Tanaka"]
+- id: "ddavis"
+  name: "Dave Davis"
+  aliases: ["D. Davis"]
   role: "phd_student"
   status: "current"
-  website: "https://example.org/people/mtanaka"
+  website: "https://example.org/people/ddavis"
   start_year: 2023
 
-- id: "tferreira"
-  name: "Tomás Ferreira"
-  aliases: ["T. Ferreira"]
+- id: "eevans"
+  name: "Erin Evans"
+  aliases: ["E. Evans"]
   role: "phd_student"
   status: "current"
   start_year: 2024
 
 # Current MS students
-- id: "lnovak"
-  name: "Lena Novak"
-  aliases: ["L. Novak"]
+- id: "ffischer"
+  name: "Frank Fischer"
+  aliases: ["F. Fischer"]
   role: "ms_student"
   status: "current"
   start_year: 2024
 
-- id: "kasante"
-  name: "Kwame Asante"
-  aliases: ["K. Asante"]
+- id: "ggreen"
+  name: "Grace Green"
+  aliases: ["G. Green"]
   role: "ms_student"
   status: "current"
   start_year: 2024
 
 # Alumni: postdocs
-- id: "hweber"
-  name: "Hannah Weber"
-  aliases: ["H. Weber"]
+- id: "hhughes"
+  name: "Heidi Hughes"
+  aliases: ["H. Hughes"]
   role: "postdoc"
   status: "alumni"
-  website: "https://example.org/people/hweber"
+  website: "https://example.org/people/hhughes"
   start_year: 2018
   end_year: 2021
   current_position: "Assistant Professor, Example State University"
 
 # Alumni: PhD students
-- id: "riyer"
-  name: "Ravi Iyer"
-  aliases: ["R. Iyer"]
+- id: "iingram"
+  name: "Ivan Ingram"
+  aliases: ["I. Ingram"]
   role: "phd_student"
   status: "alumni"
   start_year: 2016
@@ -78,13 +78,13 @@
   thesis_title: "Learning Grasp Affordances from Play"
   current_position: "Research Scientist, Example Robotics Inc."
 
-- id: "slindqvist"
-  name: "Sofia Lindqvist"
-  aliases: ["S. Lindqvist"]
+- id: "jjones"
+  name: "Judy Jones"
+  aliases: ["J. Jones"]
   role: "phd_student"
   status: "alumni"
-  website: "https://example.org/people/slindqvist"
-  co_advisor: "Isabel Duarte"
+  website: "https://example.org/people/jjones"
+  co_advisor: "Rupert Reed"
   start_year: 2017
   end_year: 2023
   degree: "PhD"
@@ -92,9 +92,9 @@
   current_position: "Assistant Professor, Example Institute of Technology"
 
 # Alumni: MS students
-- id: "ebrooks"
-  name: "Ethan Brooks"
-  aliases: ["E. Brooks"]
+- id: "nnolan"
+  name: "Niaj Nolan"
+  aliases: ["N. Nolan"]
   role: "ms_student"
   status: "alumni"
   start_year: 2019

@@ -125,9 +125,9 @@ All fields are also preserved in the copyable BibTeX button.
 labdata introduces one custom BibTeX field: `project`. Add it to any entry to link that paper to a research project:
 
 ```bibtex
-@inproceedings{morales2024pantry,
+@inproceedings{cote2024pantry,
   title     = {Where Does This Go? Object Placement in Unfamiliar Kitchens},
-  author    = {Morales, Diego and Tanaka, Mei and Chen, Wei and Quinn, Avery},
+  author    = {C{\^o}t{\'e}, Carol and Davis, Dave and Ortiz, Olivia and Adams, Alice},
   booktitle = {Proceedings of the Conference on Robot Learning Systems},
   year      = {2024},
   eprint    = {2406.99812},
@@ -145,18 +145,18 @@ This single tag is all labdata needs to auto-generate project pages with linked 
 A list of lab members and alumni. The `aliases` field tells labdata how to match BibTeX author names to people:
 
 ```yaml
-- id: "praman"
-  name: "Priya Raman"
-  aliases: ["P. Raman"]
+- id: "bbrown"
+  name: "Bob Brown"
+  aliases: ["B. Brown"]
   role: "phd_student"
   status: "current"
-  website: "https://example.org/people/praman"
-  co_advisor: "Nadia Haddad"
+  website: "https://example.org/people/bbrown"
+  co_advisor: "Peggy Park"
   start_year: 2021
 
-- id: "riyer"
-  name: "Ravi Iyer"
-  aliases: ["R. Iyer"]
+- id: "iingram"
+  name: "Ivan Ingram"
+  aliases: ["I. Ingram"]
   role: "phd_student"
   status: "alumni"
   start_year: 2016
