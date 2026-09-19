@@ -16,7 +16,7 @@ import pytest
 import yaml
 
 from .support import (
-    EXPECTED, REPO_ROOT, SCHEMA_PATH, VALID, covers, export, item, xfail_owned_entries,
+    EXPECTED, REPO_ROOT, SCHEMA_PATH, VALID, covers, corpus_entry_keys, export, item, xfail_owned_entries,
 )
 
 DEMO_CONFIG = "examples/demo/lab.yaml"
@@ -154,6 +154,24 @@ def test_snapshot_avoids_xfailed_cases(valid_output):
         from_pubs = {p["bib_id"] for p in valid_output["publications"]
                      if any(a["name"] == collaborator["name"] for a in p["authors"])}
         assert sorted(from_pubs & excluded) == [], collaborator["name"]
+
+
+def test_xfail_ownership_names_real_entries():
+    """A typo in owns= would quietly exclude nothing, so reject it here."""
+    unknown = sorted(xfail_owned_entries() - corpus_entry_keys())
+    assert unknown == [], f"owns= names entries that are in no .bib: {unknown}"
+
+
+def test_xfail_without_declared_ownership_is_an_error():
+    """An xfailed covers() that forgets owns= fails loudly, not silently."""
+    # Called through a local name: this exercises the decorator's contract and
+    # is not a claim to cover a case, which is what a literal covers(...) call
+    # would mean to tests/COVERAGE.md.
+    declare = covers
+    with pytest.raises(TypeError):
+        declare("example.not_a_real_case", xfail="#23")
+    # Declaring no ownership is fine; only leaving it out is an error.
+    assert declare("example.not_a_real_case", xfail="#23", owns=()) is not None
 
 
 def diff_paths(expected, actual, path=""):

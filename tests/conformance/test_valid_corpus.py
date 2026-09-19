@@ -36,7 +36,7 @@ def test_strings(valid_output, case_id, bib_key, path, expected):
     check_publication(valid_output, bib_key, path, expected)
 
 
-@covers("strings.redefined_report", xfail="#21")
+@covers("strings.redefined_report", xfail="#21", owns=())
 def test_redefined_strings_reported_once(valid_validate):
     """The three redefined macros are reported together by labdata, not one by one."""
     lines = valid_validate.output.splitlines()

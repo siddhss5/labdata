@@ -15,6 +15,7 @@ import importlib
 import io
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set
@@ -64,13 +65,19 @@ def case(case_id, *values, xfail=None, owns=None):
     return pytest.param(case_id, *values, id=label, marks=_xfail_marks(xfail))
 
 
-def covers(*case_ids, xfail=None, owns=()):
+def covers(*case_ids, xfail=None, owns=None):
     """Decorate a test that checks the given case IDs.
 
-    ``owns`` names the corpus entries whose values issue ``xfail`` will
-    change; unlike a table row, a covers() test has no entry to infer.
+    An xfailed test must say what it ``owns``: the corpus entries whose values
+    issue ``xfail`` will change, or ``()`` when it owns none, because a
+    covers() test has no entry to infer one from. Leaving it out is an error,
+    so an omission cannot pass for "owns nothing".
     """
     if xfail:
+        if owns is None:
+            raise TypeError(
+                f"covers({case_ids[0]!r}, xfail={xfail!r}) needs owns=(...): name the "
+                "corpus entries the fix will change, or owns=() if it changes none")
         _record_ownership(case_ids, owns)
 
     def decorate(func):
@@ -146,6 +153,20 @@ def write_variant(tmp_path: Path, **changes) -> Path:
     with open(path, "w", encoding="utf-8") as f:
         yaml.safe_dump(config, f, allow_unicode=True, sort_keys=False)
     return path
+
+
+ENTRY_KEY_RE = re.compile(r"^@(\w+)\s*\{\s*([^,\s}]+)\s*,", re.MULTILINE)
+NOT_ENTRIES = {"string", "comment", "preamble"}
+
+
+def corpus_entry_keys() -> Set[str]:
+    """Every citation key defined anywhere in tests/corpus."""
+    keys = set()
+    for path in sorted(CORPUS.rglob("*.bib")):
+        text = path.read_bytes().decode("utf-8-sig")
+        keys |= {key for kind, key in ENTRY_KEY_RE.findall(text)
+                 if kind.lower() not in NOT_ENTRIES}
+    return keys
 
 
 def xfail_owned_entries() -> Set[str]:
