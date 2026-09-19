@@ -1,0 +1,30 @@
+# Example Lab: a fictional lab used as the labdata demo.
+# Every person, project, paper and URL in examples/demo/ is invented.
+#
+# Paths are relative to the repository root, so run labdata from there:
+#   labdata --config examples/demo/lab.yaml --validate
+
+lab:
+  name: "Example Lab"
+  description: "We build robots that help around the home and work alongside people, from tidying up a kitchen to sharing control of an assistive arm."
+  university: "Example University"
+  department: "Department of Computer Science"
+  website: "https://example.org"
+
+# Jekyll site settings (read by scripts/generate_site_config.py).
+# The site title and description come from lab.name and lab.description.
+site:
+  baseurl: "/labdata"
+
+bib_dir: "examples/demo/bib"
+bib_files:
+  - name: "journal.bib"
+    category: "Journal Papers"
+  - name: "conference.bib"
+    category: "Conference Papers"
+  - name: "other.bib"
+    category: "Other Papers"
+
+pdf_base_url: "https://example.org/publications"
+people_file: "examples/demo/people.yaml"
+projects_file: "examples/demo/projects.yaml"
