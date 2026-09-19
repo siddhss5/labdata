@@ -1,3 +1,6 @@
+# CASE people.invalid_status
+# A status that is neither current nor alumni.
+
 - id: "aadams"
   name: "Alice Adams"
   aliases: ["A. Adams"]

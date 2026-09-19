@@ -1,3 +1,6 @@
+# CASE people.missing_name
+# A person with no name.
+
 - id: "aadams"
   name: "Alice Adams"
   aliases: ["A. Adams"]

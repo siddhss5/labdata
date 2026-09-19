@@ -1,3 +1,6 @@
+# CASE people.duplicate_id
+# The same person id twice.
+
 - id: "aadams"
   name: "Alice Adams"
   aliases: ["A. Adams"]

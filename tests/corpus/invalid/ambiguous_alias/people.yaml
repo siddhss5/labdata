@@ -1,3 +1,7 @@
+# CASE identity.ambiguous_alias
+# CASE diag.ambiguous_alias
+# Two people declare the same alias.
+
 - id: "aadams"
   name: "Alice Adams"
   aliases: ["A. Adams"]

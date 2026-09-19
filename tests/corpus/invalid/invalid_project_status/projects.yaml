@@ -1,3 +1,6 @@
+# CASE projects.invalid_status
+# A project status outside the known set.
+
 - id: "homebot"
   title: "Household Manipulation"
   status: "active"
