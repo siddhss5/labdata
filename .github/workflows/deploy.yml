@@ -53,6 +53,9 @@ jobs:
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: '3.3'
+        # Installs the gems pinned in site/Gemfile.lock (frozen) and caches them.
+        bundler-cache: true
+        working-directory: site
 
     - name: Build Jekyll site
       working-directory: site
@@ -60,9 +63,7 @@ jobs:
         JEKYLL_ENV: production
         JEKYLL_GITHUB_TOKEN: ${{ github.token }}
         PAGES_REPO_NWO: ${{ github.repository }}
-      run: |
-        bundle install
-        bundle exec jekyll build --config _config.yml,_config.generated.yml --destination ../_site
+      run: bundle exec jekyll build --config _config.yml,_config.generated.yml --destination ../_site
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v5
