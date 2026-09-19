@@ -10,6 +10,7 @@ in a parameter table or ``covers()`` on a test function. The meta-test in
 test_coverage_table.py reads those calls to match tests to table rows.
 """
 
+import ast
 import contextlib
 import io
 import json
@@ -121,6 +122,26 @@ def write_variant(tmp_path: Path, **changes) -> Path:
     with open(path, "w", encoding="utf-8") as f:
         yaml.safe_dump(config, f, allow_unicode=True, sort_keys=False)
     return path
+
+
+def xfailed_strings() -> List[str]:
+    """Every string named by an xfailed ``case()`` or ``covers()`` call.
+
+    Used to keep the snapshot in test_output_format.py off the output that an
+    open issue still owns: intersected with the corpus's bib keys, this is the
+    list of entries whose values a fix is expected to change.
+    """
+    found: List[str] = []
+    for path in sorted(Path(__file__).parent.glob("test_*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id in ("case", "covers")):
+                continue
+            if not any(kw.arg == "xfail" for kw in node.keywords):
+                continue
+            found += [a.value for a in node.args
+                      if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+    return found
 
 
 # --- Looking things up in the output ---------------------------------------
