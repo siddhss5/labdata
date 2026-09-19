@@ -52,6 +52,11 @@ def test_status_matches_xfail_markers(problems):
     assert of(problems, "status") == ""
 
 
+def test_diagnostics_checks_name_something(problems):
+    """Every reports/locates/kept list in diagnostics.yaml says what to look for."""
+    assert of(problems, "diagnostics") == ""
+
+
 def test_no_orphan_cases(problems):
     """Every CASE marker and every case a test names has a row."""
     assert of(problems, "orphan") == ""

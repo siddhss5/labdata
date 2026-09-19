@@ -10,12 +10,23 @@ A row of the table is valid when
 - its fixture marks the case with ``% CASE <id>`` (``# CASE <id>`` in YAML),
   or, for a fixture outside the corpus, simply exists;
 - the test it names exists, is bound to that case ID, and carries an
-  assertion: an ``assert`` of its own, or a call to a helper that asserts;
+  effective assertion: a reachable ``assert`` over something other than
+  literals, or a call to a helper in the same module (or one it imports) that
+  carries one. A parametrized test must also read the values its table
+  supplies, so a table cannot be attached to a function that ignores it;
 - its status agrees with the ``xfail`` markers the tests attach to the case.
 
 A case ID is bound to a test function by a ``case()`` or ``covers()`` call in
 that function or its decorators, including through a parametrize table, or, for
 the invalid corpus, by naming a check that expected/diagnostics.yaml lists.
+
+What this cannot do: decide whether an assertion is *meaningful*. It rejects
+the forms that are decidable — a constant or literal-only test, an assertion
+after an unconditional ``return``/``raise``/``continue``/``break``, an
+assertion inherited from a same-named function in an unrelated module, a
+parametrize table whose values the test never reads, and an empty token list
+in expected/diagnostics.yaml — and nothing beyond that. A test that asserts
+something true but irrelevant still passes, and only review catches it.
 """
 
 import ast
@@ -60,6 +71,7 @@ class Binding:
     function: str
     ids: Dict[str, Set[str]] = field(default_factory=dict)  # id -> xfail issues
     asserts: bool = False
+    reads_parameters: bool = True
 
 
 # --- Reading the three inputs ------------------------------------------------
@@ -103,6 +115,18 @@ def _diagnostics_ids(path: Optional[Path]) -> Dict[str, Dict[str, Set[str]]]:
     return by_check
 
 
+def _diagnostics_tokens(path: Optional[Path]):
+    """(check, case id, tokens) for each token list in expected/diagnostics.yaml."""
+    if path is None or not Path(path).is_file():
+        return
+    with open(path, encoding="utf-8") as f:
+        specs = yaml.safe_load(f) or {}
+    for case_id, spec in specs.items():
+        for check in ("reports", "locates", "kept"):
+            if check in spec:
+                yield check, case_id, spec[check]
+
+
 def _case_calls(node: ast.AST):
     """(ids, xfail issues) for every case()/covers() call inside ``node``."""
     for sub in ast.walk(node):
@@ -126,15 +150,93 @@ def _params_checks(node: ast.AST):
                     yield arg.value
 
 
-def _called_names(node: ast.AST) -> Set[str]:
-    names = set()
-    for sub in ast.walk(node):
-        if isinstance(sub, ast.Call):
-            if isinstance(sub.func, ast.Name):
-                names.add(sub.func.id)
-            elif isinstance(sub.func, ast.Attribute):
-                names.add(sub.func.attr)
-    return names
+TERMINATORS = (ast.Return, ast.Raise, ast.Continue, ast.Break)
+
+
+def _bodies(stmt: ast.stmt):
+    for name in ("body", "orelse", "finalbody"):
+        block = getattr(stmt, name, None)
+        if isinstance(block, list):
+            yield block
+    for handler in getattr(stmt, "handlers", []):
+        yield handler.body
+
+
+def _reachable(body: List[ast.stmt]):
+    """Statements that can run: anything after a terminator in a block cannot."""
+    for stmt in body:
+        yield stmt
+        for block in _bodies(stmt):
+            yield from _reachable(block)
+        if isinstance(stmt, TERMINATORS):
+            return
+
+
+def _own_expressions(stmt: ast.stmt):
+    """The expressions of one statement, without the blocks nested inside it."""
+    for name, value in ast.iter_fields(stmt):
+        if name in ("body", "orelse", "finalbody", "handlers"):
+            continue
+        for node in (value if isinstance(value, list) else [value]):
+            if isinstance(node, ast.AST):
+                yield from ast.walk(node)
+
+
+def _called_names(fn: ast.FunctionDef) -> Set[str]:
+    """Plain function calls that can run: a call in dead code carries nothing."""
+    return {sub.func.id for stmt in _reachable(fn.body)
+            for sub in _own_expressions(stmt)
+            if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name)}
+
+
+def _is_trivial(test: ast.expr) -> bool:
+    """True for a test built only from literals: ``True``, ``1``, ``2 + 2 == 4``."""
+    return not any(isinstance(n, (ast.Name, ast.Call, ast.Attribute, ast.Subscript,
+                                  ast.Starred, ast.Await, ast.Yield))
+                   for n in ast.walk(test))
+
+
+def _asserts_something(fn: ast.FunctionDef) -> bool:
+    return any(isinstance(stmt, ast.Assert) and not _is_trivial(stmt.test)
+               for stmt in _reachable(fn.body))
+
+
+def _import_map(tree: ast.Module, modules: Set[str]) -> Dict[str, str]:
+    """{imported name: module file} for imports of other files in the test dir."""
+    imported = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            target = f"{node.module.split('.')[-1]}.py"
+            if target in modules:
+                for alias in node.names:
+                    imported[alias.asname or alias.name] = target
+    return imported
+
+
+def _parametrized_names(fn: ast.FunctionDef) -> List[List[str]]:
+    """The argnames of each @pytest.mark.parametrize on ``fn``."""
+    found = []
+    for dec in fn.decorator_list:
+        for sub in ast.walk(dec):
+            if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute) \
+                    and sub.func.attr == "parametrize" and sub.args \
+                    and isinstance(sub.args[0], ast.Constant):
+                found.append([n.strip() for n in sub.args[0].value.split(",") if n.strip()])
+    return found
+
+
+def _reads_parameters(fn: ast.FunctionDef) -> bool:
+    """Every parametrized value the table supplies is read by the test.
+
+    ``case_id`` is a label, so a test that ignores it is fine; ignoring the
+    input or the expectation is not.
+    """
+    used = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+    for argnames in _parametrized_names(fn):
+        wanted = [n for n in argnames if n != "case_id"] or argnames
+        if not set(wanted) <= used:
+            return False
+    return True
 
 
 def read_tests(tests_dir: Path, diagnostics: Optional[Path] = None) -> Dict[str, Binding]:
@@ -148,16 +250,27 @@ def read_tests(tests_dir: Path, diagnostics: Optional[Path] = None) -> Dict[str,
     trees = {p.name: ast.parse(p.read_text(encoding="utf-8"))
              for p in sorted(tests_dir.glob("*.py"))}
 
-    # Which functions assert, directly or through another function.
+    # Which functions assert, on their own or through a helper. A call is
+    # resolved in the defining module, then in the module it was imported
+    # from: never by bare name, so a same-named function elsewhere in the
+    # tree cannot donate its assert.
+    defined: Set[str] = set()
     direct: Dict[str, bool] = {}
     calls: Dict[str, Set[str]] = {}
-    by_name: Dict[str, List[str]] = {}
+    imports = {module: _import_map(tree, set(trees)) for module, tree in trees.items()}
     for module, tree in trees.items():
         for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
             key = f"{module}::{fn.name}"
-            direct[key] = any(isinstance(n, ast.Assert) for n in ast.walk(fn))
+            defined.add(key)
+            direct[key] = _asserts_something(fn)
             calls[key] = _called_names(fn)
-            by_name.setdefault(fn.name, []).append(key)
+
+    def resolve(module: str, name: str) -> Optional[str]:
+        own = f"{module}::{name}"
+        if own in defined:
+            return own
+        target = imports[module].get(name)
+        return f"{target}::{name}" if target and f"{target}::{name}" in defined else None
 
     asserts = dict(direct)
     for _ in range(len(asserts) + 1):
@@ -165,12 +278,10 @@ def read_tests(tests_dir: Path, diagnostics: Optional[Path] = None) -> Dict[str,
         for key, called in calls.items():
             if asserts[key]:
                 continue
+            module = key.split("::")[0]
             for name in called:
-                # Resolve a call in the defining module first, then anywhere.
-                module = key.split("::")[0]
-                candidates = [k for k in by_name.get(name, []) if k.startswith(f"{module}::")] \
-                    or by_name.get(name, [])
-                if any(asserts.get(k) for k in candidates):
+                resolved = resolve(module, name)
+                if resolved and asserts.get(resolved):
                     asserts[key] = changed = True
                     break
         if not changed:
@@ -186,7 +297,8 @@ def read_tests(tests_dir: Path, diagnostics: Optional[Path] = None) -> Dict[str,
                     tables[node.targets[0].id] = found
         for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
             key = f"{module}::{fn.name}"
-            binding = Binding(module=module, function=fn.name, asserts=asserts[key])
+            binding = Binding(module=module, function=fn.name, asserts=asserts[key],
+                              reads_parameters=_reads_parameters(fn))
             found = list(_case_calls(fn))
             for dec in fn.decorator_list:
                 for sub in ast.walk(dec):
@@ -244,7 +356,11 @@ def validate(table: Path, corpus_dir: Path, tests_dir: Path, repo_root: Path,
             bad("assertion", f"{row.id}: {row.test} does not check this case"
                              + (f" (named by {named})" if named else ""))
         elif not binding.asserts:
-            bad("assertion", f"{row.id}: {row.test} has no assertion")
+            bad("assertion", f"{row.id}: {row.test} has no effective assertion "
+                             "(none, unreachable, or only over literals)")
+        elif not binding.reads_parameters:
+            bad("assertion", f"{row.id}: {row.test} never reads the values its "
+                             "parametrize table supplies")
 
         issues = set()
         for b in bindings.values():
@@ -255,6 +371,10 @@ def validate(table: Path, corpus_dir: Path, tests_dir: Path, repo_root: Path,
                               f"{', '.join(sorted(issues))}")
         elif row.status != "pass":
             bad("status", f"{row.id}: status {row.status!r}, but no test is xfailed")
+
+    for check, case_id, tokens in _diagnostics_tokens(diagnostics):
+        if not tokens:
+            bad("diagnostics", f"{case_id}: '{check}' lists nothing to look for")
 
     known_ids = set(markers)
     for binding in bindings.values():

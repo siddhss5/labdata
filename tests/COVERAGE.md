@@ -20,12 +20,19 @@ warning or an error. Silently ignoring an input is never correct.
 
 `tests/conformance/test_coverage_table.py` fails if a row's fixture has no
 `CASE` marker, if the test it names does not check that case, if that test
-carries no assertion of its own or through a helper, or if its status
-disagrees with the `xfail` markers in the tests. The rules live in
-`tests/conformance/coverage_check.py`, and `test_coverage_check.py` drives
-them against tiny synthetic tables to prove each one still bites. `xfail`
-markers are `strict=True`, so a case turns red once the linked issue is fixed
-and the marker is stale.
+carries no effective assertion, or if its status disagrees with the `xfail`
+markers in the tests. The rules live in `tests/conformance/coverage_check.py`,
+and `test_coverage_check.py` drives them against tiny synthetic tables to
+prove each one still bites. `xfail` markers are `strict=True`, so a case turns
+red once the linked issue is fixed and the marker is stale.
+
+An assertion counts when it can be reached and is not made of literals alone,
+whether the test makes it itself or through a helper it defines or imports; a
+parametrized test must also read the values its table supplies, and a
+diagnostics check must say which tokens it looks for. What no checker can
+decide is whether an assertion is *about the right thing*: a test that asserts
+something true but beside the point still passes, and only review catches
+that.
 
 A case can also be checked by tests other than the one its row names; the
 status column reports `xfail` when any of them is xfailed.
