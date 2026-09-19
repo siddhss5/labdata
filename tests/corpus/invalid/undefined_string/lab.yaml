@@ -1,0 +1,8 @@
+# CASE strings.undefined
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "macro.bib"
+    category: "Papers"
+people_file: "people.yaml"
+projects_file: "projects.yaml"

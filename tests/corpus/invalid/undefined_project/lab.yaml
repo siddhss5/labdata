@@ -1,0 +1,9 @@
+# CASE projects.undefined
+# CASE diag.unknown_projects
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "tagged.bib"
+    category: "Papers"
+people_file: "people.yaml"
+projects_file: "projects.yaml"

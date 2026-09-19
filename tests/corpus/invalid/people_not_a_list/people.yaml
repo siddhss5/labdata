@@ -1,0 +1,6 @@
+# CASE people.not_a_list
+# A mapping where labdata expects a list.
+
+aadams:
+  name: "Alice Adams"
+  role: "professor"

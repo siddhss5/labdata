@@ -1,0 +1,19 @@
+# Fictional projects for the conformance corpus (see tests/COVERAGE.md).
+
+# CASE output.project.id
+# CASE output.project.title
+# CASE output.project.description
+# CASE output.project.website
+# CASE output.project.status
+# CASE output.project.publication_ids
+# CASE output.project.people_ids
+- id: "homebot"
+  title: "Household Manipulation"
+  description: "Robots that tidy up a fictional kitchen."
+  website: "https://example.org/projects/homebot"
+  status: "active"
+
+- id: "sharedarm"
+  title: "Shared Control"
+  description: "Sharing control of a fictional assistive arm."
+  status: "completed"

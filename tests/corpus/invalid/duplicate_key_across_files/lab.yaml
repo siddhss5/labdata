@@ -1,0 +1,10 @@
+# CASE structure.duplicate_key_across
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "first.bib"
+    category: "Papers"
+  - name: "second.bib"
+    category: "Papers"
+people_file: "people.yaml"
+projects_file: "projects.yaml"

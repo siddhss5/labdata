@@ -1,0 +1,231 @@
+# Part of the output of tests/corpus/valid/, compared as parsed data by
+# tests/conformance/test_output_format.py::test_full_output. The entries
+# here are the ones no open issue is expected to change; SNAPSHOT in that
+# file says which they are and why the rest is left out. Regenerate with
+#   LABDATA_REGENERATE_EXPECTED=1 uv run pytest tests/conformance/test_output_format.py
+# and review the diff before committing.
+schema_version: 1
+lab:
+  name: Corpus Lab
+  description: A fictional lab used only by the labdata conformance tests.
+  university: Example University
+  website: https://example.org/corpus
+publications:
+- bib_id: str-repeat
+  title: Last Definition Wins
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2021
+  venue: '*Robotics Venue*, 2021'
+  category: Strings
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{str-repeat,\n  year = {2021},\n  booktitle = {Robotics Venue},\n  author = {Adams,\
+    \ Alice},\n  title = {Last Definition Wins},\n}"
+- bib_id: type-article
+  title: An Article
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  - name: B. Brown
+    person_id: bbrown
+  year: 2020
+  venue: '*Journal of Fictional Robots*, 12(3), 2020'
+  category: Structure
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{type-article,\n  year = {2020},\n  publisher = {Fictional Press},\n  pages = {1--10},\n\
+    \  number = {3},\n  volume = {12},\n  journal = {Journal of Fictional Robots},\n  author = {Adams,\
+    \ Alice and Brown, Bob},\n  title = {An Article},\n}"
+- bib_id: type-phdthesis
+  title: A Doctoral Thesis
+  authors:
+  - name: E. Evans
+    person_id: eevans
+  year: 2020
+  venue: PhD thesis, Example University, 2020
+  category: Structure
+  entry_type: phdthesis
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@phdthesis{type-phdthesis,\n  year = {2020},\n  school = {Example University},\n  author =\
+    \ {Evans, Erin},\n  title = {A Doctoral Thesis},\n}"
+- bib_id: link-doi-bare
+  title: Bare DOI
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*Journal of Fictional Robots*, 2023'
+  category: Links
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: https://doi.org/10.5555/corpus.0001
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{link-doi-bare,\n  doi = {10.5555/corpus.0001},\n  year = {2023},\n  journal = {Journal\
+    \ of Fictional Robots},\n  author = {Adams, Alice},\n  title = {Bare DOI},\n}"
+- bib_id: link-youtube
+  title: A YouTube Video
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*Proceedings of the Fictional Conference*, 2023'
+  category: Links
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: https://www.youtube.com/watch?v=corpus00001
+  project_ids: []
+  bibtex: "@inproceedings{link-youtube,\n  url = {https://www.youtube.com/watch?v=corpus00001},\n  year\
+    \ = {2023},\n  booktitle = {Proceedings of the Fictional Conference},\n  author = {Adams, Alice},\n\
+    \  title = {A YouTube Video},\n}"
+- bib_id: present
+  title: A Paper Whose PDF Is Present
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  year: 2023
+  venue: '*Proceedings of the Fictional Conference*, 2023'
+  category: Links
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: pdfs/present.pdf
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@inproceedings{present,\n  year = {2023},\n  booktitle = {Proceedings of the Fictional Conference},\n\
+    \  author = {Adams, Alice},\n  title = {A Paper Whose PDF Is Present},\n}"
+- bib_id: proj-multiple
+  title: Two Projects
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  - name: C. Côté
+    person_id: ccote
+  year: 2024
+  venue: '*Proceedings of the Fictional Conference*, 2024'
+  category: Projects
+  entry_type: inproceedings
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids:
+  - homebot
+  - sharedarm
+  bibtex: "@inproceedings{proj-multiple,\n  project = {homebot, sharedarm},\n  year = {2024},\n  booktitle\
+    \ = {Proceedings of the Fictional Conference},\n  author = {Adams, Alice and C{\\^o}t{\\'e}, Carol},\n\
+    \  title = {Two Projects},\n}"
+- bib_id: id-external-2023
+  title: External Coauthors, Later
+  authors:
+  - name: A. Adams
+    person_id: aadams
+  - name: Q. Quinn
+    person_id: null
+  year: 2023
+  venue: '*Journal of Fictional Robots*, 2023'
+  category: Names
+  entry_type: article
+  abstract: null
+  note: null
+  pdf_url: null
+  doi_url: null
+  arxiv_url: null
+  url: null
+  video_url: null
+  project_ids: []
+  bibtex: "@article{id-external-2023,\n  year = {2023},\n  journal = {Journal of Fictional Robots},\n\
+    \  author = {Adams, Alice and Quinn, Quentin},\n  title = {External Coauthors, Later},\n}"
+people:
+- id: ccote
+  name: Carol Côté
+  role: phd_student
+  status: current
+  website: null
+  publication_count: 4
+  publication_ids:
+  - proj-multiple
+  - name-accent-tex
+  - name-accent-utf8
+  - enc-bom-crlf
+- id: eevans
+  name: Erin Evans
+  role: phd_student
+  status: alumni
+  website: null
+  publication_count: 1
+  start_year: 2014
+  end_year: 2020
+  degree: PhD
+  thesis_title: Learning to Tidy
+  current_position: Research Scientist, Example Robotics Inc.
+  publication_ids:
+  - type-phdthesis
+- id: vvandenberg
+  name: Victor van den Berg
+  role: postdoc
+  status: alumni
+  website: null
+  publication_count: 1
+  start_year: 2016
+  end_year: 2018
+  publication_ids:
+  - name-particle-van
+projects:
+- id: homebot
+  title: Household Manipulation
+  description: Robots that tidy up a fictional kitchen.
+  website: https://example.org/projects/homebot
+  status: active
+  publication_ids:
+  - proj-single
+  - proj-multiple
+  people_ids:
+  - aadams
+  - bbrown
+  - ccote
+collaborators:
+- name: Q. Quinn
+  publication_count: 2
+  last_year: 2023
+- name: R. Ross
+  publication_count: 1
+  last_year: 2019

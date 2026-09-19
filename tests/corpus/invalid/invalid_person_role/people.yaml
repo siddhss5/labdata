@@ -1,0 +1,13 @@
+# CASE people.invalid_role
+# A role the people page has no group for.
+
+- id: "aadams"
+  name: "Alice Adams"
+  aliases: ["A. Adams"]
+  role: "professor"
+  status: "current"
+
+- id: "bbrown"
+  name: "Bob Brown"
+  role: "wizard"
+  status: "current"

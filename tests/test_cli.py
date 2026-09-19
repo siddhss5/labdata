@@ -110,9 +110,10 @@ class TestCLIUnresolved:
         assert result.returncode == 0
         assert "E. E. Jones" in result.stdout
 
+    @pytest.mark.xfail(strict=True, reason="#22")
     def test_unresolved_without_people(self, run_cli, tmp_path):
-        """Without people_file, no authors can be resolved, but unresolved list is empty
-        (no people to match against → nothing to report)."""
+        """Without people_file, resolution never ran, so --unresolved must say so
+        (naming people_file) instead of reporting every author as resolved."""
         config_data = {
             "bib_dir": str(FIXTURES),
             "bib_files": [{"name": "sample.bib", "category": "Test"}],
@@ -122,5 +123,5 @@ class TestCLIUnresolved:
             yaml.dump(config_data, f)
 
         result = run_cli("--config", str(config_path), "--unresolved")
-        assert result.returncode == 0
-        assert "All authors resolved" in result.stdout
+        assert "All authors resolved" not in result.stdout
+        assert "people_file" in result.stdout + result.stderr

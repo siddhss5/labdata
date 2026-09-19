@@ -1,0 +1,98 @@
+% Fictional link cases for tests/COVERAGE.md. 10.5555 is a DOI test prefix.
+
+% CASE links.doi_bare
+% CASE fields.doi
+% CASE output.publication.doi_url
+@article{link-doi-bare,
+  title   = {Bare DOI},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2023},
+  doi     = {10.5555/corpus.0001}
+}
+
+% CASE links.doi_url
+@article{link-doi-url,
+  title   = {DOI Given as a URL},
+  author  = {Adams, Alice},
+  journal = {Journal of Fictional Robots},
+  year    = {2023},
+  doi     = {https://doi.org/10.5555/corpus.0002}
+}
+
+% CASE links.arxiv_prefixed
+% CASE fields.archiveprefix
+% CASE output.publication.arxiv_url
+@misc{link-arxiv-prefix,
+  title         = {arXiv with archivePrefix},
+  author        = {Adams, Alice},
+  eprint        = {2401.00001},
+  archivePrefix = {arXiv},
+  year          = {2023}
+}
+
+% CASE links.arxiv_unprefixed
+@misc{link-arxiv-bare,
+  title  = {arXiv without archivePrefix},
+  author = {Adams, Alice},
+  eprint = {2401.00002},
+  year   = {2023}
+}
+
+% CASE links.youtube
+% CASE fields.url
+% CASE output.publication.video_url
+@inproceedings{link-youtube,
+  title     = {A YouTube Video},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2023},
+  url       = {https://www.youtube.com/watch?v=corpus00001}
+}
+
+% CASE links.vimeo
+@inproceedings{link-vimeo,
+  title     = {A Vimeo Video},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2023},
+  url       = {https://vimeo.com/000000001}
+}
+
+% CASE links.url
+% CASE output.publication.url
+@inproceedings{link-url,
+  title     = {A Plain Web Link},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2023},
+  url       = {https://example.org/papers/link-url}
+}
+
+% pdfs/present.pdf exists for this key.
+% CASE links.pdf.local_present
+% CASE output.publication.pdf_url
+@inproceedings{present,
+  title     = {A Paper Whose PDF Is Present},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2023}
+}
+
+% There is no pdfs/missing.pdf.
+% CASE links.pdf.local_missing
+@inproceedings{missing,
+  title     = {A Paper Whose PDF Is Missing},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2023}
+}
+
+% CASE links.note_link_award
+@inproceedings{link-note-award,
+  title     = {A Note with a Link and an Award},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2023},
+  note      = {\href{https://example.org/papers/award}{Website}, Best Paper Award Finalist}
+}

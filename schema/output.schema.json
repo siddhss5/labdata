@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/siddhss5/labdata/blob/main/schema/output.schema.json",
+  "title": "labdata output",
+  "description": "The lab.yml / lab.json file written by `labdata --output`. YAML and JSON exports hold the same data.",
+  "type": "object",
+  "required": ["schema_version", "publications", "people", "projects", "collaborators"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "description": "Version of this output format. Bumped when a change could break a consumer.",
+      "const": 1
+    },
+    "lab": {
+      "description": "The lab section of lab.yaml, copied through unchanged.",
+      "type": "object"
+    },
+    "publications": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/publication" }
+    },
+    "people": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/person" }
+    },
+    "projects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/project" }
+    },
+    "collaborators": {
+      "description": "Co-authors who did not resolve to anyone in people.yaml.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/collaborator" }
+    }
+  },
+  "$defs": {
+    "optionalString": { "type": ["string", "null"] },
+    "idList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "author": {
+      "type": "object",
+      "required": ["name", "person_id"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "person_id": {
+          "description": "The id of the matching person in people.yaml, or null.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "publication": {
+      "type": "object",
+      "required": [
+        "bib_id", "title", "authors", "year", "venue", "category", "entry_type",
+        "abstract", "note", "pdf_url", "doi_url", "arxiv_url", "url", "video_url",
+        "project_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "bib_id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "authors": { "type": "array", "items": { "$ref": "#/$defs/author" } },
+        "year": { "type": "integer", "minimum": 0 },
+        "venue": { "type": "string" },
+        "category": { "type": "string" },
+        "entry_type": { "type": "string", "minLength": 1 },
+        "abstract": { "$ref": "#/$defs/optionalString" },
+        "note": { "$ref": "#/$defs/optionalString" },
+        "pdf_url": { "$ref": "#/$defs/optionalString" },
+        "doi_url": { "$ref": "#/$defs/optionalString" },
+        "arxiv_url": { "$ref": "#/$defs/optionalString" },
+        "url": { "$ref": "#/$defs/optionalString" },
+        "video_url": { "$ref": "#/$defs/optionalString" },
+        "project_ids": { "$ref": "#/$defs/idList" },
+        "bibtex": { "type": "string" }
+      }
+    },
+    "person": {
+      "type": "object",
+      "required": ["id", "name", "role", "status", "website", "publication_count"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "role": { "$ref": "#/$defs/optionalString" },
+        "status": { "type": "string" },
+        "website": { "$ref": "#/$defs/optionalString" },
+        "publication_count": { "type": "integer", "minimum": 0 },
+        "photo": { "type": "string" },
+        "email": { "type": "string" },
+        "co_advisor": { "type": "string" },
+        "start_year": { "type": "integer" },
+        "end_year": { "type": "integer" },
+        "degree": { "type": "string" },
+        "thesis_title": { "type": "string" },
+        "current_position": { "type": "string" },
+        "publication_ids": { "$ref": "#/$defs/idList" }
+      }
+    },
+    "project": {
+      "type": "object",
+      "required": [
+        "id", "title", "description", "website", "status", "publication_ids", "people_ids"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "description": { "$ref": "#/$defs/optionalString" },
+        "website": { "$ref": "#/$defs/optionalString" },
+        "status": { "type": "string" },
+        "publication_ids": { "$ref": "#/$defs/idList" },
+        "people_ids": { "$ref": "#/$defs/idList" }
+      }
+    },
+    "collaborator": {
+      "type": "object",
+      "required": ["name", "publication_count", "last_year"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "publication_count": { "type": "integer", "minimum": 1 },
+        "last_year": { "type": "integer" }
+      }
+    }
+  }
+}

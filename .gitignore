@@ -24,3 +24,6 @@ site/_config.generated.yml
 
 # Site build output
 _site/
+
+# The conformance corpus ships a tiny fictional PDF fixture (tests/corpus).
+!tests/corpus/valid/pdfs/present.pdf

@@ -1,0 +1,9 @@
+# CASE config.unknown_key
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "ok.bib"
+    category: "Papers"
+people_file: "people.yaml"
+projects_file: "projects.yaml"
+people_fil: "people.yaml"

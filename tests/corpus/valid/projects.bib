@@ -1,0 +1,38 @@
+% Fictional project-tag cases for tests/COVERAGE.md.
+
+% CASE projects.single
+% CASE fields.project
+% CASE output.publication.project_ids
+@inproceedings{proj-single,
+  title     = {One Project},
+  author    = {Adams, Alice and Brown, Bob},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2024},
+  project   = {homebot}
+}
+
+% CASE projects.multiple
+@inproceedings{proj-multiple,
+  title     = {Two Projects},
+  author    = {Adams, Alice and C{\^o}t{\'e}, Carol},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2024},
+  project   = {homebot, sharedarm}
+}
+
+% CASE projects.none
+@inproceedings{proj-none,
+  title     = {No Project},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2024}
+}
+
+% CASE projects.keywords
+@inproceedings{proj-keywords,
+  title     = {Project in Keywords},
+  author    = {Davis, Dave},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2024},
+  keywords  = {project:sharedarm, manipulation}
+}

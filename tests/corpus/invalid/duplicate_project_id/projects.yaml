@@ -1,0 +1,10 @@
+# CASE projects.duplicate_id
+# The same project id twice.
+
+- id: "homebot"
+  title: "Household Manipulation"
+  status: "active"
+
+- id: "homebot"
+  title: "Another Household Project"
+  status: "active"

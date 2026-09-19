@@ -18,7 +18,7 @@ from labdata.assembler import assemble
 from labdata.config import LabDataConfig, BibFile
 
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
 class TestNormalizeName:
