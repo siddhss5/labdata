@@ -110,7 +110,6 @@ class TestCLIUnresolved:
         assert result.returncode == 0
         assert "E. E. Jones" in result.stdout
 
-    @pytest.mark.xfail(strict=True, reason="#22")
     def test_unresolved_without_people(self, run_cli, tmp_path):
         """Without people_file, resolution never ran, so --unresolved must say so
         (naming people_file) instead of reporting every author as resolved."""

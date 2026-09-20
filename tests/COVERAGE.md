@@ -44,8 +44,8 @@ A case can also be checked by tests other than the one its row names; the
 status column reports `xfail` when any of them is xfailed.
 
 Cases that fail today are not fixed here (that is the linked issue's job):
-#20 (unverified PDF links), #21 (one `@string` summary), #22 (`--unresolved`
-with no people file), #24 (structured-name matching), #26 (precise
+#20 (unverified PDF links), #21 (one `@string` summary), #24
+(structured-name matching), #26 (precise
 diagnostics), #27 (explicit link and award fields), #28 (`keywords` project
 tags). #18 is still open for
 the template side — `| escape`, attribute-safe escaping and the checks on
@@ -247,7 +247,7 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 | `config.pdf_base_url.missing` | No `pdf_base_url` | Accepted; no publication gets a `pdf_url` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_pdf_base_url_missing` | pass |
 | `config.pdf_base_url.wrong_type` | `pdf_base_url: 42` | Error naming the file and the key | `tests/corpus/invalid/config_pdf_base_url_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.people_file.present` | `people_file` pointing at a people list | People are loaded and authors are resolved against them | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_people_file_present` | pass |
-| `config.people_file.missing` | No `people_file` | Accepted; every author is a collaborator, and `--unresolved` says resolution is not configured | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_people_file_missing` | xfail #22 |
+| `config.people_file.missing` | No `people_file` | Accepted; every author is a collaborator, and `--unresolved` says resolution is not configured | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_people_file_missing` | pass |
 | `config.people_file.not_found` | `people_file` naming a file that is not there | Error naming the key and the missing file | `tests/corpus/invalid/people_file_not_found/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.people_file.wrong_type` | `people_file` as a list | Error naming the file and the key | `tests/corpus/invalid/config_people_file_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.projects_file.present` | `projects_file` pointing at a project list | Projects are loaded and tags are validated against them | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_projects_file_present` | pass |
