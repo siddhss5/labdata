@@ -247,11 +247,15 @@ people:
   role: phd_student
   status: current
   website: null
-  publication_count: 4
+  publication_count: 8
   publication_ids:
   - proj-multiple
   - name-accent-tex
   - name-accent-utf8
+  - name-equal-dollar
+  - name-equal-caret
+  - name-equal-superscript
+  - name-equal-star
   - enc-bom-crlf
 - id: eevans
   name: Erin Evans
@@ -271,10 +275,14 @@ people:
   role: postdoc
   status: alumni
   website: null
-  publication_count: 1
+  publication_count: 5
   start_year: 2016
   end_year: 2018
   publication_ids:
+  - name-equal-dollar
+  - name-equal-caret
+  - name-equal-superscript
+  - name-equal-star
   - name-particle-van
 projects:
 - id: homebot

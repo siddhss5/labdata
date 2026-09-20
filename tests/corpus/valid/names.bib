@@ -92,38 +92,73 @@
   year    = {2022}
 }
 
-% The four forms the marker is written in, on the given name.
+% Equal contribution: each marker form, on each part of a name. The four
+% entries below differ only in the form, and each one writes it on the given
+% name, the surname, the particle and the lineage suffix in turn. Carol Côté
+% carries it on a surname spelled with TeX accents, as the Example Lab demo
+% does, and Alice Adams is never marked.
+
 % CASE names.equal_contribution
 % CASE names.equal_contribution_marker
-@inproceedings{name-equal,
-  title     = {Equal Contribution Markers on the Given Name},
-  author    = {Brown, Bob$^{*}$ and Davis, Dave^{*} and
-               Green, Grace-Ann\textsuperscript{*} and Kim, Alex* and
+@inproceedings{name-equal-dollar,
+  title     = {Equal Contribution Written as $^{*}$},
+  author    = {Brown, Bob$^{*}$ and C{\^o}t{\'e}$^{*}$, Carol and
+               van$^{*}$ den Berg, Victor and Smith, Jr.$^{*}$, John and
                Adams, Alice},
   booktitle = {Proceedings of the Fictional Conference},
   year      = {2022}
 }
 
-% The same four forms on the surname, which is where the Example Lab demo
-% writes them and where #46 found them corrupting the name.
 % CASE names.equal_contribution
 % CASE names.equal_contribution_marker
-@inproceedings{name-equal-family,
-  title     = {Equal Contribution Markers on the Surname},
-  author    = {Brown$^{*}$, Bob and Davis^{*}, Dave and
-               Green\textsuperscript{*}, Grace-Ann and Kim*, Alex and
+@inproceedings{name-equal-caret,
+  title     = {Equal Contribution Written as ^{*}},
+  author    = {Brown, Bob^{*} and C{\^o}t{\'e}^{*}, Carol and
+               van^{*} den Berg, Victor and Smith, Jr.^{*}, John and
                Adams, Alice},
   booktitle = {Proceedings of the Fictional Conference},
   year      = {2022}
 }
 
-% The marker on the two parts a surname can also be split into: the particle
-% and the lineage suffix.
 % CASE names.equal_contribution
 % CASE names.equal_contribution_marker
-@inproceedings{name-equal-parts,
-  title     = {Equal Contribution Markers on a Particle and a Suffix},
-  author    = {de$^{*}$ la Cruz, Rupert and Smith, Jr.*, John and Adams, Alice},
+@inproceedings{name-equal-superscript,
+  title     = {Equal Contribution Written as \textsuperscript{*}},
+  author    = {Brown, Bob\textsuperscript{*} and C{\^o}t{\'e}\textsuperscript{*}, Carol and
+               van\textsuperscript{*} den Berg, Victor and Smith, Jr.\textsuperscript{*}, John and
+               Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
+% CASE names.equal_contribution
+% CASE names.equal_contribution_marker
+@inproceedings{name-equal-star,
+  title     = {Equal Contribution Written as *},
+  author    = {Brown, Bob* and C{\^o}t{\'e}*, Carol and
+               van* den Berg, Victor and Smith, Jr.*, John and
+               Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
+% A marker written twice over, and one wrapped in a brace group of its own.
+% Both come off, and neither leaves anything behind in the name.
+% CASE names.equal_contribution_normalized
+@inproceedings{name-equal-normalized,
+  title     = {Equal Contribution Written Twice, and in a Brace Group},
+  author    = {Brown$^{*}$*, Bob and Kim{$^{*}$}, Alex and Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
+% A star, caret or dollar with a backslash in front of it is escaped text, not
+% a marker: it stays in the name and marks nobody.
+% CASE names.equal_contribution_escaped
+@inproceedings{name-equal-escaped,
+  title     = {Escaped Stars Are Not Markers},
+  author    = {Brown\*, Bob and Davis\^{*}, Dave and Green\$^{*}$, Grace-Ann and
+               Adams, Alice},
   booktitle = {Proceedings of the Fictional Conference},
   year      = {2022}
 }

@@ -79,31 +79,6 @@ NAMES = [
     case("names.accent_utf8", "name-accent-utf8", "authors.0.person_id", "ccote"),
     case("names.others", "name-others", "authors.*.person_id", Contains("aadams", "bbrown")),
     case("names.others", "name-others", "authors.*.name", Excludes("others")),
-    # The marker comes off the name, whichever part it was written on and in
-    # whichever of the four forms, and the cleaned name still resolves.
-    case("names.equal_contribution", "name-equal", "authors.*.name",
-         ["B. Brown", "D. Davis", "G.-A. Green", "A. Kim", "A. Adams"]),
-    case("names.equal_contribution", "name-equal", "authors.*.person_id",
-         ["bbrown", "ddavis", "ggreen", "akim", "aadams"]),
-    case("names.equal_contribution", "name-equal", "authors.*.given",
-         ["Bob", "Dave", "Grace-Ann", "Alex", "Alice"]),
-    case("names.equal_contribution", "name-equal-family", "authors.*.name",
-         ["B. Brown", "D. Davis", "G.-A. Green", "A. Kim", "A. Adams"]),
-    case("names.equal_contribution", "name-equal-family", "authors.*.person_id",
-         ["bbrown", "ddavis", "ggreen", "akim", "aadams"]),
-    case("names.equal_contribution", "name-equal-family", "authors.*.family",
-         ["Brown", "Davis", "Green", "Kim", "Adams"]),
-    case("names.equal_contribution", "name-equal-parts", "authors.*.name",
-         ["R. de la Cruz", "J. Smith, Jr.", "A. Adams"]),
-    case("names.equal_contribution", "name-equal-parts", "authors.0.von", "de la"),
-    case("names.equal_contribution", "name-equal-parts", "authors.0.person_id", "rdelacruz"),
-    case("names.equal_contribution", "name-equal-parts", "authors.1.suffix", "Jr."),
-    case("names.equal_contribution_marker", "name-equal", "authors.*.equal_contribution",
-         [True, True, True, True, False]),
-    case("names.equal_contribution_marker", "name-equal-family",
-         "authors.*.equal_contribution", [True, True, True, True, False]),
-    case("names.equal_contribution_marker", "name-equal-parts",
-         "authors.*.equal_contribution", [True, True, False]),
     case("names.same_initial_alex", "name-kim-alex", "authors.0.person_id", "akim"),
     case("names.same_initial_alan", "name-kim-alan", "authors.0.person_id", "alankim",
          xfail="#24"),
@@ -119,6 +94,56 @@ NAMES = [
 
 @pytest.mark.parametrize("case_id, bib_key, path, expected", NAMES)
 def test_names(valid_output, case_id, bib_key, path, expected):
+    check_publication(valid_output, bib_key, path, expected)
+
+
+# --- Equal contribution ------------------------------------------------------
+# Four corpus entries differing only in the marker form, each writing it on a
+# different part of a name, give the sixteen combinations of form and part.
+# Every marked author is a lab member, so each one also says the cleaned name
+# still finds its person.
+
+EQUAL_ENTRIES = ["name-equal-dollar", "name-equal-caret",
+                 "name-equal-superscript", "name-equal-star"]
+EQUAL_NAMES = ["B. Brown", "C. Côté", "V. van den Berg", "J. Smith, Jr.", "A. Adams"]
+EQUAL_IDS = ["bbrown", "ccote", "vvandenberg", "jsmith", "aadams"]
+# The part each author carries the marker on, and how that part reads once it
+# is off. The last author is never marked.
+EQUAL_PARTS = [("authors.0.given", "Bob"), ("authors.1.family", "Côté"),
+               ("authors.2.von", "van den"), ("authors.3.suffix", "Jr.")]
+EQUAL_MARKED = [True, True, True, True, False]
+
+EQUAL_CONTRIBUTION = [
+    case("names.equal_contribution", bib_key, path, expected)
+    for bib_key in EQUAL_ENTRIES
+    for path, expected in ([("authors.*.name", EQUAL_NAMES),
+                            ("authors.*.person_id", EQUAL_IDS)] + EQUAL_PARTS)
+] + [
+    case("names.equal_contribution_marker", bib_key, "authors.*.equal_contribution",
+         EQUAL_MARKED)
+    for bib_key in EQUAL_ENTRIES
+] + [
+    # A marker written twice, and one in a brace group of its own: both come
+    # off, and the name still resolves.
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.*.name", ["B. Brown", "A. Kim", "A. Adams"]),
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.*.person_id", ["bbrown", "akim", "aadams"]),
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.*.equal_contribution", [True, True, False]),
+    # An escaped star, caret or dollar is text: nobody is marked, and what was
+    # written stays in the name rather than being read as an annotation.
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.*.equal_contribution", [False, False, False, False]),
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.1.name", Contains("Davis", "*")),
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.2.name", Contains("Green", "*")),
+]
+
+
+@pytest.mark.parametrize("case_id, bib_key, path, expected", EQUAL_CONTRIBUTION)
+def test_equal_contribution(valid_output, case_id, bib_key, path, expected):
     check_publication(valid_output, bib_key, path, expected)
 
 
@@ -192,23 +217,23 @@ def test_every_display_name_agrees_with_its_parts(valid_output):
     assert checked > 40, checked
 
 
-MARKED_ENTRIES = {"name-equal", "name-equal-family", "name-equal-parts"}
+MARKED_ENTRIES = set(EQUAL_ENTRIES) | {"name-equal-normalized"}
 
 
 @covers("names.equal_contribution_marker")
 def test_only_marked_authors_are_equal_contributors(valid_output):
     """Across the corpus, equal_contribution is set exactly where a marker was.
 
-    A row-by-row check says the marked authors are marked. This says the
-    unmarked ones are not: no name elsewhere in the corpus — a starred title,
-    a corporate name, an accent written in TeX — picks the flag up.
+    The rows above say the marked authors are marked. This says the unmarked
+    ones are not: no name elsewhere in the corpus — a starred title, a
+    corporate name, an accent written in TeX, an escaped star — picks the flag
+    up. Nor does a marked name keep a star once the marker is off.
     """
     marked = {(p["bib_id"], a["name"]) for p in valid_output["publications"]
               for a in p["authors"] if a["equal_contribution"]}
     assert {bib_id for bib_id, _ in marked} == MARKED_ENTRIES
-    assert len(marked) == 10, sorted(marked)
-    assert all("*" not in a["name"] for p in valid_output["publications"]
-               for a in p["authors"])
+    assert len(marked) == len(EQUAL_ENTRIES) * 4 + 2, sorted(marked)
+    assert [name for _, name in marked if "*" in name] == []
 
 
 @covers("names.initials_ambiguous", xfail="#24", owns=("name-kim-initial",))
@@ -449,9 +474,11 @@ OUTPUT_FIELDS = [
          "Learning to Tidy"),
     case("output.person.current_position", "people", "id", "eevans", "current_position",
          "Research Scientist, Example Robotics Inc."),
-    case("output.person.publication_count", "people", "id", "ccote", "publication_count", 4),
+    case("output.person.publication_count", "people", "id", "ccote", "publication_count", 8),
     case("output.person.publication_ids", "people", "id", "ccote", "publication_ids",
-         ["proj-multiple", "name-accent-tex", "name-accent-utf8", "enc-bom-crlf"]),
+         ["proj-multiple", "name-accent-tex", "name-accent-utf8", "name-equal-dollar",
+          "name-equal-caret", "name-equal-superscript", "name-equal-star",
+          "enc-bom-crlf"]),
     case("output.project.id", "projects", "title", "Household Manipulation", "id", "homebot"),
     case("output.project.title", "projects", "id", "sharedarm", "title", "Shared Control"),
     case("output.project.description", "projects", "id", "homebot", "description",

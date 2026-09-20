@@ -39,13 +39,26 @@ TEXT_FIELDS = frozenset({
 # A name list ending in "and others" means "et al."; it is not an author.
 OTHERS = "others"
 
-# Equal contribution is written as a star on one part of a name, in any of
+# Equal contribution is written as a star on one part of a name, in one of
 # these four forms. It is an annotation rather than part of the name, so it is
 # taken off the part before the name is read and recorded on the author
 # instead. Other author annotations — corresponding author, affiliation
 # numbers, daggers — are not read.
+#
+# A star, caret or dollar written with a backslash in front of it is escaped
+# text rather than the start of a marker: `Brown\*` is a name with a star in
+# it. The accent in `C{\^o}t{\'e}$^{*}$` is escaped the same way, and the
+# marker after it is not, which is how that name keeps working.
+_WRITTEN = r"\$\^\{\*\}\$|\^\{\*\}|\\textsuperscript\s*\{\*\}"
+_MARKER = rf"(?<!\\)(?:{_WRITTEN}|\*)"
+
+# A marker at the end of a name part, on its own or in a brace group of its
+# own: BibTeX grouping such as `Brown{$^{*}$}` protects the marker from the
+# name, and does not make it part of it. Only a form that brings its own
+# command is unwrapped, because a lone `{*}` is how any other command takes
+# its argument — the star in `Brown\^{*}` is an accented star, not a marker.
 EQUAL_CONTRIBUTION = re.compile(
-    r"(?:\$\^\{\*\}\$|\^\{\*\}|\\textsuperscript\s*\{\*\}|\*)\s*$")
+    rf"(?:(?<!\\)\{{\s*(?:{_WRITTEN})\s*\}}|{_MARKER})\s*$")
 
 _STRING_DEFINITION = re.compile(r'@string\s*[{(]\s*([^\s=,{}()"]+)\s*=', re.IGNORECASE)
 
@@ -206,8 +219,16 @@ def _name_parts(person: Person) -> List[str]:
 
 
 def _without_marker(part: str) -> str:
-    """One name part with an equal-contribution marker taken off its end."""
-    return EQUAL_CONTRIBUTION.sub("", part)
+    """One name part with its equal-contribution markers taken off the end.
+
+    Stripping repeats, because a name written ``Brown$^{*}$*`` carries the
+    marker twice and taking one off would leave the other in the name.
+    """
+    while True:
+        stripped = EQUAL_CONTRIBUTION.sub("", part, count=1)
+        if stripped == part:
+            return part
+        part = stripped
 
 
 def marks_equal_contribution(person: Person) -> bool:
