@@ -103,6 +103,9 @@ Examples:
 
     # --unresolved mode
     if args.unresolved:
+        if not config.people_file:
+            print("Author resolution is not configured (no people_file).")
+            return
         if not result.unresolved_authors:
             print("All authors resolved.")
         else:
