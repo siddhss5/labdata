@@ -40,8 +40,10 @@ TEXT_FIELDS = frozenset({
 OTHERS = "others"
 
 # A stable code makes validation output suitable for CI and tooling without
-# making callers depend on its English wording.
-DUPLICATE_CITATION_KEY = "E-BIB-DUPLICATE-KEY"
+# making callers depend on its English wording. The code names the condition
+# only: the same duplicate is an error under --validate and a warning
+# elsewhere, so severity is not part of it. See "Diagnostic codes" in SPEC.md.
+DUPLICATE_CITATION_KEY = "BIB-DUPLICATE-KEY"
 
 # Equal contribution is written as a star on one part of a name, in one of
 # these four forms. It is an annotation rather than part of the name, so it is
