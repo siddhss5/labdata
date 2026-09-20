@@ -123,14 +123,22 @@ EQUAL_CONTRIBUTION = [
          EQUAL_MARKED)
     for bib_key in EQUAL_ENTRIES
 ] + [
-    # A marker written twice, and one in a brace group of its own: both come
-    # off, and the name still resolves.
+    # A marker written twice, one in a brace group of its own, and one whose
+    # command and argument BibTeX split into two name parts: each comes off
+    # whole, and the name still resolves. A brace group holding only a star is
+    # another command's argument, not a marker, and is left alone.
     case("names.equal_contribution_normalized", "name-equal-normalized",
-         "authors.*.name", ["B. Brown", "A. Kim", "A. Adams"]),
+         "authors.*.person_id", ["bbrown", "akim", "ggreen", "ddavis", "aadams"]),
     case("names.equal_contribution_normalized", "name-equal-normalized",
-         "authors.*.person_id", ["bbrown", "akim", "aadams"]),
+         "authors.*.equal_contribution", [True, True, True, False, False]),
     case("names.equal_contribution_normalized", "name-equal-normalized",
-         "authors.*.equal_contribution", [True, True, False]),
+         "authors.0.name", "B. Brown"),
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.1.name", "A. Kim"),
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.2.name", "G.-A. Green"),
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.3.name", Contains("Davis", "*")),
     # An escaped star, caret or dollar is text: nobody is marked, and what was
     # written stays in the name rather than being read as an annotation.
     case("names.equal_contribution_escaped", "name-equal-escaped",
@@ -232,7 +240,9 @@ def test_only_marked_authors_are_equal_contributors(valid_output):
     marked = {(p["bib_id"], a["name"]) for p in valid_output["publications"]
               for a in p["authors"] if a["equal_contribution"]}
     assert {bib_id for bib_id, _ in marked} == MARKED_ENTRIES
-    assert len(marked) == len(EQUAL_ENTRIES) * 4 + 2, sorted(marked)
+    # Four parts marked in each of the four form entries, and three of the
+    # five authors of name-equal-normalized.
+    assert len(marked) == len(EQUAL_ENTRIES) * 4 + 3, sorted(marked)
     assert [name for _, name in marked if "*" in name] == []
 
 

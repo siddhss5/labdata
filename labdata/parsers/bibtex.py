@@ -60,6 +60,15 @@ _MARKER = rf"(?<!\\)(?:{_WRITTEN}|\*)"
 EQUAL_CONTRIBUTION = re.compile(
     rf"(?:(?<!\\)\{{\s*(?:{_WRITTEN})\s*\}}|{_MARKER})\s*$")
 
+# `\textsuperscript {*}`, with a space before the argument, is the same form:
+# BibTeX splits a name on spaces, so the command and its argument arrive as two
+# name parts and neither is a marker on its own. Only this one command takes
+# its argument back, and only when the argument is exactly `{*}`, so a brace
+# group that belongs to anything else — the accent in `Brown\^ {*}` — is left
+# where it is.
+_MARKER_COMMAND = re.compile(r"\\textsuperscript\s*$")
+_MARKER_ARGUMENT = "{*}"
+
 _STRING_DEFINITION = re.compile(r'@string\s*[{(]\s*([^\s=,{}()"]+)\s*=', re.IGNORECASE)
 
 # The command name pybtex is about to read, when that name is `comment`.
@@ -211,11 +220,35 @@ def _initials(given: str) -> str:
     return "-".join(f"{part[0]}." for part in parts)
 
 
+def _name_part_groups(person: Person) -> List[List[str]]:
+    """A pybtex name's parts, grouped as the BibTeX parts that read them.
+
+    Given and middle names are one group because they are read as one part,
+    and because BibTeX puts the first word of a given name in one list and the
+    rest in the other — which is a split a marker can land across.
+    """
+    return [list(person.first_names) + list(person.middle_names),
+            list(person.prelast_names),
+            list(person.last_names),
+            list(person.lineage_names)]
+
+
+def _with_marker_joined(parts: List[str]) -> List[str]:
+    """One group of name parts, with a marker split across two of them joined."""
+    joined: List[str] = []
+    for part in parts:
+        if (joined and part == _MARKER_ARGUMENT
+                and _MARKER_COMMAND.search(joined[-1])):
+            joined[-1] += part
+        else:
+            joined.append(part)
+    return joined
+
+
 def _name_parts(person: Person) -> List[str]:
-    """Every part of a pybtex name, as written in the file."""
-    return (list(person.first_names) + list(person.middle_names)
-            + list(person.prelast_names) + list(person.last_names)
-            + list(person.lineage_names))
+    """Every part of a pybtex name, as written, with split markers joined."""
+    return [part for group in _name_part_groups(person)
+            for part in _with_marker_joined(group)]
 
 
 def _without_marker(part: str) -> str:
@@ -270,7 +303,7 @@ def person_name_parts(person: Person, where: str) -> Dict[str, Optional[str]]:
     """
     def text(parts) -> Optional[str]:
         joined = " ".join(_convert(_without_marker(part), where)
-                          for part in parts).strip()
+                          for part in _with_marker_joined(parts)).strip()
         return joined or None
 
     if _is_literal(person):

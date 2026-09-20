@@ -142,12 +142,17 @@
   year      = {2022}
 }
 
-% A marker written twice over, and one wrapped in a brace group of its own.
-% Both come off, and neither leaves anything behind in the name.
+% The same marker written in ways that need putting back together first: twice
+% over, wrapped in a brace group of its own, and with a space between
+% \textsuperscript and its argument, which BibTeX splits into two name parts.
+% All three come off. A brace group holding only a star is not one of them: it
+% is how any other command takes its argument, so Dave Davis is not marked.
 % CASE names.equal_contribution_normalized
 @inproceedings{name-equal-normalized,
-  title     = {Equal Contribution Written Twice, and in a Brace Group},
-  author    = {Brown$^{*}$*, Bob and Kim{$^{*}$}, Alex and Adams, Alice},
+  title     = {Equal Contribution Written Twice, in a Brace Group, and Spaced},
+  author    = {Brown$^{*}$*, Bob and Kim{$^{*}$}, Alex and
+               Green\textsuperscript {*}, Grace-Ann and Davis{*}, Dave and
+               Adams, Alice},
   booktitle = {Proceedings of the Fictional Conference},
   year      = {2022}
 }
