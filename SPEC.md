@@ -140,7 +140,7 @@ can be derived from the other.
 **Every string in the emitted document that is meant for display is plain
 Unicode text.** Not HTML, not Markdown, not escaped, not LaTeX. The document
 also carries strings that are not display text at all — identifiers, URLs and
-the `bibtex` record — and category 4 below lists them.
+the `bibtex` record — and heading 4 below lists them.
 
 **Text is untrusted.** A title may contain `<`, `&`, `"`, `*` or `$`, and
 often does: `Informed RRT*` and `BIT*` are real paper titles. labdata does
@@ -151,7 +151,17 @@ HTML attributes, for shell arguments, for whatever they emit.
 ### What labdata converts, and what it does not
 
 This is the part that must be read carefully, because labdata enforces the
-rule in one place only. Every string is in exactly one of four categories.
+rule in one place only.
+
+The four headings below are **lenses, not a partition**. Conversion and fate
+are separate stages: a field is first converted or not, and then emitted,
+consumed into a derived field, or discarded. A field can therefore appear
+under more than one heading, and several do. `journal` is converted (1) and
+then consumed into `venue` (3). `series`, `publisher`, `address` and
+`organization` are converted (1) and then used by nothing (3).
+`publication.url` is copied unconverted (2) and is also a URL rather than
+display text (4). Read each heading as a question to ask about a string, not
+as a box the string lives in.
 
 **1. Converted prose — the rule is enforced here.** Prose fields read from
 BibTeX are converted from LaTeX to Unicode by
@@ -167,16 +177,18 @@ Being converted is not the same as being emitted. Of these fields, `title`,
 `booktitle`, `school`, `institution` and `type` are consumed by
 `format_venue()` (§5) and reach the document only through `venue`; and
 `series`, `publisher`, `address` and `organization` are converted and then
-used by nothing, so they fall into category 3 below.
+used by nothing, so they also appear under heading 3.
 
 **2. Emitted without conversion — the rule is a requirement on the input.**
 These strings do reach the document, exactly as written, and labdata neither
 converts nor checks them:
 
-- **Every string supplied in YAML.** `labdata.loaders.load_people()` and
-  `load_projects()` perform no conversion of any kind, so a person's `name`,
-  `role`, `current_position` or `thesis_title`, and a project's `title` or
-  `description`, are copied straight from `people.yaml` and `projects.yaml`.
+- **The person and project strings supplied in YAML.**
+  `labdata.loaders.load_people()` and `load_projects()` perform no conversion
+  of any kind, so a person's `name`, `role`, `current_position` or
+  `thesis_title`, and a project's `title` or `description`, are copied
+  straight from `people.yaml` and `projects.yaml`. Not every YAML string is
+  emitted — `aliases` and the configuration paths are not; see heading 3.
 - **`publication.category`**, which comes from the `category` of the
   `bib_files` entry in `lab.yaml`, not from the `.bib` file
   (`labdata.config.LabDataConfig.from_yaml()`, then
@@ -193,35 +205,59 @@ directly: a category of `<b>Cat</b> & **md**` is emitted unchanged. Authors
 of input files are responsible for keeping these plain, and renderers should
 escape them as they escape everything else.
 
-**3. Transformed, parsed, or never emitted.** These inputs do *not* appear in
-the document under their own names, so the rule does not apply to them at
-all. `/$defs/publication/properties` declares no `doi`, `eprint` or `project`:
+**3. Read and acted on.** labdata reads each of these and does something with
+it other than passing it through as display text: transforms it, consumes it
+into a derived field, or reads it only to make a decision. None of them
+reaches the document as a plain-text string under its own name, so the text
+rule does not apply to the input itself — only to whatever it produces.
+`/$defs/publication/properties` declares no `doi`, `eprint` or `project`.
 
 | Input | What becomes of it |
 |---|---|
 | `doi` | Transformed into `doi_url` (`construct_doi_url()`). |
 | `eprint` | Transformed into `arxiv_url` (`construct_arxiv_url()`). |
+| `archivePrefix` (or `archiveprefix`) | Read only to decide whether `eprint` is an arXiv id (`construct_arxiv_url()`). |
 | `project` | Parsed into the list `project_ids` (`parse_project_ids()`). |
-| `url`, for a video host | Emitted as `video_url` instead of `url` (`extract_video_url()`); `url` is then `null`. |
+| `url`, for a video host | Detected by `extract_video_url()` and emitted as `video_url` by `entry_to_publication()`, which then leaves `url` as `null`. |
+| `author` | Parsed into the `authors` list (`parse_author_list()`); the name parts are converted under heading 1. |
+| `year` | Emitted as the integer `year` — not a string — and drives the publication order (§3) and `venue`. |
+| `volume`, `number` | Outside `TEXT_FIELDS`, so unconverted; consumed by `format_venue()` and not emitted separately. |
+| `crossref` | Resolved by `resolve_crossref()`, which fills the child's missing fields from the parent. Not emitted as a property. |
+| The citation key and the entry type | Become `bib_id` and `entry_type` (`entry_fields()`); see heading 4. |
+| `journal`, `booktitle`, `school`, `institution`, `type` | Converted under heading 1, then consumed by `format_venue()`. |
+| `series`, `publisher`, `address`, `organization` | Converted under heading 1, then used by nothing. |
 | `person.aliases` | Read for matching by `labdata.resolver.build_alias_index()`, never emitted — `Person.to_dict()` has no `aliases` key. |
 | `bib_dir`, `bib_files[].name`, `people_file`, `projects_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed `pdf_url`. |
-| Any other BibTeX field | Dropped from the first-class properties, surviving only inside `bibtex` (§5). Emitting more of them is #56. |
+| Any BibTeX field not named anywhere in this table or heading 1 — `pages`, `editor`, `month`, `isbn` and the rest | Not read by labdata at all. It affects nothing and survives only inside the `bibtex` record (§5). Emitting more of them as first-class properties is #56. |
+
+The fields named in that table and in heading 1 are the complete set labdata
+reads from a `.bib` entry; everything else falls in the last row. Verified by
+enumerating the field names `labdata/parsers/bibtex.py` looks up.
+
+"Not emitted" throughout that table means *not emitted as a property of the
+publication*. Every field of the entry, read or not, also survives inside the
+`bibtex` record, which is a re-serialization of the entry's data rather than a
+set of first-class properties (§5).
 
 **4. Not display text.** Some emitted strings are identifiers or machine
 values, and the plain-text rule is beside the point for them: `bib_id`,
-`entry_type`, `category`'s role as a grouping key, every `*_url`, every id in
-`project_ids`, `publication_ids` and `people_ids`, and `person_id`. Also here
-is **`publication.bibtex`**, which is a BibTeX record meant to be copied
-rather than displayed, and which still contains LaTeX — see §5 for what it
-does and does not preserve. `lab` is a YAML mapping rather than a string; its
-*values* fall under category 2.
+`entry_type`, `person_id`, every `*_url` including `publication.url`, and
+every id in `project_ids`, `publication_ids` and `people_ids`. Also here is
+**`publication.bibtex`**, which is a BibTeX record meant to be copied rather
+than displayed, and which still contains LaTeX — see §5 for what it does and
+does not preserve. `lab` is a YAML mapping rather than a string; its *values*
+fall under heading 2.
+
+`publication.category` is *not* in this group. It is a label a renderer
+displays as a section heading as well as grouping by, so it is display text
+and heading 2 applies to it in full.
 
 ### The one markup exception
 
 **Math is left as TeX**, delimited by `$…$`, so that KaTeX or MathJax can
 typeset it (`labdata.parsers.latex._CONVERTER` is built with
 `math_mode='verbatim'`). This is the one place a text field is expected to
-contain markup, and it applies only to category 1.
+contain markup, and it applies only to the fields under heading 1.
 
 ### Two degraded cases
 
