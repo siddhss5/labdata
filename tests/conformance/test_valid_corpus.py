@@ -79,12 +79,31 @@ NAMES = [
     case("names.accent_utf8", "name-accent-utf8", "authors.0.person_id", "ccote"),
     case("names.others", "name-others", "authors.*.person_id", Contains("aadams", "bbrown")),
     case("names.others", "name-others", "authors.*.name", Excludes("others")),
+    # The marker comes off the name, whichever part it was written on and in
+    # whichever of the four forms, and the cleaned name still resolves.
     case("names.equal_contribution", "name-equal", "authors.*.name",
-         ["B. Brown", "D. Davis", "A. Adams"]),
+         ["B. Brown", "D. Davis", "G.-A. Green", "A. Kim", "A. Adams"]),
     case("names.equal_contribution", "name-equal", "authors.*.person_id",
-         ["bbrown", "ddavis", "aadams"]),
+         ["bbrown", "ddavis", "ggreen", "akim", "aadams"]),
+    case("names.equal_contribution", "name-equal", "authors.*.given",
+         ["Bob", "Dave", "Grace-Ann", "Alex", "Alice"]),
+    case("names.equal_contribution", "name-equal-family", "authors.*.name",
+         ["B. Brown", "D. Davis", "G.-A. Green", "A. Kim", "A. Adams"]),
+    case("names.equal_contribution", "name-equal-family", "authors.*.person_id",
+         ["bbrown", "ddavis", "ggreen", "akim", "aadams"]),
+    case("names.equal_contribution", "name-equal-family", "authors.*.family",
+         ["Brown", "Davis", "Green", "Kim", "Adams"]),
+    case("names.equal_contribution", "name-equal-parts", "authors.*.name",
+         ["R. de la Cruz", "J. Smith, Jr.", "A. Adams"]),
+    case("names.equal_contribution", "name-equal-parts", "authors.0.von", "de la"),
+    case("names.equal_contribution", "name-equal-parts", "authors.0.person_id", "rdelacruz"),
+    case("names.equal_contribution", "name-equal-parts", "authors.1.suffix", "Jr."),
     case("names.equal_contribution_marker", "name-equal", "authors.*.equal_contribution",
-         [True, True, False], xfail="#46"),
+         [True, True, True, True, False]),
+    case("names.equal_contribution_marker", "name-equal-family",
+         "authors.*.equal_contribution", [True, True, True, True, False]),
+    case("names.equal_contribution_marker", "name-equal-parts",
+         "authors.*.equal_contribution", [True, True, False]),
     case("names.same_initial_alex", "name-kim-alex", "authors.0.person_id", "akim"),
     case("names.same_initial_alan", "name-kim-alan", "authors.0.person_id", "alankim",
          xfail="#24"),
@@ -171,6 +190,25 @@ def test_every_display_name_agrees_with_its_parts(valid_output):
             checked += 1
     # The loop has to have run over the names the corpus is built from.
     assert checked > 40, checked
+
+
+MARKED_ENTRIES = {"name-equal", "name-equal-family", "name-equal-parts"}
+
+
+@covers("names.equal_contribution_marker")
+def test_only_marked_authors_are_equal_contributors(valid_output):
+    """Across the corpus, equal_contribution is set exactly where a marker was.
+
+    A row-by-row check says the marked authors are marked. This says the
+    unmarked ones are not: no name elsewhere in the corpus — a starred title,
+    a corporate name, an accent written in TeX — picks the flag up.
+    """
+    marked = {(p["bib_id"], a["name"]) for p in valid_output["publications"]
+              for a in p["authors"] if a["equal_contribution"]}
+    assert {bib_id for bib_id, _ in marked} == MARKED_ENTRIES
+    assert len(marked) == 10, sorted(marked)
+    assert all("*" not in a["name"] for p in valid_output["publications"]
+               for a in p["authors"])
 
 
 @covers("names.initials_ambiguous", xfail="#24", owns=("name-kim-initial",))
@@ -360,7 +398,7 @@ def test_project_backlinks(valid_output):
 # (case_id, section, lookup key, lookup value, field path, expected)
 
 OUTPUT_FIELDS = [
-    case("output.schema_version", "", "", "", "schema_version", 2),
+    case("output.schema_version", "", "", "", "schema_version", 3),
     case("output.lab", "", "", "", "lab.name", "Corpus Lab"),
     case("output.publication.bib_id", "publications", "bib_id", "type-article", "bib_id",
          "type-article"),
@@ -368,7 +406,8 @@ OUTPUT_FIELDS = [
          "Robots 机器人 and Émoji 🤖"),
     case("output.publication.authors", "publications", "bib_id", "name-last-first", "authors",
          [{"name": "A. Adams", "person_id": "aadams", "given": "Alice", "von": None,
-           "family": "Adams", "suffix": None, "literal": None}]),
+           "family": "Adams", "suffix": None, "literal": None,
+           "equal_contribution": False}]),
     case("output.publication.year", "publications", "bib_id", "type-article", "year", 2020),
     case("output.publication.venue", "publications", "bib_id", "type-article", "venue",
          Contains("Journal of Fictional Robots")),

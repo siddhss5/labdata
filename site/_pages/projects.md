@@ -47,8 +47,12 @@ classes: wide
     {% endif %}
   </div>
   <div style="font-size: 0.9em; color: #494e52;">
-    {% for author in pub.authors %}{{ author.name }}{% unless forloop.last %}, {% endunless %}{% endfor %}
+    {% for author in pub.authors %}{{ author.name }}{% if author.equal_contribution %}<sup>*</sup>{% endif %}{% unless forloop.last %}, {% endunless %}{% endfor %}
   </div>
+  {% assign equal_authors = pub.authors | where: "equal_contribution", true %}
+  {% if equal_authors.size > 0 %}
+  <div style="font-size: 0.85em; color: #494e52;"><sup>*</sup> equal contribution</div>
+  {% endif %}
   <div style="font-size: 0.9em; color: #494e52;">
     {{ pub.venue | markdownify | remove: "<p>" | remove: "</p>" }}
   </div>

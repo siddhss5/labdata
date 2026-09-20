@@ -13,7 +13,9 @@ dependencies = [
 test = [
     "pytest",
     "pytest-cov",
-    "jsonschema>=4"
+    "jsonschema>=4",
+    # Renders the site/ Liquid templates in tests/test_site_templates.py.
+    "python-liquid>=2"
 ]
 
 [project.scripts]

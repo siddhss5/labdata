@@ -18,7 +18,8 @@ from typing import Dict, Optional, List
 #
 # 2: authors carry their structured name parts (#23). The schema is closed,
 #    so a consumer validating against version 1 would reject the new keys.
-SCHEMA_VERSION = 2
+# 3: authors carry equal_contribution (#46), for the same reason.
+SCHEMA_VERSION = 3
 
 
 @dataclass
@@ -30,6 +31,10 @@ class Author:
     structure to go on and not only a display string. ``literal`` holds a
     corporate name written as one brace-protected unit, such as
     ``{Example Robotics Consortium}``, where the other parts do not apply.
+
+    ``equal_contribution`` records that the entry marked this author with a
+    ``*``; the marker itself is taken off the name, so neither the display
+    form nor the name used for matching carries it.
     """
     name: str
     person_id: Optional[str] = None
@@ -38,6 +43,7 @@ class Author:
     family: Optional[str] = None
     suffix: Optional[str] = None
     literal: Optional[str] = None
+    equal_contribution: bool = False
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
@@ -49,6 +55,7 @@ class Author:
             'family': self.family,
             'suffix': self.suffix,
             'literal': self.literal,
+            'equal_contribution': self.equal_contribution,
         }
 
 

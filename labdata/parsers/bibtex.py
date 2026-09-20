@@ -39,6 +39,14 @@ TEXT_FIELDS = frozenset({
 # A name list ending in "and others" means "et al."; it is not an author.
 OTHERS = "others"
 
+# Equal contribution is written as a star on one part of a name, in any of
+# these four forms. It is an annotation rather than part of the name, so it is
+# taken off the part before the name is read and recorded on the author
+# instead. Other author annotations — corresponding author, affiliation
+# numbers, daggers — are not read.
+EQUAL_CONTRIBUTION = re.compile(
+    r"(?:\$\^\{\*\}\$|\^\{\*\}|\\textsuperscript\s*\{\*\}|\*)\s*$")
+
 _STRING_DEFINITION = re.compile(r'@string\s*[{(]\s*([^\s=,{}()"]+)\s*=', re.IGNORECASE)
 
 # The command name pybtex is about to read, when that name is `comment`.
@@ -190,6 +198,28 @@ def _initials(given: str) -> str:
     return "-".join(f"{part[0]}." for part in parts)
 
 
+def _name_parts(person: Person) -> List[str]:
+    """Every part of a pybtex name, as written in the file."""
+    return (list(person.first_names) + list(person.middle_names)
+            + list(person.prelast_names) + list(person.last_names)
+            + list(person.lineage_names))
+
+
+def _without_marker(part: str) -> str:
+    """One name part with an equal-contribution marker taken off its end."""
+    return EQUAL_CONTRIBUTION.sub("", part)
+
+
+def marks_equal_contribution(person: Person) -> bool:
+    """True when any part of this name carries an equal-contribution marker.
+
+    Given, family, von and suffix are all read: BibTeX splits the name before
+    labdata sees it, so which part the star landed on is the author's choice
+    of where to write it, not a different meaning.
+    """
+    return any(_without_marker(part) != part for part in _name_parts(person))
+
+
 def _is_others(person: Person) -> bool:
     """``and others``: BibTeX's "et al.", not a person."""
     return (not person.first_names and not person.middle_names
@@ -213,9 +243,13 @@ def person_name_parts(person: Person, where: str) -> Dict[str, Optional[str]]:
     corporate name comes back as ``literal`` instead, with the other four
     unset. An empty part is ``None`` rather than ``""``, so the output says
     "this name has no such part" rather than "it is blank".
+
+    An equal-contribution marker is not part of the name and does not appear
+    in any part; ``marks_equal_contribution`` reports it separately.
     """
     def text(parts) -> Optional[str]:
-        joined = " ".join(_convert(part, where) for part in parts).strip()
+        joined = " ".join(_convert(_without_marker(part), where)
+                          for part in parts).strip()
         return joined or None
 
     if _is_literal(person):
@@ -249,8 +283,9 @@ def parse_author_list(entry: Entry, where: str) -> List[Author]:
     """The entry's authors, in source order, with person_id unresolved.
 
     Each author carries the parts BibTeX split its name into as well as the
-    display form. Matching on those parts is #24; the resolver still reads
-    only the display name.
+    display form, and whether the entry marked it as an equal contribution.
+    Matching on those parts is #24; the resolver still reads only the display
+    name, which is why the marker has to come off the name itself.
     """
     persons = list(entry.persons.get("author", []))
     if persons and _is_others(persons[-1]):
@@ -261,7 +296,10 @@ def parse_author_list(entry: Entry, where: str) -> List[Author]:
         parts = person_name_parts(person, where)
         name = format_name(parts)
         if name:
-            authors.append(Author(name=name, **parts))
+            authors.append(Author(
+                name=name,
+                equal_contribution=marks_equal_contribution(person),
+                **parts))
     return authors
 
 
