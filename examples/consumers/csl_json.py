@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Consumer probe: a CSL-JSON export.
+
+    python examples/consumers/csl_json.py lab.json > lab.csl.json
+
+Standard library only. Reads the document named on the command line and
+nothing else. See README.md in this directory for the rule this probe exists
+to test, and for why this probe cannot produce a correct journal-article
+record today.
+"""
+
+import json
+import sys
+
+
+# CSL types for the entry types the document emits. Anything else falls back
+# to "document", which CSL defines for exactly that purpose.
+CSL_TYPES = {
+    "article": "article-journal",
+    "inproceedings": "paper-conference",
+    "conference": "paper-conference",
+    "incollection": "chapter",
+    "inbook": "chapter",
+    "book": "book",
+    "phdthesis": "thesis",
+    "mastersthesis": "thesis",
+    "techreport": "report",
+    "unpublished": "manuscript",
+    "misc": "document",
+}
+
+
+def csl_name(author):
+    """One CSL name object, built from the parts the document splits a name into.
+
+    `name` is the document's display form and abbreviates given names to
+    initials; CSL wants the parts, and the document emits them.
+    """
+    if author.get("literal"):
+        return {"literal": author["literal"]}
+    name = {}
+    for csl_key, doc_key in (("given", "given"), ("family", "family"),
+                             ("non-dropping-particle", "von"), ("suffix", "suffix")):
+        if author.get(doc_key):
+            name[csl_key] = author[doc_key]
+    return name
+
+
+def venue_parts(pub):
+    """The venue as structured data, or None when the document composed it.
+
+    Today `venue` is one pre-composed string with Markdown emphasis inside
+    it -- `*Transactions on Robot Learning*, 4(2), 2025` -- so there is no
+    container title to put in `container-title` and no volume or number
+    beside it. Taking that string apart, or reading the verbatim export the
+    document carries alongside it, would prove nothing about the document:
+    see README.md.
+    """
+    venue = pub.get("venue")
+    return venue if isinstance(venue, dict) else None
+
+
+def bibliographic(pub, key):
+    """A first-class bibliographic property, from the work or from its venue."""
+    value = pub.get(key)
+    if value is None:
+        value = (venue_parts(pub) or {}).get(key)
+    return value
+
+
+def record(pub):
+    out = {
+        "id": pub["bib_id"],
+        "type": CSL_TYPES.get(pub["entry_type"], "document"),
+        "title": pub["title"],
+        "author": [csl_name(a) for a in pub["authors"]],
+        "issued": {"date-parts": [[pub["year"]]]},
+    }
+    name = (venue_parts(pub) or {}).get("name")
+    if name:
+        out["container-title"] = name
+    for csl_key, doc_key in (("volume", "volume"), ("issue", "number"),
+                             ("publisher", "publisher"),
+                             ("publisher-place", "address"),
+                             ("collection-title", "series")):
+        value = bibliographic(pub, doc_key)
+        if value:
+            out[csl_key] = str(value)
+    pages = bibliographic(pub, "pages")
+    if pages:
+        out["page"] = str(pages).replace("--", "-")
+
+    # CSL wants identifiers, not links. `doi_url` and `arxiv_url` are links:
+    # the document builds them from an identifier it does not itself emit,
+    # and the construction is not invertible, because a `doi` written as a
+    # URL in the input is passed through as the link unchanged. So a probe
+    # cannot read the identifier back out of the link.
+    doi = bibliographic(pub, "doi")
+    if doi:
+        out["DOI"] = str(doi)
+    for csl_key, doc_key in (("URL", "url"), ("abstract", "abstract"),
+                             ("note", "note")):
+        if pub.get(doc_key):
+            out[csl_key] = pub[doc_key]
+    out.setdefault("URL", pub.get("pdf_url") or pub.get("doi_url")
+                   or pub.get("arxiv_url"))
+    if out["URL"] is None:
+        del out["URL"]
+    return out
+
+
+def main(argv):
+    if len(argv) != 2:
+        sys.stderr.write("usage: csl_json.py DOCUMENT\n")
+        return 2
+    with open(argv[1], encoding="utf-8") as f:
+        doc = json.load(f)
+    text = json.dumps([record(p) for p in doc["publications"]],
+                      indent=2, ensure_ascii=False, sort_keys=True)
+    # Written as bytes so the export is UTF-8 whatever the locale says.
+    sys.stdout.buffer.write((text + "\n").encode("utf-8"))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

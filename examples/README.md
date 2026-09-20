@@ -42,6 +42,14 @@ See `config.yaml` for an annotated example of the configuration format. It point
 the files in `demo/`. [`demo/lab.yaml`](demo/lab.yaml) configures the same lab with paths
 relative to the repository root, plus the `site` settings used to build the demo site.
 
+## Consumer Probes
+
+[`consumers/`](consumers/) holds four small programs that read the emitted
+document and nothing else — an HTML page, a LaTeX CV fragment, a CSL-JSON
+export and an edge list. They are falsification tests rather than examples to
+copy: three of them cannot be written against the current schema, and that is
+the point. See [`consumers/README.md`](consumers/README.md).
+
 ## Jekyll Site
 
 For a complete Jekyll site that renders labdata output, see the [`site/`](../site/) directory.
