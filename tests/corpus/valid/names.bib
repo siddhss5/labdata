@@ -157,13 +157,29 @@
   year      = {2022}
 }
 
-% A star, caret or dollar with a backslash in front of it is escaped text, not
-% a marker: it stays in the name and marks nobody.
+% A spaced marker followed by another one, in each of the four forms: joining
+% the command to its argument makes the first whole, and the rest comes off
+% the same way an unspaced run of markers does.
+% CASE names.equal_contribution_normalized
+@inproceedings{name-equal-stacked,
+  title     = {A Spaced Marker Followed by Another},
+  author    = {Brown\textsuperscript {*}$^{*}$, Bob and
+               Davis\textsuperscript {*}^{*}, Dave and
+               Green\textsuperscript {*}\textsuperscript{*}, Grace-Ann and
+               Kim\textsuperscript {*}*, Alex and Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
+% A star, caret, dollar or backslash with a backslash in front of it is escaped
+% text, not a marker: nobody is marked, and the name parts keep their own
+% boundaries. What the escaped spelling itself becomes is the ordinary LaTeX
+% conversion's business.
 % CASE names.equal_contribution_escaped
 @inproceedings{name-equal-escaped,
   title     = {Escaped Stars Are Not Markers},
   author    = {Brown\*, Bob and Davis\^{*}, Dave and Green\$^{*}$, Grace-Ann and
-               Adams, Alice},
+               Evans\\textsuperscript {*}, Erin and Adams, Alice},
   booktitle = {Proceedings of the Fictional Conference},
   year      = {2022}
 }

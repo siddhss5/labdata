@@ -57,17 +57,19 @@ _MARKER = rf"(?<!\\)(?:{_WRITTEN}|\*)"
 # name, and does not make it part of it. Only a form that brings its own
 # command is unwrapped, because a lone `{*}` is how any other command takes
 # its argument — the star in `Brown\^{*}` is an accented star, not a marker.
-EQUAL_CONTRIBUTION = re.compile(
-    rf"(?:(?<!\\)\{{\s*(?:{_WRITTEN})\s*\}}|{_MARKER})\s*$")
+_ANY_MARKER = rf"(?:(?<!\\)\{{\s*(?:{_WRITTEN})\s*\}}|{_MARKER})"
+EQUAL_CONTRIBUTION = re.compile(rf"{_ANY_MARKER}\s*$")
 
 # `\textsuperscript {*}`, with a space before the argument, is the same form:
 # BibTeX splits a name on spaces, so the command and its argument arrive as two
 # name parts and neither is a marker on its own. Only this one command takes
-# its argument back, and only when the argument is exactly `{*}`, so a brace
-# group that belongs to anything else — the accent in `Brown\^ {*}` — is left
-# where it is.
-_MARKER_COMMAND = re.compile(r"\\textsuperscript\s*$")
-_MARKER_ARGUMENT = "{*}"
+# its argument back, written as the command and not as an escaped backslash,
+# and only from a part that is the argument and nothing but further markers —
+# so the accent in `Brown\^ {*}`, a `{*}` after any other command, and a part
+# carrying text of its own all keep their own boundary. What the part carries
+# after `{*}` is left to the stripping below, as it is for an unspaced marker.
+_MARKER_COMMAND = re.compile(r"(?<!\\)\\textsuperscript\s*$")
+_MARKER_ARGUMENT = re.compile(rf"\{{\*\}}(?:{_ANY_MARKER})*")
 
 _STRING_DEFINITION = re.compile(r'@string\s*[{(]\s*([^\s=,{}()"]+)\s*=', re.IGNORECASE)
 
@@ -237,7 +239,7 @@ def _with_marker_joined(parts: List[str]) -> List[str]:
     """One group of name parts, with a marker split across two of them joined."""
     joined: List[str] = []
     for part in parts:
-        if (joined and part == _MARKER_ARGUMENT
+        if (joined and _MARKER_ARGUMENT.fullmatch(part)
                 and _MARKER_COMMAND.search(joined[-1])):
             joined[-1] += part
         else:

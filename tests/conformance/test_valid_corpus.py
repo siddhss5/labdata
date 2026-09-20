@@ -139,14 +139,29 @@ EQUAL_CONTRIBUTION = [
          "authors.2.name", "G.-A. Green"),
     case("names.equal_contribution_normalized", "name-equal-normalized",
          "authors.3.name", Contains("Davis", "*")),
-    # An escaped star, caret or dollar is text: nobody is marked, and what was
-    # written stays in the name rather than being read as an annotation.
+    # A spaced marker followed by another, in each of the four forms: the
+    # first is joined back together, the rest is stripped, and nothing of
+    # either is left in the name.
+    case("names.equal_contribution_normalized", "name-equal-stacked",
+         "authors.*.name",
+         ["B. Brown", "D. Davis", "G.-A. Green", "A. Kim", "A. Adams"]),
+    case("names.equal_contribution_normalized", "name-equal-stacked",
+         "authors.*.person_id", ["bbrown", "ddavis", "ggreen", "akim", "aadams"]),
+    case("names.equal_contribution_normalized", "name-equal-stacked",
+         "authors.*.equal_contribution", [True, True, True, True, False]),
+    # An escaped star, caret, dollar or backslash is text: nobody is marked,
+    # and the name parts keep their own boundaries. What each spelling becomes
+    # is the ordinary LaTeX conversion's doing, and is pinned here as it is.
     case("names.equal_contribution_escaped", "name-equal-escaped",
-         "authors.*.equal_contribution", [False, False, False, False]),
+         "authors.*.equal_contribution", [False, False, False, False, False]),
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.0.name", "B. Brown"),
     case("names.equal_contribution_escaped", "name-equal-escaped",
          "authors.1.name", Contains("Davis", "*")),
     case("names.equal_contribution_escaped", "name-equal-escaped",
          "authors.2.name", Contains("Green", "*")),
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.3.name", Contains("Evans", " *")),
 ]
 
 
@@ -225,7 +240,7 @@ def test_every_display_name_agrees_with_its_parts(valid_output):
     assert checked > 40, checked
 
 
-MARKED_ENTRIES = set(EQUAL_ENTRIES) | {"name-equal-normalized"}
+MARKED_ENTRIES = set(EQUAL_ENTRIES) | {"name-equal-normalized", "name-equal-stacked"}
 
 
 @covers("names.equal_contribution_marker")
@@ -240,9 +255,9 @@ def test_only_marked_authors_are_equal_contributors(valid_output):
     marked = {(p["bib_id"], a["name"]) for p in valid_output["publications"]
               for a in p["authors"] if a["equal_contribution"]}
     assert {bib_id for bib_id, _ in marked} == MARKED_ENTRIES
-    # Four parts marked in each of the four form entries, and three of the
-    # five authors of name-equal-normalized.
-    assert len(marked) == len(EQUAL_ENTRIES) * 4 + 3, sorted(marked)
+    # Four parts marked in each of the four form entries, three of the five
+    # authors of name-equal-normalized, and four of name-equal-stacked.
+    assert len(marked) == len(EQUAL_ENTRIES) * 4 + 3 + 4, sorted(marked)
     assert [name for _, name in marked if "*" in name] == []
 
 
