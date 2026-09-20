@@ -4,6 +4,7 @@ import pytest
 from pathlib import Path
 
 from labdata.parsers.bibtex import (
+    DUPLICATE_CITATION_KEY,
     _Parser,
     _convert,
     format_authors_string,
@@ -194,6 +195,31 @@ class TestCrossref:
         )
         assert [p.bib_id for p in pubs] == ["a-child"]
         assert "no-such-parent" in capsys.readouterr().err
+
+
+class TestDuplicateCitationKeys:
+    def test_cross_file_duplicate_preserves_the_first_key_spelling(self, tmp_path):
+        """Citation keys compare without case, but diagnostics retain both sources."""
+        first = tmp_path / "first.bib"
+        second = tmp_path / "second.bib"
+        first.write_text(entry("FirstKey"), encoding="utf-8")
+        second.write_text(entry("firstkey"), encoding="utf-8")
+
+        errors = []
+        parse_all_publications(
+            bib_dir=str(tmp_path),
+            bib_files=[
+                {"name": first.name, "category": "Test Papers"},
+                {"name": second.name, "category": "Test Papers"},
+            ],
+            duplicate_errors=errors,
+        )
+
+        assert errors == [
+            f"{DUPLICATE_CITATION_KEY} {second}:firstkey:citation_key: "
+            f"duplicate citation key; first defined in "
+            f"{first}:FirstKey:citation_key"
+        ]
 
 
 def entry(key: str, title: str = "A Fictional Title") -> str:

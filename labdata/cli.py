@@ -94,6 +94,12 @@ Examples:
                 print(f"  - {pid}")
             errors += len(result.unknown_projects)
 
+        if result.bibliography_errors:
+            print(f"\nBibliography errors ({len(result.bibliography_errors)}):")
+            for error in result.bibliography_errors:
+                print(f"  - {error}")
+            errors += len(result.bibliography_errors)
+
         if errors:
             print(f"\nValidation found {errors} error(s).")
             sys.exit(1)
@@ -103,6 +109,8 @@ Examples:
 
     # --unresolved mode
     if args.unresolved:
+        for error in result.bibliography_errors:
+            print(f"Warning: {error}", file=sys.stderr)
         if not config.people_file:
             print("Author resolution is not configured (no people_file).")
             return
@@ -115,6 +123,8 @@ Examples:
         return
 
     # Export
+    for error in result.bibliography_errors:
+        print(f"Warning: {error}", file=sys.stderr)
     export_func = export_to_yaml if args.format == 'yaml' else export_to_json
     export_func(data, args.output)
 

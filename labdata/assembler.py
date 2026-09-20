@@ -25,6 +25,7 @@ class AssemblyResult:
     data: LabData
     unresolved_authors: List[str] = field(default_factory=list)
     unknown_projects: List[str] = field(default_factory=list)
+    bibliography_errors: List[str] = field(default_factory=list)
 
 
 def assemble(config: LabDataConfig, diagnostics: bool = False):
@@ -43,10 +44,12 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     """
     # Parse publications
     bib_files = [{'name': bf.name, 'category': bf.category} for bf in config.bib_files]
+    bibliography_errors: List[str] = []
     publications = parse_all_publications(
         bib_dir=config.bib_dir,
         bib_files=bib_files,
         pdf_base_url=config.pdf_base_url,
+        duplicate_errors=bibliography_errors if diagnostics else None,
     )
 
     # Load people and projects
@@ -89,5 +92,6 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
             data=data,
             unresolved_authors=unresolved_authors,
             unknown_projects=unknown_projects,
+            bibliography_errors=bibliography_errors,
         )
     return data
