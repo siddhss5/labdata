@@ -67,7 +67,7 @@ strings.undefined:
   reports: [nosuchmacro]
   locates: [macro.bib, undefined-macro, booktitle]
   kept: [undefined-macro, ok-entry]
-  xfail: {exit: "#23", reports: "#23", locates: "#26", kept: "#23"}
+  xfail: {locates: "#26"}
 
 types.unsupported:
   dir: unsupported_entry_type

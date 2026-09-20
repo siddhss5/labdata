@@ -44,11 +44,12 @@ A case can also be checked by tests other than the one its row names; the
 status column reports `xfail` when any of them is xfailed.
 
 Cases that fail today are not fixed here (that is the linked issue's job):
-#18 (LaTeX to plain text), #20 (unverified PDF links), #21 (one `@string`
-summary), #22 (`--unresolved` with no people file), #23 (parser swap),
-#24 (structured-name matching), #26 (precise diagnostics), #27 (explicit link
-and award fields), #28 (`keywords` project tags), #46 (equal-contribution
-markers in the output).
+#20 (unverified PDF links), #21 (one `@string` summary), #22 (`--unresolved`
+with no people file), #24 (structured-name matching), #26 (precise
+diagnostics), #27 (explicit link and award fields), #28 (`keywords` project
+tags), #46 (equal-contribution markers in the output). #18 is still open for
+the template side — `| escape`, attribute-safe escaping and the checks on
+rendered output — but every LaTeX-to-text row below passes.
 
 ## `@string` macros and BibTeX structure
 Rule: when a macro is defined more than once, **the last definition wins**, as
@@ -63,15 +64,16 @@ the second definition is the one that reaches the output.
 | `strings.defined_once` | A macro defined exactly once | Expanded like any other; no message mentions it | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_macro_defined_once_is_not_reported` | pass |
 | `strings.concat` | `"Joined " # "Title"` and `"Proceedings of the " # cfx` | The parts are concatenated, macros expanded | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
 | `strings.macro_journal` | `journal = jfx # " Letters"` | The journal is the expanded macro plus the literal suffix | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
-| `strings.undefined` | `booktitle = nosuchmacro`, which no `@string` defines | Warning naming the file, key, field and macro; the entry and its neighbours are kept | `tests/corpus/invalid/undefined_string/macro.bib` | `test_invalid_corpus.py::test_kept` | xfail #23, #26 |
+| `strings.undefined` | `booktitle = nosuchmacro`, which no `@string` defines | Warning naming the file, key, field and macro; the entry and its neighbours are kept | `tests/corpus/invalid/undefined_string/macro.bib` | `test_invalid_corpus.py::test_kept` | xfail #26 |
 | `structure.comment_lines` | A `%` comment line between entries | Ignored; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
 | `structure.comment_entry` | `@comment{...}` wrapping something that looks like an entry | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
 | `structure.preamble` | `@preamble{"..."}` | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
+| `structure.comment_mentions_command` | A `%` comment line whose prose contains `@comment{` | Ignored; it is not read as a command, and the entry after it is read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
 | `structure.uppercase` | `@ARTICLE` with `TITLE`, `AUTHOR`, `JOURNAL`, `YEAR` | Read exactly as the lower-case spelling is | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_quoted` | Field values in `"quotes"` | Read like braced values | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_braced` | Field values in `{braces}`, including a doubly braced title | Read; the braces themselves never reach the output | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_numeric` | Unquoted numeric `year`, `volume`, `number` | Read like quoted values | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `structure.crossref` | A child entry with `crossref` to a `@proceedings` parent | Missing fields come from the parent: the parent's year, and its title as the booktitle | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | xfail #23 |
+| `structure.crossref` | A child entry with `crossref` to a `@proceedings` parent | Missing fields come from the parent: the parent's year, and its title as the booktitle | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.bom_crlf` | A file with a UTF-8 BOM and CRLF line endings | Read normally; the BOM is not part of the first key, accents still decode | `tests/corpus/valid/encoding.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.unclosed_brace` | An entry whose `title` brace is never closed | Warning naming the file and key; the entries before and after it are still read | `tests/corpus/invalid/unclosed_brace/broken.bib` | `test_invalid_corpus.py::test_kept` | xfail #26 |
 | `structure.duplicate_key_file` | The same citation key twice in one file | Error naming the file and the repeated key | `tests/corpus/invalid/duplicate_key_same_file/dup.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
@@ -125,14 +127,15 @@ field of the output.
 | `names.last_first` | `Adams, Alice` | Name `A. Adams`, resolved to the person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.first_last` | `Bob Brown` | Name `B. Brown`, resolved to the person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.particle_last_first` | `van den Berg, Victor` | The particle stays with the surname: `V. van den Berg` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
-| `names.particle_first_last` | `Rupert de la Cruz` | The particle stays with the surname: `R. de la Cruz` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #23 |
-| `names.suffix` | `Smith, Jr., John` | The suffix is kept and is not mistaken for a given name | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #23 |
-| `names.corporate` | `{Example Robotics Consortium}` | Kept as one name, without its braces, and not abbreviated | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #23 |
-| `names.corporate_escaped` | `{AT\&T Research}` | Kept as one name, with `\&` decoded to `&` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #23 |
-| `names.hyphenated` | `Green, Grace-Ann` | Both halves of the given name are kept: `G.-A. Green` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #23 |
+| `names.particle_first_last` | `Rupert de la Cruz` | The particle stays with the surname: `R. de la Cruz` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.suffix` | `Smith, Jr., John` | The suffix is kept and is not mistaken for a given name | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.corporate` | `{Example Robotics Consortium}` | Kept as one name, without its braces, and not abbreviated | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.corporate_escaped` | `{AT\&T Research}` | Kept as one name, with `\&` decoded to `&` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.hyphenated` | `Green, Grace-Ann` | Both halves of the given name are kept: `G.-A. Green` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.structured` | Any author name | The parts BibTeX split it into — given, von, family, suffix, or literal for a corporate name — reach the output beside the display name | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_name_parts` | pass |
 | `names.accent_tex` | `C{\^o}t{\'e}, Carol` | Name `C. Côté`, resolved to the person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.accent_utf8` | `Côté, Carol` in raw UTF-8 | Same output as the TeX spelling, resolved to the same person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
-| `names.others` | `... and others` | The real authors are resolved; `others` is not emitted as an author | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #23 |
+| `names.others` | `... and others` | The real authors are resolved; `others` is not emitted as an author | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.equal_contribution` | `Brown, Bob$^{*}$ and Davis, Dave*` | The marker does not corrupt the name or block resolution | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.equal_contribution_marker` | `$^{*}$` and a trailing `*` on author names | The output records which authors are marked as contributing equally | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #46 |
 | `names.same_initial_alex` | `Kim, Alex`, who declares the alias `A. Kim` | Resolves to `akim` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
@@ -159,17 +162,17 @@ the source text are not markup and must survive unchanged.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `latex.textbf` | `A \textbf{Bold} Claim` | Plain text `A Bold Claim`, with no Markdown `**` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | xfail #18 |
-| `latex.nested` | `\textbf{a {B} c}` and `\emph{d \textbf{e} f}` | Plain text, with the nested braces and macros resolved | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | xfail #18 |
+| `latex.textbf` | `A \textbf{Bold} Claim` | Plain text `A Bold Claim`, with no Markdown `**` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.nested` | `\textbf{a {B} c}` and `\emph{d \textbf{e} f}` | Plain text, with the nested braces and macros resolved | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.accent_braced` | `Caf{\'e}` and `M{\"u}nchen` | `Café` and `München` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
-| `latex.caron_space` | `Ha{\v c}ek on {\v c}` | `Haček on č` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | xfail #23 |
-| `latex.dotless_i` | `Mar\'\i a` | `María` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | xfail #23 |
-| `latex.ampersand` | `Pick \& Place` | `Pick & Place` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | xfail #23 |
-| `latex.percent` | `A 50\% Speedup` | `A 50% Speedup` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | xfail #23 |
-| `latex.underscore` | `robot\_arm` | `robot_arm` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | xfail #23 |
-| `latex.endash` | `1--10` | `1–10` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | xfail #23 |
-| `latex.emdash` | `Robots---and People` | `Robots—and People` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | xfail #23 |
-| `latex.quotes` | ` ``Tidy'' ` | Typographic quotes `“Tidy”` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | xfail #23 |
+| `latex.caron_space` | `Ha{\v c}ek on {\v c}` | `Haček on č` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.dotless_i` | `Mar\'\i a` | `María` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.ampersand` | `Pick \& Place` | `Pick & Place` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.percent` | `A 50\% Speedup` | `A 50% Speedup` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.underscore` | `robot\_arm` | `robot_arm` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.endash` | `1--10` | `1–10` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.emdash` | `Robots---and People` | `Robots—and People` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
+| `latex.quotes` | ` ``Tidy'' ` | Typographic quotes `“Tidy”` | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.star_braced` | `{RRT}*` | `RRT*`: the star is kept and the braces are dropped | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.star_plain` | `BIT*` | `BIT*`: the star is kept | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.star_braced_whole` | `{BIT*}` | `BIT*`: the star is kept | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
@@ -177,9 +180,9 @@ the source text are not markup and must survive unchanged.
 | `latex.html_special` | `< > & " '` in a title | Kept as characters in the data; escaping is the renderer's job | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.markdown_punctuation` | `[a link](x)`, `` `code` ``, `# heading`, `*emphasis*` | Kept verbatim: they are text, not markup | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.unicode_raw` | Raw CJK and emoji | Passed through unchanged | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
-| `latex.abstract` | An abstract with accents, math and `\emph` | Same rules as a title: plain text with math left as TeX | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | xfail #18 |
+| `latex.abstract` | An abstract with accents, math and `\emph` | Same rules as a title: plain text with math left as TeX | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.note_href` | `note = {Code at \href{url}{our site}}` | The link and its text both survive; the entry is never dropped | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
-| `latex.unknown_macro` | `\fictionalmacro{Strange}` | Warning naming the file, key and field; the macro's text is kept and no raw LaTeX reaches the output | `tests/corpus/invalid/unknown_macro/macro.bib` | `test_invalid_corpus.py::test_unknown_macro_keeps_its_text` | xfail #23, #26 |
+| `latex.unknown_macro` | `\fictionalmacro{Strange}` | Warning naming the file, key and field; the macro's text is kept and no raw LaTeX reaches the output | `tests/corpus/invalid/unknown_macro/macro.bib` | `test_invalid_corpus.py::test_unknown_macro_keeps_its_text` | xfail #26 |
 
 ## Links
 
@@ -297,7 +300,7 @@ as a whole. The structure is defined by
 | `output.lab` | A `lab:` section in the config | Copied through to `lab` | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.bib_id` | The citation key | `bib_id` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.title` | `title` | `title`, as plain text | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.authors` | `author` | `authors`: a list of `{name, person_id}`, in source order | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.publication.authors` | `author` | `authors`: a list of `{name, person_id, given, von, family, suffix, literal}`, in source order | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.year` | `year` | `year`, as an integer | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.venue` | The venue fields for the entry type | `venue`, the formatted venue string | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.category` | The `bib_files` category of the file the entry came from | `category` | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |

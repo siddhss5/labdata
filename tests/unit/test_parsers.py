@@ -4,8 +4,8 @@ import pytest
 from pathlib import Path
 
 from labdata.parsers.bibtex import (
-    parse_bibtex_file,
-    parse_author_list,
+    _Parser,
+    _convert,
     format_authors_string,
     format_venue,
     extract_note,
@@ -13,52 +13,12 @@ from labdata.parsers.bibtex import (
     construct_doi_url,
     construct_arxiv_url,
     parse_project_ids,
-    entry_to_publication,
     parse_all_publications,
 )
 from labdata.models import Author
 
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
-
-
-class TestParseBibtexFile:
-    def test_parse_sample(self):
-        entries = parse_bibtex_file(str(FIXTURES / "sample.bib"))
-        assert len(entries) == 3
-        ids = {e["ID"] for e in entries}
-        assert "adams2024robot" in ids
-        assert "brown2023planning" in ids
-
-
-class TestParseAuthorList:
-    def test_single_author(self):
-        authors = parse_author_list("Adams, Alice")
-        assert len(authors) == 1
-        assert authors[0].name == "A. Adams"
-        assert authors[0].person_id is None
-
-    def test_multiple_authors(self):
-        authors = parse_author_list("Adams, Alice and Brown, Bob A.")
-        assert len(authors) == 2
-        assert authors[0].name == "A. Adams"
-        assert "B." in authors[1].name
-
-    def test_three_authors(self):
-        authors = parse_author_list(
-            "Adams, Alice and Brown, Bob A. and M{\\\"u}ller, Hans"
-        )
-        assert len(authors) == 3
-        assert "Müller" in authors[2].name
-
-    def test_empty_field(self):
-        assert parse_author_list("") == []
-        assert parse_author_list("   ") == []
-
-    def test_malformed_field(self):
-        # Should not crash, return something reasonable
-        authors = parse_author_list("Just A Name")
-        assert len(authors) >= 1
 
 
 class TestFormatAuthorsString:
@@ -130,9 +90,8 @@ class TestFormatVenue:
 
 class TestExtractNote:
     def test_with_note(self):
-        entry = {"note": "\\textbf{Best Paper Award}"}
-        result = extract_note(entry)
-        assert result == "**Best Paper Award**"
+        entry = {"note": "Best Paper Award."}
+        assert extract_note(entry) == "Best Paper Award"
 
     def test_no_note(self):
         assert extract_note({}) is None
@@ -202,53 +161,6 @@ class TestParseProjectIds:
         assert parse_project_ids({"project": ""}) == []
 
 
-class TestEntryToPublication:
-    def test_basic(self):
-        entry = {
-            "ID": "adams2024",
-            "ENTRYTYPE": "article",
-            "title": "A \\textbf{Great} Paper",
-            "author": "Adams, Alice",
-            "journal": "Test Journal",
-            "year": "2024",
-            "doi": "10.1234/test",
-        }
-        pub = entry_to_publication(entry, "Journal Papers")
-        assert pub.bib_id == "adams2024"
-        assert len(pub.authors) == 1
-        assert pub.authors[0].name == "A. Adams"
-        assert pub.year == 2024
-        assert pub.category == "Journal Papers"
-        assert pub.entry_type == "article"
-        assert pub.doi_url == "https://doi.org/10.1234/test"
-
-    @pytest.mark.xfail(strict=True, reason="#18")
-    def test_title_is_plain_text(self):
-        """Titles come out as plain text, without Markdown ``**`` for \\textbf."""
-        entry = {
-            "ID": "adams2024",
-            "ENTRYTYPE": "article",
-            "title": "A \\textbf{Great} Paper",
-            "author": "Adams, Alice",
-            "year": "2024",
-        }
-        pub = entry_to_publication(entry, "Journal Papers")
-        assert pub.title == "A Great Paper"
-
-    def test_with_video_url(self):
-        entry = {
-            "ID": "test2024",
-            "ENTRYTYPE": "misc",
-            "title": "Test",
-            "author": "Test, A.",
-            "year": "2024",
-            "url": "https://youtube.com/watch?v=abc",
-        }
-        pub = entry_to_publication(entry, "Other")
-        assert pub.video_url == "https://youtube.com/watch?v=abc"
-        assert pub.url is None  # Not duplicated
-
-
 class TestParseAllPublications:
     def test_parse_fixtures(self):
         bib_files = [
@@ -263,3 +175,184 @@ class TestParseAllPublications:
         assert pubs[0].year >= pubs[-1].year
         # Check first pub has structured authors
         assert all(isinstance(a, Author) for a in pubs[0].authors)
+
+
+class TestCrossref:
+    """A crossref that points nowhere is reported; the entry is still read."""
+
+    def test_missing_parent_is_reported_and_the_entry_is_kept(self, tmp_path, capsys):
+        (tmp_path / "child.bib").write_text(
+            "@inproceedings{a-child,\n"
+            "  title    = {A Child Paper},\n"
+            "  author   = {Adams, Alice},\n"
+            "  year     = {2024},\n"
+            "  crossref = {no-such-parent}\n"
+            "}\n", encoding="utf-8")
+        pubs = parse_all_publications(
+            bib_dir=str(tmp_path),
+            bib_files=[{"name": "child.bib", "category": "Test Papers"}],
+        )
+        assert [p.bib_id for p in pubs] == ["a-child"]
+        assert "no-such-parent" in capsys.readouterr().err
+
+
+def entry(key: str, title: str = "A Fictional Title") -> str:
+    return (f"@article{{{key},\n"
+            f"  title   = {{{title}}},\n"
+            "  author  = {Adams, Alice},\n"
+            "  journal = {Journal of Fictional Robots},\n"
+            "  year    = {2024}\n"
+            "}\n")
+
+
+# Inputs around @comment handling. Each case names every key the file defines,
+# split into the ones that must be read and the ones that must not: "the entry
+# I named survives" would pass just as happily while a neighbour vanished or a
+# commented-out entry leaked, which is how the quoted-value defect got through.
+#
+# labdata differs from pybtex on exactly one thing: a balanced @comment group
+# is a comment, so entries inside it are not publications. Everywhere else the
+# expectations below are pybtex's own reading of the file.
+#
+# (label, source, keys that must be read, keys that must not be)
+COMMENT_HAZARDS = [
+    ("a balanced @comment block hides what is inside it",
+     "@comment{not a publication: @article{hidden, title = {H}}}\n" + entry("kept"),
+     {"kept"}, {"hidden"}),
+    ("@comment spelled with a space before its brace",
+     "@comment {@article{hidden, title = {H}}}\n" + entry("kept"),
+     {"kept"}, {"hidden"}),
+    ("@comment written with parentheses",
+     "@comment(not a publication: @article{hidden, title = {H}})\n" + entry("kept"),
+     {"kept"}, {"hidden"}),
+    ("a % comment line that only mentions the command",
+     "% Documentation mentions @comment{ syntax here\n" + entry("real"),
+     {"real"}, set()),
+    ("an @comment that never closes",
+     "@comment{never closes\n" + entry("kept"),
+     {"kept"}, set()),
+    ("an unclosed brace inside @comment at the end of the file",
+     entry("kept") + "@comment{x {unclosed\n",
+     {"kept"}, set()),
+    ("an @comment inside a braced field value",
+     "@article{host, title = {Braces around @comment{x} keep it text},"
+     " year = {2024}}\n" + entry("kept"),
+     {"host", "kept"}, set()),
+    ("an @comment inside a quoted field value",
+     '@article{host, title = "Quotes around @comment{x} keep it text",'
+     ' year = {2024}}\n' + entry("kept"),
+     {"host", "kept"}, set()),
+    ("a paren-delimited entry whose quoted value holds ) and a command",
+     '@article(host,title="Host ) @comment(unclosed", author="Adams, Alice",'
+     ' journal="J", year=2024)\n' + entry("real"),
+     {"host", "real"}, set()),
+    ("a % comment inside an entry body",
+     "@article{host,\n  title = {T},  % a note to self\n  year  = {2024}\n}\n"
+     + entry("kept"),
+     {"host", "kept"}, set()),
+    ("an unterminated quote at the end of the file",
+     entry("kept") + '@article{broken, title = "never closed\n',
+     {"broken", "kept"}, set()),
+    ("an unclosed brace inside a quote at the end of the file",
+     entry("kept") + '@article{broken, title = "a {b\n',
+     {"broken", "kept"}, set()),
+    ("an @ that starts no command",
+     "@ not a command at all\n" + entry("kept"),
+     {"kept"}, set()),
+    ("a bare @ at the end of the file",
+     entry("kept") + "\n@",
+     {"kept"}, set()),
+    # Braces are counted as pybtex counts them, which is BibTeX's own rule: a
+    # brace is a brace whether it is escaped or quoted. These three pin that,
+    # because the group then ends earlier than a reader might expect and what
+    # follows is exposed — matching the library rather than second-guessing it.
+    ("an escaped brace ends the group, as pybtex counts it",
+     "@comment{ignored \\} " + entry("fake") + "}\n" + entry("real"),
+     {"fake", "real"}, set()),
+    ("a quoted closing brace ends the group, as pybtex counts it",
+     '@comment{note "}" @article{hidden, title={H}}}\n' + entry("kept"),
+     {"hidden", "kept"}, set()),
+    ("a quoted opening brace keeps the group open, as pybtex counts it",
+     '@comment{note "{" ignored}\n' + entry("kept"),
+     {"kept"}, set()),
+]
+
+
+def read_source(tmp_path, source, name="hazard.bib"):
+    (tmp_path / name).write_text(source, encoding="utf-8")
+    return parse_all_publications(
+        bib_dir=str(tmp_path),
+        bib_files=[{"name": name, "category": "Test Papers"}],
+    )
+
+
+class TestCommentHandling:
+    """What a @comment group hides, and what it must never take with it."""
+
+    @pytest.mark.parametrize("label, source, present, absent",
+                             COMMENT_HAZARDS,
+                             ids=[case[0] for case in COMMENT_HAZARDS])
+    def test_exactly_the_expected_entries_are_read(self, tmp_path, label, source,
+                                                   present, absent):
+        read = {pub.bib_id for pub in read_source(tmp_path, source)}
+        assert read == present, label
+        assert not (read & absent), label
+
+    def test_a_quoted_value_does_not_end_a_paren_entry(self, tmp_path):
+        """Regression: a ) inside "..." used to end @article(...) early.
+
+        labdata read the file itself to find @comment groups, so it could be
+        wrong about where a value ended; the entry then lost every field and
+        the entry after it disappeared. pybtex tokenizes the file now.
+        """
+        source = ('@article(host,title="Host ) @comment(unclosed",'
+                  ' author="Adams, Alice", journal="J", year=2024)\n' + entry("real"))
+        pubs = {pub.bib_id: pub for pub in read_source(tmp_path, source)}
+        assert sorted(pubs) == ["host", "real"]
+        host = pubs["host"]
+        assert host.title == "Host ) @comment(unclosed"
+        assert host.year == 2024
+        assert [a.name for a in host.authors] == ["A. Adams"]
+        assert "J" in host.venue
+
+
+class TestLatexFallback:
+    """A field pylatexenc cannot read costs that field's markup, never the entry."""
+
+    def test_keeps_the_raw_text_and_says_where(self, capsys):
+        value = r"Speed: {\verb"
+        assert _convert(value, "papers.bib:someone2024:title") == r"Speed: \verb"
+        assert "papers.bib:someone2024:title" in capsys.readouterr().err
+
+    def test_the_entry_is_still_published(self, tmp_path, capsys):
+        """End to end: the entry is read, with the raw text of the bad field."""
+        pubs = read_source(tmp_path, entry("kept", title=r"Speed: \verb"))
+        assert [pub.bib_id for pub in pubs] == ["kept"]
+        assert pubs[0].title == r"Speed: \verb"
+        assert pubs[0].year == 2024
+        assert [a.name for a in pubs[0].authors] == ["A. Adams"]
+        assert "hazard.bib:kept:title" in capsys.readouterr().err
+
+
+class TestEntryFiltering:
+    """pybtex raises SkipEntry for a filtered entry too, not only for @comment.
+
+    labdata passes ``wanted_entries`` straight through, so recovering from the
+    wrong SkipEntry would corrupt a filtered read — and would do it silently,
+    because the scanner is left somewhere quite different from a comment.
+    """
+
+    REJECTED = "@article{drop, title = {D}, year = {2024}}\n"
+    WANTED = "@article{keep, title = {K}, year = {2024}}\n"
+
+    def parse(self, text):
+        return _Parser(wanted_entries=["keep"]).parse_string(text)
+
+    def test_a_filtered_entry_does_not_swallow_the_next_one(self):
+        data = self.parse(self.REJECTED + "@article(keep, title = {K}, year = {2024})\n")
+        assert list(data.entries) == ["keep"]
+
+    def test_a_filtered_entry_does_not_swallow_a_preamble(self):
+        data = self.parse(self.REJECTED + '@preamble("a preamble")\n' + self.WANTED)
+        assert list(data.entries) == ["keep"]
+        assert data.preamble == "a preamble"

@@ -4,7 +4,7 @@
 # file says which they are and why the rest is left out. Regenerate with
 #   LABDATA_REGENERATE_EXPECTED=1 uv run pytest tests/conformance/test_output_format.py
 # and review the diff before committing.
-schema_version: 1
+schema_version: 2
 lab:
   name: Corpus Lab
   description: A fictional lab used only by the labdata conformance tests.
@@ -16,6 +16,11 @@ publications:
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   year: 2021
   venue: '*Robotics Venue*, 2021'
   category: Strings
@@ -28,15 +33,25 @@ publications:
   url: null
   video_url: null
   project_ids: []
-  bibtex: "@inproceedings{str-repeat,\n  year = {2021},\n  booktitle = {Robotics Venue},\n  author = {Adams,\
-    \ Alice},\n  title = {Last Definition Wins},\n}"
+  bibtex: "@inproceedings{str-repeat,\n    author = \"Adams, Alice\",\n    title = \"Last Definition Wins\"\
+    ,\n    booktitle = \"Robotics Venue\",\n    year = \"2021\"\n}"
 - bib_id: type-article
   title: An Article
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   - name: B. Brown
     person_id: bbrown
+    given: Bob
+    von: null
+    family: Brown
+    suffix: null
+    literal: null
   year: 2020
   venue: '*Journal of Fictional Robots*, 12(3), 2020'
   category: Structure
@@ -49,14 +64,19 @@ publications:
   url: null
   video_url: null
   project_ids: []
-  bibtex: "@article{type-article,\n  year = {2020},\n  publisher = {Fictional Press},\n  pages = {1--10},\n\
-    \  number = {3},\n  volume = {12},\n  journal = {Journal of Fictional Robots},\n  author = {Adams,\
-    \ Alice and Brown, Bob},\n  title = {An Article},\n}"
+  bibtex: "@article{type-article,\n    author = \"Adams, Alice and Brown, Bob\",\n    title = \"An Article\"\
+    ,\n    journal = \"Journal of Fictional Robots\",\n    volume = \"12\",\n    number = \"3\",\n   \
+    \ pages = \"1--10\",\n    publisher = \"Fictional Press\",\n    year = \"2020\"\n}"
 - bib_id: type-phdthesis
   title: A Doctoral Thesis
   authors:
   - name: E. Evans
     person_id: eevans
+    given: Erin
+    von: null
+    family: Evans
+    suffix: null
+    literal: null
   year: 2020
   venue: PhD thesis, Example University, 2020
   category: Structure
@@ -69,13 +89,18 @@ publications:
   url: null
   video_url: null
   project_ids: []
-  bibtex: "@phdthesis{type-phdthesis,\n  year = {2020},\n  school = {Example University},\n  author =\
-    \ {Evans, Erin},\n  title = {A Doctoral Thesis},\n}"
+  bibtex: "@phdthesis{type-phdthesis,\n    author = \"Evans, Erin\",\n    title = \"A Doctoral Thesis\"\
+    ,\n    school = \"Example University\",\n    year = \"2020\"\n}"
 - bib_id: link-doi-bare
   title: Bare DOI
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   year: 2023
   venue: '*Journal of Fictional Robots*, 2023'
   category: Links
@@ -88,13 +113,18 @@ publications:
   url: null
   video_url: null
   project_ids: []
-  bibtex: "@article{link-doi-bare,\n  doi = {10.5555/corpus.0001},\n  year = {2023},\n  journal = {Journal\
-    \ of Fictional Robots},\n  author = {Adams, Alice},\n  title = {Bare DOI},\n}"
+  bibtex: "@article{link-doi-bare,\n    author = \"Adams, Alice\",\n    title = \"Bare DOI\",\n    journal\
+    \ = \"Journal of Fictional Robots\",\n    year = \"2023\",\n    doi = \"10.5555/corpus.0001\"\n}"
 - bib_id: link-youtube
   title: A YouTube Video
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   year: 2023
   venue: '*Proceedings of the Fictional Conference*, 2023'
   category: Links
@@ -107,14 +137,19 @@ publications:
   url: null
   video_url: https://www.youtube.com/watch?v=corpus00001
   project_ids: []
-  bibtex: "@inproceedings{link-youtube,\n  url = {https://www.youtube.com/watch?v=corpus00001},\n  year\
-    \ = {2023},\n  booktitle = {Proceedings of the Fictional Conference},\n  author = {Adams, Alice},\n\
-    \  title = {A YouTube Video},\n}"
+  bibtex: "@inproceedings{link-youtube,\n    author = \"Adams, Alice\",\n    title = \"A YouTube Video\"\
+    ,\n    booktitle = \"Proceedings of the Fictional Conference\",\n    year = \"2023\",\n    url = \"\
+    https://www.youtube.com/watch?v=corpus00001\"\n}"
 - bib_id: present
   title: A Paper Whose PDF Is Present
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   year: 2023
   venue: '*Proceedings of the Fictional Conference*, 2023'
   category: Links
@@ -127,15 +162,25 @@ publications:
   url: null
   video_url: null
   project_ids: []
-  bibtex: "@inproceedings{present,\n  year = {2023},\n  booktitle = {Proceedings of the Fictional Conference},\n\
-    \  author = {Adams, Alice},\n  title = {A Paper Whose PDF Is Present},\n}"
+  bibtex: "@inproceedings{present,\n    author = \"Adams, Alice\",\n    title = \"A Paper Whose PDF Is\
+    \ Present\",\n    booktitle = \"Proceedings of the Fictional Conference\",\n    year = \"2023\"\n}"
 - bib_id: proj-multiple
   title: Two Projects
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   - name: C. Côté
     person_id: ccote
+    given: Carol
+    von: null
+    family: Côté
+    suffix: null
+    literal: null
   year: 2024
   venue: '*Proceedings of the Fictional Conference*, 2024'
   category: Projects
@@ -150,16 +195,26 @@ publications:
   project_ids:
   - homebot
   - sharedarm
-  bibtex: "@inproceedings{proj-multiple,\n  project = {homebot, sharedarm},\n  year = {2024},\n  booktitle\
-    \ = {Proceedings of the Fictional Conference},\n  author = {Adams, Alice and C{\\^o}t{\\'e}, Carol},\n\
-    \  title = {Two Projects},\n}"
+  bibtex: "@inproceedings{proj-multiple,\n    author = \"Adams, Alice and C{\\^o}t{\\'e}, Carol\",\n \
+    \   title = \"Two Projects\",\n    booktitle = \"Proceedings of the Fictional Conference\",\n    year\
+    \ = \"2024\",\n    project = \"homebot, sharedarm\"\n}"
 - bib_id: id-external-2023
   title: External Coauthors, Later
   authors:
   - name: A. Adams
     person_id: aadams
+    given: Alice
+    von: null
+    family: Adams
+    suffix: null
+    literal: null
   - name: Q. Quinn
     person_id: null
+    given: Quentin
+    von: null
+    family: Quinn
+    suffix: null
+    literal: null
   year: 2023
   venue: '*Journal of Fictional Robots*, 2023'
   category: Names
@@ -172,8 +227,9 @@ publications:
   url: null
   video_url: null
   project_ids: []
-  bibtex: "@article{id-external-2023,\n  year = {2023},\n  journal = {Journal of Fictional Robots},\n\
-    \  author = {Adams, Alice and Quinn, Quentin},\n  title = {External Coauthors, Later},\n}"
+  bibtex: "@article{id-external-2023,\n    author = \"Adams, Alice and Quinn, Quentin\",\n    title =\
+    \ \"External Coauthors, Later\",\n    journal = \"Journal of Fictional Robots\",\n    year = \"2023\"\
+    \n}"
 people:
 - id: ccote
   name: Carol Côté

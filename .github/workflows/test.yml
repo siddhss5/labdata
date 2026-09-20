@@ -41,7 +41,7 @@ jobs:
     # The floor matches [tool.coverage.report] fail_under in pyproject.toml.
     - name: Run tests with coverage
       run: |
-        uv run --frozen pytest --cov=labdata --cov-branch --cov-report=term-missing --cov-fail-under=92
+        uv run --frozen pytest --cov=labdata --cov-branch --cov-report=term-missing --cov-fail-under=97
 
     - name: Validate demo lab
       run: |

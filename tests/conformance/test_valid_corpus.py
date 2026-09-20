@@ -61,26 +61,24 @@ NAMES = [
     case("names.first_last", "name-first-last", "authors.0.person_id", "bbrown"),
     case("names.particle_last_first", "name-particle-van", "authors.0.name", "V. van den Berg"),
     case("names.particle_last_first", "name-particle-van", "authors.0.person_id", "vvandenberg"),
-    case("names.particle_first_last", "name-particle-de", "authors.0.name", "R. de la Cruz",
-         xfail="#23"),
+    case("names.particle_first_last", "name-particle-de", "authors.0.name", "R. de la Cruz"),
     case("names.particle_first_last", "name-particle-de", "authors.0.person_id", "rdelacruz"),
     case("names.suffix", "name-suffix", "authors.0.name",
-         AllOf(Contains("Smith", "Jr."), Excludes("J. J.")), xfail="#23"),
+         AllOf(Contains("Smith", "Jr."), Excludes("J. J."))),
     case("names.suffix", "name-suffix", "authors.1.person_id", "aadams"),
-    case("names.corporate", "name-corporate", "authors.0.name", "Example Robotics Consortium",
-         xfail="#23"),
+    case("names.corporate", "name-corporate", "authors.0.name",
+         "Example Robotics Consortium"),
     case("names.corporate", "name-corporate", "authors.0.person_id", None),
-    case("names.corporate_escaped", "name-corporate-amp", "authors.0.name", "AT&T Research",
-         xfail="#23"),
+    case("names.corporate_escaped", "name-corporate-amp", "authors.0.name", "AT&T Research"),
     case("names.corporate_escaped", "name-corporate-amp", "authors.1.person_id", "aadams"),
-    case("names.hyphenated", "name-hyphen", "authors.0.name", "G.-A. Green", xfail="#23"),
-    case("names.hyphenated", "name-hyphen", "authors.0.person_id", "ggreen", xfail="#23"),
+    case("names.hyphenated", "name-hyphen", "authors.0.name", "G.-A. Green"),
+    case("names.hyphenated", "name-hyphen", "authors.0.person_id", "ggreen"),
     case("names.accent_tex", "name-accent-tex", "authors.0.name", "C. Côté"),
     case("names.accent_tex", "name-accent-tex", "authors.0.person_id", "ccote"),
     case("names.accent_utf8", "name-accent-utf8", "authors.0.name", "C. Côté"),
     case("names.accent_utf8", "name-accent-utf8", "authors.0.person_id", "ccote"),
     case("names.others", "name-others", "authors.*.person_id", Contains("aadams", "bbrown")),
-    case("names.others", "name-others", "authors.*.name", Excludes("others"), xfail="#23"),
+    case("names.others", "name-others", "authors.*.name", Excludes("others")),
     case("names.equal_contribution", "name-equal", "authors.*.name",
          ["B. Brown", "D. Davis", "A. Adams"]),
     case("names.equal_contribution", "name-equal", "authors.*.person_id",
@@ -105,6 +103,76 @@ def test_names(valid_output, case_id, bib_key, path, expected):
     check_publication(valid_output, bib_key, path, expected)
 
 
+# The parts BibTeX split each name into, carried through to the output rather
+# than collapsed into the display string. Matching on them is #24.
+
+NAME_PARTS = [
+    case("names.structured", "name-suffix", "authors.0.given", "John"),
+    case("names.structured", "name-suffix", "authors.0.von", None),
+    case("names.structured", "name-suffix", "authors.0.family", "Smith"),
+    case("names.structured", "name-suffix", "authors.0.suffix", "Jr."),
+    case("names.structured", "name-suffix", "authors.0.literal", None),
+    case("names.structured", "name-particle-van", "authors.0.given", "Victor"),
+    case("names.structured", "name-particle-van", "authors.0.von", "van den"),
+    case("names.structured", "name-particle-van", "authors.0.family", "Berg"),
+    case("names.structured", "name-hyphen", "authors.0.given", "Grace-Ann"),
+    case("names.structured", "name-hyphen", "authors.0.family", "Green"),
+    case("names.structured", "name-corporate", "authors.0.literal",
+         "Example Robotics Consortium"),
+    case("names.structured", "name-corporate", "authors.0.given", None),
+    case("names.structured", "name-corporate", "authors.0.family", None),
+    case("names.structured", "name-corporate-amp", "authors.0.literal", "AT&T Research"),
+    case("names.structured", "name-corporate-amp", "authors.1.given", "Alice"),
+    case("names.structured", "name-corporate-amp", "authors.1.family", "Adams"),
+    case("names.structured", "name-corporate-amp", "authors.1.literal", None),
+]
+
+
+@pytest.mark.parametrize("case_id, bib_key, path, expected", NAME_PARTS)
+def test_name_parts(valid_output, case_id, bib_key, path, expected):
+    """The structured parts survive on the author, not only the display name."""
+    check_publication(valid_output, bib_key, path, expected)
+
+
+def display_name_from_parts(author):
+    """The display form the parts imply: ``F. M. van Last, Jr.``
+
+    Each given name is abbreviated to its initial, and each half of a
+    hyphenated one keeps its own: ``Grace-Ann`` is ``G.-A.``, ``Dave M.`` is
+    ``D. M.``
+    """
+    initials = " ".join(
+        "-".join(f"{piece[0]}." for piece in part.split("-") if piece)
+        for part in (author["given"] or "").split())
+    name = " ".join(part for part in (initials, author["von"], author["family"]) if part)
+    return f"{name}, {author['suffix']}" if author["suffix"] else name
+
+
+@covers("names.structured")
+def test_every_display_name_agrees_with_its_parts(valid_output):
+    """Across the whole corpus, the display name follows from the parts.
+
+    A row-by-row check of the parts would still pass if the parts were filled
+    in beside a display name built some other way, and a containment check
+    would still pass if the initials were dropped. This rebuilds the whole
+    name from the parts and compares it.
+    """
+    checked = 0
+    for publication in valid_output["publications"]:
+        for author in publication["authors"]:
+            where = f"{publication['bib_id']}: {author}"
+            if author["literal"]:
+                assert author["name"] == author["literal"], where
+                assert [author[part] for part in ("given", "von", "family", "suffix")] \
+                    == [None, None, None, None], where
+            else:
+                assert author["family"], where
+                assert author["name"] == display_name_from_parts(author), where
+            checked += 1
+    # The loop has to have run over the names the corpus is built from.
+    assert checked > 40, checked
+
+
 @covers("names.initials_ambiguous", xfail="#24", owns=("name-kim-initial",))
 def test_ambiguous_initials_listed(valid_unresolved):
     """An initials-only name that fits two members is listed for a human to resolve."""
@@ -122,17 +190,17 @@ def test_external_author_listed(valid_unresolved, valid_output):
 # Titles and abstracts come out as plain Unicode text; $...$ math stays TeX.
 
 LATEX = [
-    case("latex.textbf", "tex-textbf", "title", "A Bold Claim", xfail="#18"),
-    case("latex.nested", "tex-nested", "title", "a B c and d e f", xfail="#18"),
+    case("latex.textbf", "tex-textbf", "title", "A Bold Claim"),
+    case("latex.nested", "tex-nested", "title", "a B c and d e f"),
     case("latex.accent_braced", "tex-accent", "title", "Café Robots in München"),
-    case("latex.caron_space", "tex-caron", "title", "Haček on č", xfail="#23"),
-    case("latex.dotless_i", "tex-dotless", "title", "María's Robot", xfail="#23"),
-    case("latex.ampersand", "tex-amp", "title", "Pick & Place", xfail="#23"),
-    case("latex.percent", "tex-percent", "title", "A 50% Speedup", xfail="#23"),
-    case("latex.underscore", "tex-underscore", "title", "The robot_arm Package", xfail="#23"),
-    case("latex.endash", "tex-endash", "title", "Pages 1–10", xfail="#23"),
-    case("latex.emdash", "tex-emdash", "title", "Robots—and People", xfail="#23"),
-    case("latex.quotes", "tex-quotes", "title", "The “Tidy” Robot", xfail="#23"),
+    case("latex.caron_space", "tex-caron", "title", "Haček on č"),
+    case("latex.dotless_i", "tex-dotless", "title", "María's Robot"),
+    case("latex.ampersand", "tex-amp", "title", "Pick & Place"),
+    case("latex.percent", "tex-percent", "title", "A 50% Speedup"),
+    case("latex.underscore", "tex-underscore", "title", "The robot_arm Package"),
+    case("latex.endash", "tex-endash", "title", "Pages 1–10"),
+    case("latex.emdash", "tex-emdash", "title", "Robots—and People"),
+    case("latex.quotes", "tex-quotes", "title", "The “Tidy” Robot"),
     case("latex.star_braced", "tex-rrt", "title", "Faster RRT* Planning"),
     case("latex.star_plain", "tex-bit", "title", "BIT* in Clutter"),
     case("latex.star_braced_whole", "tex-bit-braced", "title", "BIT* Revisited"),
@@ -142,7 +210,7 @@ LATEX = [
          "Not [a link](x), not `code`, not # heading, not *emphasis*"),
     case("latex.unicode_raw", "tex-unicode", "title", "Robots 机器人 and Émoji 🤖"),
     case("latex.abstract", "tex-abstract", "abstract",
-         "Café robots run in $O(n)$ time and are very tidy.", xfail="#18"),
+         "Café robots run in $O(n)$ time and are very tidy."),
     case("latex.note_href", "tex-note-href", "note",
          Contains("https://example.org/code", "our site")),
 ]
@@ -194,9 +262,10 @@ STRUCTURE = [
     case("structure.value_braced", "struct-braced", "title", "A Braced Title"),
     case("structure.value_numeric", "struct-numeric", "year", 2019),
     case("structure.value_numeric", "struct-numeric", "venue", Contains("7(2)")),
-    case("structure.crossref", "struct-child", "year", 2018, xfail="#23"),
+    case("structure.crossref", "struct-child", "year", 2018),
+    case("structure.crossref", "struct-child", "title", "A Child Paper"),
     case("structure.crossref", "struct-child", "venue",
-         Contains("Proceedings of the Fictional Workshop"), xfail="#23"),
+         Contains("Proceedings of the Fictional Workshop")),
     case("structure.bom_crlf", "enc-bom-crlf", "title", "Byte Order Mark and CRLF"),
     case("structure.bom_crlf", "enc-bom-crlf", "authors.0.person_id", "ccote"),
     case("structure.bom_crlf", "enc-second", "title", "Second Entry After CRLF"),
@@ -237,7 +306,8 @@ def test_structure(valid_output, case_id, bib_key, path, expected):
     check_publication(valid_output, bib_key, path, expected)
 
 
-@covers("structure.comment_lines", "structure.comment_entry", "structure.preamble")
+@covers("structure.comment_lines", "structure.comment_entry", "structure.preamble",
+        "structure.comment_mentions_command")
 def test_comments_and_preamble_are_not_publications(valid_output):
     structure = {p["bib_id"] for p in valid_output["publications"]
                  if p["category"] == "Structure"}
@@ -245,6 +315,9 @@ def test_comments_and_preamble_are_not_publications(valid_output):
     assert {"struct-upper", "type-article", "type-misc"} <= structure
     # The @article inside @comment{...} is not a publication.
     assert "fake" not in structure
+    # A % comment line that only mentions @comment{ is prose, not a command:
+    # the entry after it is read like any other.
+    assert "struct-comment-prose" in structure
     assert not [p for p in valid_output["publications"]
                 if p["entry_type"] in ("comment", "preamble", "string")]
 
@@ -287,14 +360,15 @@ def test_project_backlinks(valid_output):
 # (case_id, section, lookup key, lookup value, field path, expected)
 
 OUTPUT_FIELDS = [
-    case("output.schema_version", "", "", "", "schema_version", 1),
+    case("output.schema_version", "", "", "", "schema_version", 2),
     case("output.lab", "", "", "", "lab.name", "Corpus Lab"),
     case("output.publication.bib_id", "publications", "bib_id", "type-article", "bib_id",
          "type-article"),
     case("output.publication.title", "publications", "bib_id", "tex-unicode", "title",
          "Robots 机器人 and Émoji 🤖"),
     case("output.publication.authors", "publications", "bib_id", "name-last-first", "authors",
-         [{"name": "A. Adams", "person_id": "aadams"}]),
+         [{"name": "A. Adams", "person_id": "aadams", "given": "Alice", "von": None,
+           "family": "Adams", "suffix": None, "literal": None}]),
     case("output.publication.year", "publications", "bib_id", "type-article", "year", 2020),
     case("output.publication.venue", "publications", "bib_id", "type-article", "venue",
          Contains("Journal of Fictional Robots")),
