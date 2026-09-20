@@ -1,8 +1,8 @@
 # labdata specification
 
 labdata is a compiler. It reads BibTeX and a little YAML and emits one
-validated document describing a lab's works, people, projects and the links
-between them.
+document describing a lab's works, people, projects and the links between
+them.
 
 This file states the parts of that contract a JSON Schema cannot express:
 what the strings in the document are, what order the lists are in, what an
@@ -13,10 +13,24 @@ the rest.
 Everything here is normative unless it carries a `Target` note. A `Target`
 note marks a rule that the emitted document does **not** satisfy today, and
 names the issue that will make it true. Until that issue lands, the rule is
-the intent and the note is the fact.
+the intent and the note is the fact. A `Version note` marks behaviour that
+changed at a known release boundary, and states both sides.
 
-- Applies to: `schema_version` 3, package version 2.0.0
-  (`labdata/models.py:22`, `labdata/__init__.py:36`).
+- Applies to: `schema_version` 3 (`labdata.models.SCHEMA_VERSION`), package
+  version 2.0.0 (`labdata.__version__`).
+
+### How this file cites the code
+
+Every rule below is grounded in a named part of the code rather than a line
+number, because line numbers rot silently: a function such as
+`labdata.parsers.bibtex.parse_all_publications()`, a method such as
+`Person.to_dict()`, a module-level constant such as `TEXT_FIELDS`, a JSON
+Pointer into `schema/output.schema.json` such as `/$defs/person/required`, or
+a `tests/COVERAGE.md` row key such as `config.people_file.missing`. A bare
+statement is cited by its enclosing function.
+
+Nothing yet checks that these references resolve; #63 proposes the test that
+would.
 
 ---
 
@@ -31,10 +45,10 @@ code is the bug.** A consumer that validates against the published schema and
 is rejected by labdata's own output has found a defect in labdata, never in
 itself.
 
-**The CLI is the reference compiler.** Its flags, its exit codes and its
-diagnostic format are public API.
+**The CLI is the reference compiler.** Its flags, its exit codes and the
+stream each kind of message goes to are public API.
 
-Flags (`labdata/cli.py:38-57`):
+Flags, as `labdata.cli.main()` defines them:
 
 | Flag | Meaning |
 |---|---|
@@ -44,73 +58,87 @@ Flags (`labdata/cli.py:38-57`):
 | `--validate` | Report counts and problems, then exit without writing. |
 | `--unresolved` | List author names that matched no person, then exit. |
 
-Exactly one of `--output`, `--validate` or `--unresolved` is required
-(`labdata/cli.py:62-63`).
+**At least one** of `--output`, `--validate` or `--unresolved` is required —
+not exactly one. `labdata.cli.main()` rejects only the case where all three
+are absent, so combinations are accepted and resolved by **precedence**:
+`--validate` is handled first and returns; `--unresolved` next; `--output`
+only if neither was given. So `labdata --config c.yaml --validate --output
+out.yml` reports and writes **nothing**, exiting `0`. Verified by running
+both combinations.
 
-Exit codes, as `labdata/cli.py` returns them today:
+Exit codes, as `labdata.cli.main()` returns them:
 
 | Code | Meaning |
 |---|---|
-| `0` | Success. `--output` wrote the file; `--validate` found no errors. |
-| `1` | Error. Configuration file missing (`cli.py:68-70`), configuration failed to load (`cli.py:71-73`), or `--validate` found unknown project ids (`cli.py:97-99`). |
+| `0` | Success. `--output` wrote the file; `--validate` found no errors; `--unresolved` reported. |
+| `1` | Error. Configuration file missing, configuration failed to load, or `--validate` found unknown project ids. |
 | `2` | Usage error from the argument parser: a missing or unrecognised flag, or none of `--output` / `--validate` / `--unresolved`. |
 
-Diagnostics go to standard error and are prefixed `Warning: `
-(`labdata/parsers/bibtex.py:80-86`, `labdata/resolver.py:91`). Ordinary
-reporting — counts, unresolved names, unknown project ids — goes to standard
-output (`labdata/cli.py:82-94`).
+**Streams and message shapes.** Counts, unresolved names and unknown project
+ids — the ordinary reporting of `--validate` and `--unresolved` — go to
+**standard output**. Everything else goes to **standard error**, in one of
+three shapes:
 
-> **Target (#26).** Three gaps in the above are real today.
+| Shape | Source |
+|---|---|
+| `Warning: …` | Problems with the input, from `labdata.parsers.bibtex._warn()` and `labdata.resolver.build_alias_index()`. |
+| `Error: …` | Configuration failures, from `labdata.cli.main()`: `Error: Configuration file not found: …` and `Error loading configuration: …`. |
+| `usage: …` / `…: error: …` | Argument errors, in the argument parser's own format. |
+
+There is no single prefix across all diagnostics, and a consumer that greps
+for one will miss the other two.
+
+**Unresolved authors are not errors.** `--validate` lists them and still
+exits `0`. This is intended, not a gap: an author who is not in `people.yaml`
+is usually an external collaborator, and #26 states the rule directly —
+"unresolved external collaborators are never errors". Only unknown project
+ids fail the run, because a project id naming no project is a typo in data
+labdata does own.
+
+> **Target (#26).** Two gaps in the above are real today.
 > (a) An unhandled failure — a `.bib` file named in `lab.yaml` that does not
 > exist, or a `year` field that is not a number — prints a Python traceback
 > and also exits `1`, so `1` does not by itself distinguish a diagnosed error
-> from a crash. Verified against `labdata/parsers/bibtex.py:193` and
-> `labdata/parsers/bibtex.py:552`.
-> (b) Diagnostic *text* is not yet stable: messages relayed from the BibTeX
-> parser are passed through as that library phrased them
-> (`labdata/parsers/bibtex.py:199-202`), and labdata's own messages do not
-> consistently name the file, entry key and field. Consumers may depend on
-> the stream and the `Warning: ` prefix, not on the wording.
-> (c) `--validate` reports unresolved authors but does not count them as
-> errors (`labdata/cli.py:86-90`), so a run with unresolved authors and no
-> unknown projects exits `0`.
+> from a crash. Verified against `labdata.parsers.bibtex.parse_bibtex_file()`,
+> which reads the file with no guard, and `entry_to_publication()`, which
+> calls `int()` on the `year` field.
+> (b) Diagnostic *text* is not stable. Messages relayed from the BibTeX parser
+> are passed through as that library phrased them
+> (`labdata.parsers.bibtex.parse_bibtex_file()` relays each captured error),
+> and labdata's own messages do not consistently name the file, entry key and
+> field. Consumers may depend on the stream and the shapes above, not on the
+> wording.
 
-> **Target (#22).** `--unresolved` prints `All authors resolved.` when no
-> `people_file` is configured, where nothing was ever attempted
-> (`labdata/cli.py:106-107`).
+> **Version note (#22, PR #61).** Through commit `cf9e055`, `--unresolved`
+> printed `All authors resolved.` when no `people_file` was configured, where
+> nothing had been attempted. Since PR #61 merged, the `--unresolved` branch
+> of `labdata.cli.main()` prints `Author resolution is not configured (no
+> people_file).` and exits `0`. `tests/COVERAGE.md` row
+> `config.people_file.missing` records the current behaviour as `pass`.
 
-**The Python API is convenience only.** Public: the names exported from
-`labdata/__init__.py` (`labdata/__init__.py:18-35`) — `assemble`,
-`AssemblyResult`, the models `LabData`, `Publication`, `Author`, `Person`,
-`Project`, `Collaborator`, the config loader `LabDataConfig` with `BibFile`,
-and the exporters `export_to_yaml` and `export_to_json`.
+**The Python API is convenience only.** Public: the names in `labdata.__all__`
+— `assemble`, `AssemblyResult`, the models `LabData`, `Publication`, `Author`,
+`Person`, `Project`, `Collaborator`, the config loader `LabDataConfig` with
+`BibFile`, and the exporters `export_to_yaml` and `export_to_json`.
 
 Private, and free to change without a version bump: `labdata.parsers.*`,
 `labdata.loaders`, `labdata.resolver`, `labdata.cli`'s internals, and every
 underscore-prefixed name. Importing them is unsupported. In particular, no
 guarantee is made about which BibTeX or LaTeX library sits behind
-`labdata.parsers` (`labdata/parsers/bibtex.py:9-11`).
+`labdata.parsers`; that it is an adapter boundary is stated in the
+`labdata.parsers.bibtex` module docstring.
 
-The package version (`labdata/__init__.py:36`) and the document's
-`schema_version` (`labdata/models.py:22`) are independent. Neither can be
-derived from the other.
+The package version (`labdata.__version__`) and the document's
+`schema_version` (`labdata.models.SCHEMA_VERSION`) are independent. Neither
+can be derived from the other.
 
 ---
 
 ## 2. The text rule
 
 **Every string in the emitted document is plain Unicode text.** Not HTML, not
-Markdown, not escaped, not LaTeX. `labdata/parsers/latex.py` converts each
-prose field from LaTeX to Unicode before it reaches the document, so
-`C{\^o}t{\'e}` arrives as `Côté` and `\textbf{Best Paper}` arrives as `Best
-Paper`.
-
-Which fields are converted is listed in `labdata/parsers/bibtex.py:34-37`:
-`title`, `abstract`, `note`, `journal`, `booktitle`, `school`, `institution`,
-`type`, `series`, `publisher`, `address`, `organization`. Author name parts
-are converted the same way (`labdata/parsers/bibtex.py:306-308`). Everything
-else — `url`, `doi`, `eprint`, `project` — is data, not prose, and is carried
-through unconverted.
+Markdown, not escaped, not LaTeX. A consumer may treat any string it reads as
+text to be displayed.
 
 **Text is untrusted.** A title may contain `<`, `&`, `"`, `*` or `$`, and
 often does: `Informed RRT*` and `BIT*` are real paper titles. labdata does
@@ -118,36 +146,79 @@ not escape them and will not, because it does not know what they are being
 escaped for. **Renderers are responsible for escaping** — for HTML bodies, for
 HTML attributes, for shell arguments, for whatever they emit.
 
-### Exceptions, and there are only three
+### What labdata converts, and what it does not
 
-1. **Math is left as TeX**, delimited by `$…$`, so that KaTeX or MathJax can
-   typeset it (`labdata/parsers/latex.py:22`, `math_mode='verbatim'`). This
-   is the one place a renderer may expect markup inside a text field.
-2. **`publication.bibtex` is verbatim BibTeX**, not text. It is the entry as
-   it was read, before crossref resolution and before LaTeX conversion,
-   offered for readers to copy (`labdata/parsers/bibtex.py:410-420`).
-3. **`lab` is copied through from `lab.yaml` unchanged**
-   (`labdata/config.py:69`, `labdata/models.py:223-224`). No conversion is
-   applied. Whatever the author wrote there is what consumers receive.
+This is the part that must be read carefully, because labdata enforces the
+rule in one place only.
 
-### Two honest caveats
+**Converted.** Prose fields read from BibTeX are converted from LaTeX to
+Unicode by `labdata.parsers.latex.latex_to_text()`, so `C{\^o}t{\'e}` arrives
+as `Côté` and `\textbf{Best Paper}` arrives as `Best Paper`. Exactly the
+fields in `labdata.parsers.bibtex.TEXT_FIELDS` are converted — `title`,
+`abstract`, `note`, `journal`, `booktitle`, `school`, `institution`, `type`,
+`series`, `publisher`, `address`, `organization` — applied in
+`entry_fields()`. Author name parts are converted the same way, in
+`person_name_parts()`.
 
-- When a field cannot be converted, labdata warns and keeps the text as
-  written with its braces removed (`labdata/parsers/bibtex.py:209-216`). Such
-  a value may still contain LaTeX commands. This is a degraded case, not a
-  second contract: the document is still declared plain text, and the warning
-  is the signal that one field did not make it.
-- `\href{url}{text}` is rewritten to `text (url)` before conversion
-  (`labdata/parsers/latex.py:53-54`), because the converter cannot read it.
-  Carrying link content into explicit fields is #27.
+**Not converted, and not checked.** Every other string reaches the document
+as written:
+
+- BibTeX fields outside `TEXT_FIELDS` — `url`, `doi`, `eprint`, `project`.
+  These are data, not prose.
+- **Every string supplied in YAML.** `labdata.loaders.load_people()` and
+  `load_projects()` perform no conversion of any kind, so a person's `name`,
+  `role`, `current_position` or `thesis_title`, and a project's `title` or
+  `description`, are copied verbatim from `people.yaml` and `projects.yaml`.
+- **`publication.category`**, which comes from the `category` of the
+  `bib_files` entry in `lab.yaml`, not from the `.bib` file
+  (`labdata.config.LabDataConfig.from_yaml()`, then
+  `labdata.parsers.bibtex.parse_all_publications()`).
+- **`lab`**, copied through from `lab.yaml` unchanged
+  (`LabDataConfig.from_yaml()`, then `LabData.to_dict()`).
+
+For all of these the plain-Unicode rule is a **requirement on the input, not
+a guarantee labdata enforces**. If `people.yaml` says
+`name: "<b>Alice</b>"`, or a `bib_files` category is `"**Journal** Papers"`,
+that string appears in the document exactly as written and no diagnostic is
+raised. Verified directly: a category of `<b>Cat</b> & **md**` is emitted
+unchanged.
+
+Authors of input files are therefore responsible for keeping YAML strings
+plain, and renderers should escape them as they escape everything else.
+
+### The one markup exception
+
+**Math is left as TeX**, delimited by `$…$`, so that KaTeX or MathJax can
+typeset it (`labdata.parsers.latex._CONVERTER` is built with
+`math_mode='verbatim'`). This is the one place a text field is expected to
+contain markup, and it applies only to fields labdata converts.
+
+### Two fields that are not text at all
+
+- **`publication.bibtex` is a BibTeX record**, not prose, and is meant to be
+  copied rather than displayed. See §5 for what it does and does not preserve.
+- **`lab` is a YAML mapping**, not a string, and its values are whatever the
+  author wrote.
+
+### Two degraded cases
+
+- When a field cannot be converted, labdata warns and falls back to
+  `labdata.parsers.latex.strip_braces()`, keeping the text as written with
+  its braces removed (`labdata.parsers.bibtex._convert()`). Such a value may
+  still contain LaTeX commands. This is a degraded case, not a second
+  contract: the document is still declared plain text, and the warning is the
+  signal that one field did not make it.
+- `\href{url}{text}` is rewritten to `text (url)` before conversion, in
+  `labdata.parsers.latex.latex_to_text()`, because the converter cannot read
+  it. Carrying link content into explicit fields is #27.
 
 > **Target (#18).** `publication.venue` contains Markdown today. It is
-> composed by `format_venue`, whose own docstring says "Uses Markdown (not
-> HTML)" (`labdata/parsers/bibtex.py:436-474`): an article in journal `J`
-> published in 2021 yields the string `*J*, 2021`. This is the single known
-> violation of the text rule in the emitted document. #18 removes it; #56
-> replaces `venue` with a structured container so there is nothing left to
-> compose.
+> composed by `labdata.parsers.bibtex.format_venue()`, whose own docstring
+> says "Uses Markdown (not HTML)": an article in journal `J` published in 2021
+> yields the string `*J*, 2021`. This is the only place labdata *generates*
+> markup into a text field — as distinct from the YAML strings above, which
+> it merely passes through. #18 removes it; #56 replaces `venue` with a
+> structured container so there is nothing left to compose.
 
 ---
 
@@ -159,32 +230,33 @@ accident.
 
 | List | Order |
 |---|---|
-| `publications` | `year` **descending**. Ties keep *read order* (below). Verified: `labdata/parsers/bibtex.py:600`. |
-| `publication.authors` | The order the `author` field wrote them. A terminal `and others` is BibTeX's "et al." and is dropped rather than emitted as an author (`labdata/parsers/bibtex.py:346-348`). |
-| `publication.project_ids` | The order the `project` field wrote them, comma-separated, whitespace trimmed, empty entries dropped (`labdata/parsers/bibtex.py:514-520`). |
-| `people` | The order of `people_file`. labdata does not sort people (`labdata/loaders.py:36-56`, `labdata/assembler.py:53`). |
-| `projects` | The order of `projects_file`, likewise (`labdata/loaders.py:78-88`, `labdata/assembler.py:54`). |
-| `person.publication_ids` | The order of the `publications` list, filtered to that person, first occurrence only (`labdata/resolver.py:198-204`). |
-| `project.publication_ids` | The order of the `publications` list, filtered to that project, first occurrence only (`labdata/resolver.py:206-211`). |
-| `project.people_ids` | Person id **ascending**, by Unicode code point (`labdata/resolver.py:226`). |
-| `collaborators` | `last_year` **descending**, then `publication_count` **descending**, then `name` **ascending** by Unicode code point (`labdata/assembler.py:68-73`). |
+| `publications` | `year` **descending**. Ties keep *read order* (below). The sort is the final statement of `labdata.parsers.bibtex.parse_all_publications()`. |
+| `publication.authors` | The order the `author` field wrote them (`labdata.parsers.bibtex.parse_author_list()`). A terminal `and others` is BibTeX's "et al." and is dropped rather than emitted as an author. |
+| `publication.project_ids` | The order the `project` field wrote them, comma-separated, whitespace trimmed, empty entries dropped (`labdata.parsers.bibtex.parse_project_ids()`). |
+| `people` | The order of `people_file`. labdata does not sort people (`labdata.loaders.load_people()`, called by `labdata.assembler.assemble()`). |
+| `projects` | The order of `projects_file`, likewise (`labdata.loaders.load_projects()`). |
+| `person.publication_ids` | The order of the `publications` list, filtered to that person, first occurrence only (`labdata.resolver.compute_backlinks()`). |
+| `project.publication_ids` | The order of the `publications` list, filtered to that project, first occurrence only (`compute_backlinks()`). |
+| `project.people_ids` | Person id **ascending**, by Unicode code point (`compute_backlinks()` sorts the set it collects). |
+| `collaborators` | `last_year` **descending**, then `publication_count` **descending**, then `name` **ascending** by Unicode code point (the sort in `labdata.assembler.assemble()`; `tests/COVERAGE.md` row `output.collaborators.order`). |
 | `lab` | Unordered. It is a YAML mapping copied through; consumers read it by key. |
 
 **Read order** is the order in which entries were parsed: the files in the
 order `bib_files` lists them in `lab.yaml`, and within each file, the order
-the entries appear in the source (`labdata/parsers/bibtex.py:586-594`).
-Because the publication sort is stable, read order is the tie-breaker for
-publications of the same year, and it is a promise, not an accident.
+the entries appear in the source. `parse_all_publications()` accumulates
+entries in that order before sorting. Because the publication sort is stable,
+read order is the tie-breaker for publications of the same year, and it is a
+promise, not an accident.
 
 **Ties and missing sort keys.**
 
 - Two publications of the same year appear in read order. Two entries with
   the same year in the same file appear in source order.
 - A publication with **no `year` field is treated as year `0`**
-  (`labdata/parsers/bibtex.py:552`) and therefore sorts **last**.
-- Two collaborators can only tie through all three keys if they share a
-  name, and a name is their identity (`labdata/assembler.py:66`), so the
-  order is total.
+  (`labdata.parsers.bibtex.entry_to_publication()` calls `int()` on the field
+  with a default of `0`) and therefore sorts **last**.
+- Two collaborators can only tie through all three keys if they share a name,
+  and a name is their identity (§5), so the order is total.
 - Sorting by "Unicode code point" means `Z` sorts before `a`, and `Ö` sorts
   after `z`. No locale collation is applied.
 
@@ -195,13 +267,14 @@ publications of the same year, and it is a promise, not an accident.
 > no year changes, which is itself a breaking change under §6.
 
 **Key order within an object is not part of the contract.** The YAML export
-writes keys in insertion order (`labdata/exporters.py:29-30`,
+writes keys in insertion order (`labdata.exporters.export_to_yaml()` passes
 `sort_keys=False`) and the JSON export does the same, but both formats define
 objects as unordered and consumers must treat them that way.
 
-**YAML and JSON carry the same document.** `--format yaml` and
-`--format json` serialize the identical structure
-(`labdata/exporters.py:18-45`); neither is more authoritative.
+**YAML and JSON carry the same document.** `--format yaml` and `--format
+json` serialize the identical structure (`labdata.exporters.export_to_yaml()`
+and `export_to_json()` both serialize `LabData.to_dict()`); neither is more
+authoritative.
 
 ---
 
@@ -225,32 +298,44 @@ Two consequences worth stating outright:
 - An empty list is `[]`, never `null` and never absent. `project.people_ids`
   for a project with no publications is `[]`.
 
-This rule is satisfied today by `Author`, `Publication` (except `bibtex`),
-`Project` and `Collaborator`, all of which emit every declared key
-(`labdata/models.py:48-59`, `:86-102`, `:192-202`, `:171-176`).
+This rule is satisfied today by `Author.to_dict()`, `Publication.to_dict()`
+(except `bibtex`), `Project.to_dict()` and `Collaborator.to_dict()`, each of
+which emits every declared key unconditionally.
 
 > **Target (#56).** Three deviations exist today, and each is a bug against
 > the rule above rather than a second policy.
-> (a) `Person.to_dict` emits only `id`, `name`, `role`, `status`, `website`
-> and `publication_count` unconditionally, and **omits** `photo`, `email`,
-> `co_advisor`, `start_year`, `publication_ids` and the alumni fields
-> `end_year`, `degree`, `thesis_title` and `current_position` whenever their
-> value is falsy (`labdata/models.py:142-160`). The alumni fields are
-> additionally omitted for anyone whose `status` is not `alumni`
-> (`labdata/models.py:150`). Verified: a person with no publications has no
-> `publication_ids` key at all.
-> (b) `publication.bibtex` is omitted when the entry could not be written
-> back out as BibTeX (`labdata/models.py:103-104`).
-> (c) Top-level `lab` is omitted when `lab.yaml` has no `lab` section
-> (`labdata/models.py:223-224`).
+> (a) `Person.to_dict()` emits only `id`, `name`, `role`, `status`, `website`
+> and `publication_count` unconditionally — the same six as
+> `/$defs/person/required` — and **omits** `photo`, `email`, `co_advisor`,
+> `start_year`, `publication_ids` and the alumni fields `end_year`, `degree`,
+> `thesis_title` and `current_position` whenever their value is falsy. The
+> alumni fields are additionally omitted for anyone whose `status` is not
+> `alumni`. Verified: a person with no publications has no `publication_ids`
+> key at all.
+> (b) `Publication.to_dict()` omits `bibtex` when the entry could not be
+> written back out as BibTeX.
+> (c) `LabData.to_dict()` omits top-level `lab` when `lab.yaml` has no `lab`
+> section — and, because it tests the value's truthiness rather than its
+> presence, also when `lab.yaml` explicitly supplies an empty `lab: {}`.
+> Verified: `lab: {}` produces a document with no `lab` key, so a consumer
+> cannot tell "no header" from "an empty header".
 > Fixing any of these changes the schema's `required` lists and the
-> nullability of the affected properties, which is breaking under §6.
-> #56 is the consolidated breaking change that normalises them.
+> nullability of the affected properties, which is breaking under §6. #56 is
+> the consolidated breaking change that normalises them.
 
-Because the schema is closed (`additionalProperties: false` throughout,
-`schema/output.schema.json:8`, `:49`, `:89`, `:112`, `:136`, `:150`), a
-property that is not declared cannot appear at all. "Absent" above always
-means a declared property with no value, never an undeclared one.
+**Where "absent" cannot happen at all.** Five of the six objects in the
+schema are closed — `/additionalProperties` at the top level and
+`additionalProperties` on each of `/$defs/author`, `/$defs/publication`,
+`/$defs/person`, `/$defs/project` and `/$defs/collaborator` are all `false` —
+so within those objects a property that is not declared cannot appear, and
+"absent" always means a declared property with no value.
+
+**`lab` is the exception: it is open.** `/properties/lab` declares only
+`description` and `type: object`. It has no `properties` and no
+`additionalProperties`, so any keys whatever validate inside it. The policy
+above does not apply within `lab`: its keys are whatever `lab.yaml` supplied,
+labdata declares none of them, and a consumer must probe for the ones it
+wants rather than expect a fixed set. Giving `lab` a real structure is #56.
 
 ---
 
@@ -264,103 +349,137 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 
 | Field | Origin |
 |---|---|
-| `schema_version` | Derived — a constant of the compiler (`labdata/models.py:22`). |
-| `lab` | Input — the `lab` section of `lab.yaml`, copied unchanged (`labdata/config.py:69`). |
-| `publication.bib_id`, `entry_type` | Input — the BibTeX citation key and entry type, lowercased (`labdata/parsers/bibtex.py:405-406`). |
-| `publication.title`, `abstract`, `note` | Input — BibTeX fields, converted from LaTeX to text (§2). `note` additionally has trailing `.` and whitespace trimmed (`labdata/parsers/bibtex.py:477-482`). |
-| `publication.year` | Input — the BibTeX `year`, as an integer; `0` when absent (`labdata/parsers/bibtex.py:552`). |
-| `publication.category` | Input — the `category` of the `bib_files` entry the file was listed under, not anything in the `.bib` file (`labdata/config.py:59-61`, `labdata/parsers/bibtex.py:590`). |
-| `publication.venue` | **Derived** — composed from `journal`, `booktitle`, `school`, `institution`, `type`, `number`, `volume`, `eprint` and `year` according to the entry type (`labdata/parsers/bibtex.py:436-474`). |
-| `publication.url` | Input — the BibTeX `url`, but only when it is not a video URL (`labdata/parsers/bibtex.py:561`). |
-| `publication.video_url` | **Derived** — the BibTeX `url`, when it names youtube.com, youtu.be or vimeo.com (`labdata/parsers/bibtex.py:485-490`). |
-| `publication.doi_url` | **Derived** — `https://doi.org/` plus the `doi` field, unless `doi` is already a URL (`labdata/parsers/bibtex.py:493-501`). |
-| `publication.arxiv_url` | **Derived** — `https://arxiv.org/abs/` plus the `eprint` field (`labdata/parsers/bibtex.py:504-511`). |
-| `publication.pdf_url` | **Derived** — `pdf_base_url` plus the citation key plus `.pdf` (`labdata/parsers/bibtex.py:523-531`). |
-| `publication.project_ids` | Input — the `project` field, split on commas (`labdata/parsers/bibtex.py:514-520`). |
-| `publication.bibtex` | **Derived** — the entry serialized back out as BibTeX (`labdata/parsers/bibtex.py:410-420`). |
-| `author.given`, `von`, `family`, `suffix`, `literal` | Input — the parts BibTeX split the name into, converted from LaTeX, with an equal-contribution marker removed (`labdata/parsers/bibtex.py:295-320`). |
-| `author.name` | **Derived** — the display form, built from the parts by abbreviating given names to initials: `A. J. van Last, Jr.` (`labdata/parsers/bibtex.py:323-335`). |
-| `author.person_id` | **Derived** — the resolver's match against `people_file` (`labdata/resolver.py:124-164`). |
-| `author.equal_contribution` | **Derived** — whether the entry wrote a `*` marker on any part of the name (`labdata/parsers/bibtex.py:269-276`). |
-| `person.*` except the two below | Input — the fields of `people_file` (`labdata/loaders.py:37-53`). `aliases` is read for matching and is **not** emitted. |
-| `person.publication_ids`, `publication_count` | **Derived** — back-links, and their count (`labdata/resolver.py:198-215`). |
-| `project.id`, `title`, `description`, `website`, `status` | Input — the fields of `projects_file` (`labdata/loaders.py:80-85`). |
-| `project.publication_ids`, `people_ids` | **Derived** — back-links, and the people reached through them (`labdata/resolver.py:206-226`). |
-| `collaborators` | **Derived, entirely** — one entry per distinct author display name that resolved to nobody, with the number of publications it appears on and the most recent year (`labdata/assembler.py:60-73`). |
+| `schema_version` | Derived — a constant of the compiler (`labdata.models.SCHEMA_VERSION`). |
+| `lab` | Input — the `lab` section of `lab.yaml`, copied unchanged (`LabDataConfig.from_yaml()`). |
+| `publication.bib_id` | Input — the BibTeX citation key, **as written**. `labdata.parsers.bibtex.entry_fields()` preserves its case. |
+| `publication.entry_type` | Input — the BibTeX entry type, **lowercased** by `entry_fields()`. It is the one of the two that is case-folded. |
+| `publication.title`, `abstract`, `note` | Input — BibTeX fields, converted from LaTeX to text (§2). `note` additionally has trailing `.` and whitespace trimmed (`labdata.parsers.bibtex.extract_note()`). |
+| `publication.year` | Input — the BibTeX `year`, as an integer; `0` when absent (`entry_to_publication()`). |
+| `publication.category` | Input — the `category` of the `bib_files` entry the file was listed under, not anything in the `.bib` file (`labdata.config.BibFile`, read by `parse_all_publications()`). |
+| `publication.venue` | **Derived** — composed from `journal`, `booktitle`, `school`, `institution`, `type`, `number`, `volume`, `eprint` and `year` according to the entry type (`labdata.parsers.bibtex.format_venue()`). |
+| `publication.url` | Input — the BibTeX `url`, but only when it is not a video URL (`entry_to_publication()`). |
+| `publication.video_url` | **Derived** — the BibTeX `url`, when it names youtube.com, youtu.be or vimeo.com (`labdata.parsers.bibtex.extract_video_url()`). |
+| `publication.doi_url` | **Derived** — `https://doi.org/` plus the `doi` field, unless `doi` is already a URL (`construct_doi_url()`). |
+| `publication.arxiv_url` | **Derived** — `https://arxiv.org/abs/` plus the `eprint` field (`construct_arxiv_url()`). |
+| `publication.pdf_url` | **Derived** — `pdf_base_url` plus the citation key plus `.pdf` (`resolve_pdf_url()`). |
+| `publication.project_ids` | Input — the `project` field, split on commas (`parse_project_ids()`). |
+| `publication.bibtex` | **Derived** — the entry re-serialized as BibTeX (`format_bibtex()`). See below. |
+| `author.given`, `von`, `family`, `suffix`, `literal` | Input — the parts BibTeX split the name into, converted from LaTeX, with an equal-contribution marker removed (`person_name_parts()`). |
+| `author.name` | **Derived** — the display form, built from the parts by abbreviating given names to initials: `A. J. van Last, Jr.` (`format_name()`). |
+| `author.person_id` | **Derived** — the resolver's match against `people_file` (`labdata.resolver.resolve_authors()`). |
+| `author.equal_contribution` | **Derived** — whether the entry wrote a `*` marker on any part of the name (`labdata.parsers.bibtex.marks_equal_contribution()`). |
+| `person.*` except the two below | Input — the fields of `people_file` (`labdata.loaders.load_people()`). `aliases` is read for matching and is **not** emitted. |
+| `person.publication_ids`, `publication_count` | **Derived** — back-links, and their count (`labdata.resolver.compute_backlinks()`). |
+| `project.id`, `title`, `description`, `website`, `status` | Input — the fields of `projects_file` (`labdata.loaders.load_projects()`). |
+| `project.publication_ids`, `people_ids` | **Derived** — back-links, and the people reached through them (`compute_backlinks()`). |
+| `collaborators` | **Derived, entirely** — see below (`labdata.assembler.assemble()`). |
 
-Three properties of the derived fields consumers should know:
+### Four derived fields that need more than a row
 
-- **`pdf_url` is guessed, never verified.** For an `http`/`https` base it is
-  constructed unconditionally and may 404; for a local path the file's
-  existence is checked (`labdata/parsers/bibtex.py:529-531`). Verifying it is
-  #20.
-- **`collaborators` is keyed by display name, which is not an identity.**
-  Three different people who all write as `J. Smith` are one entry. It is a
-  derived index over unresolved authorships and must not be read as an
-  authoritative list of humans. #56 relabels it accordingly.
-- **Unknown project ids are kept, not dropped.** A `project_ids` entry naming
-  no project in `projects_file` stays in the publication so the problem stays
-  visible, and `--validate` reports it and exits `1`
-  (`labdata/resolver.py:167-185`, `labdata/cli.py:91-99`).
+**`publication.bibtex` is re-serialized, not verbatim.** It is produced by
+`format_bibtex()`, which calls pybtex's `Entry.to_string("bibtex")` on the
+*parsed* entry. What survives is the set of fields and their values. What does
+**not** survive is how they were written: field order, brace-versus-quote
+delimiters, whitespace and indentation are all the serializer's, and
+`@string` macros are gone — a field written `journal = j` comes back as
+`journal = "Expanded Journal"`. Verified directly.
+
+It is produced *before* crossref resolution and *before* LaTeX conversion, so
+a field inherited from a parent entry is absent from it and LaTeX markup is
+still present. Read it as "the entry's data, re-typeset", not as "the entry as
+the author wrote it".
+
+**`publication.pdf_url` is guessed for remote bases, never verified.** When
+`pdf_base_url` begins with `http://` or `https://`, `resolve_pdf_url()`
+constructs the URL unconditionally and does not fetch it; it may 404. When
+`pdf_base_url` is a local path, the file's existence *is* checked and a
+missing file yields `null`. So the guarantee differs by base: local is
+checked, remote is not. Verifying remote links is #20.
+
+**`collaborators` is a derived index over unresolved authorships, not a list
+of people.** `assemble()` walks every publication's authors, and for each
+author with no `person_id` increments a counter keyed by the author's
+**display name**. Two consequences:
+
+- The key is not an identity. Three different people who all write as
+  `J. Smith` are one entry, with their publications merged.
+- `publication_count` is the number of **unresolved authorship occurrences**,
+  not the number of distinct publications. There is no per-publication
+  deduplication, so one publication listing `J. Smith` twice — two different
+  Smiths, or a duplicated author field — contributes `2`. Verified: a single
+  entry with `author = {Smith, John and Smith, Jane}` and no `people.yaml`
+  yields one collaborator `J. Smith` with `publication_count: 2`.
+
+`last_year` is the greatest `year` of any publication contributing an
+occurrence. #56 relabels `collaborators` as derived so it stops reading as an
+authoritative list of humans.
+
+**Unknown project ids are kept, not dropped.** A `project_ids` entry naming no
+project in `projects_file` stays in the publication so the problem stays
+visible, and `--validate` reports it and exits `1`
+(`labdata.resolver.resolve_projects()` returns them; `labdata.cli.main()`
+counts them as errors).
 
 ---
 
 ## 6. Version policy
 
 The document carries a single integer, `schema_version`
-(`labdata/models.py:22`, `schema/output.schema.json:10-13`). It has no minor
-component, because there is nothing in the document a consumer would branch
-on below the level of "can I still read this".
+(`labdata.models.SCHEMA_VERSION`, pinned in the schema at
+`/properties/schema_version/const`). It has no minor component, because there
+is nothing in the document a consumer would branch on below the level of "can
+I still read this".
 
 **A major change increments `schema_version`.** A change is major — breaking —
 when it can make a conforming consumer reject the output or misinterpret it:
 
-- **Adding, removing or renaming a property.** *Adding* is breaking here
-  because the schema is closed: every object sets
+- **Adding, removing or renaming a property** of any of the five closed
+  objects. *Adding* is breaking there because those objects set
   `additionalProperties: false`, so a consumer validating against the
-  previous version rejects a document carrying a new key.
-- **Changing a type**, including making a string an object or a scalar a
-  list.
+  previous version rejects a document carrying a new key. **Inside `lab` this
+  does not hold**: `/properties/lab` is open (§4), nothing inside it is
+  declared, and adding a key there breaks no conforming consumer. Giving
+  `lab` a declared structure would itself be a breaking change, because it
+  would close a door that is currently open.
+- **Changing a type**, including making a string an object or a scalar a list.
 - **Changing nullability** — a property that could not be `null` now can, or
   the reverse.
-- **Changing requiredness** — moving a property into or out of `required`.
+- **Changing requiredness** — moving a property into or out of a `required`
+  list such as `/$defs/publication/required`.
 - **Changing meaning** while keeping the name and type. `venue` ceasing to
   carry Markdown is this kind of change even though it stays a string.
-- **Changing an identifier or a relationship** — how `bib_id` or a person
-  `id` is formed, or what `publication_ids` points at.
-- **Changing an order that §3 promises.** Reordering `publications`, or
-  moving where a publication with no year lands, is breaking. Changing the
-  order of a list §3 calls unordered is not.
+- **Changing an identifier or a relationship** — how `bib_id` or a person `id`
+  is formed, or what `publication_ids` points at.
+- **Changing an order that §3 promises.** Reordering `publications`, or moving
+  where a publication with no year lands, is breaking. Changing the order of a
+  list §3 calls unordered is not.
 
 **A minor change does not increment it.** Minor changes are those that leave
 every conforming document conforming and every conforming reading correct:
 new CLI flags, new diagnostics, faster or clearer implementations,
 documentation, and bug fixes whose output was already non-conforming.
 
-**Published schemas are immutable and live at versioned paths.** A schema
-that has been published is never edited. Version `N`'s schema stays
-reachable, byte for byte, at its own path after version `N+1` ships, so a
-consumer pinned to `N` keeps a stable target.
+**Published schemas are immutable and live at versioned paths.** A schema that
+has been published is never edited. Version `N`'s schema stays reachable, byte
+for byte, at its own path after version `N+1` ships, so a consumer pinned to
+`N` keeps a stable target.
 
 > **Target (#56).** This is not true today. There is one schema file, at the
 > unversioned path `schema/output.schema.json`, and it is edited in place on
-> every bump: it currently asserts `"const": 3`
-> (`schema/output.schema.json:12`). Its `$id` points at
-> `.../blob/main/schema/output.schema.json`
-> (`schema/output.schema.json:3`), a mutable branch URL, which is unfit for a
-> public contract. #56 moves the v4 schema to `schema/v4/output.schema.json`
-> and keeps v3 reachable unchanged; #37 covers publishing the resulting URLs
-> for outside consumers.
+> every bump: `/properties/schema_version/const` currently asserts `3`. Its
+> `/$id` points at `.../blob/main/schema/output.schema.json`, a mutable branch
+> URL, which is unfit for a public contract. #56 moves the v4 schema to
+> `schema/v4/output.schema.json` and keeps v3 reachable unchanged; #37 covers
+> publishing the resulting URLs for outside consumers.
 
-**Version history.**
+**Version history**, as recorded in the comment above
+`labdata.models.SCHEMA_VERSION`:
 
 | `schema_version` | Change |
 |---|---|
 | 1 | The original document. |
-| 2 | Authors carry their structured name parts (#23). Breaking: the schema is closed, so a v1 consumer rejects the new keys. |
+| 2 | Authors carry their structured name parts (#23). Breaking: the object is closed, so a v1 consumer rejects the new keys. |
 | 3 | Authors carry `equal_contribution` (#46). Breaking, for the same reason. |
-
-Recorded at `labdata/models.py:16-22`.
 
 ---
 
@@ -369,14 +488,13 @@ Recorded at `labdata/models.py:16-22`.
 BibTeX `@string` macros are expanded before a field reaches labdata. When one
 file defines the same macro more than once, **the last definition wins**.
 
-This matches classic BibTeX. It is not universal: some BibTeX parsers keep
-the first definition instead, which is why the rule has to be written down
-rather than assumed.
+This matches classic BibTeX. It is not universal: some BibTeX parsers keep the
+first definition instead, which is why the rule has to be written down rather
+than assumed.
 
 Verified: `tests/corpus/valid/strings.bib` defines `rss`, `cfx` and `jfx`
 twice each, and `tests/COVERAGE.md` row `strings.repeat_last_wins` records
-that the last definition is used and the first never appears in the output
-(`tests/conformance/test_valid_corpus.py::test_strings`, status `pass`).
+that the last definition is used and the first never appears in the output.
 
 **Precisely: expansion is positional.** A definition applies to every use
 *after* it in the same file, and a redefinition replaces it from that point
@@ -388,25 +506,29 @@ Verified directly against a file with an entry between two definitions of the
 same macro; `tests/corpus/valid/strings.bib` defines all three macros before
 any entry uses them, so the corpus does not distinguish the two readings.
 
-A redefinition is never silent. labdata reports it on standard error
-(`labdata/parsers/bibtex.py:91-107`, `:195-197`):
+A redefinition is never silent. `labdata.parsers.bibtex._redefined_macros()`
+finds them and `parse_bibtex_file()` reports each on standard error:
 
 ```
 Warning: @string macro 'rss' is defined more than once; the last definition is used
 ```
 
-Today that is one line per redefined macro per file. Collapsing a run's
+Two things about that message. It is **globally worded** where the rule is
+positional — "the last definition is used" is true of every use after the last
+definition, which is the ordinary case, but not of an entry written between
+two definitions. The rule above, not the message, is the contract. And it is
+currently **one line per redefined macro per file**; collapsing a run's
 redefinitions into a single summary line is tracked as `xfail #21` in
-`tests/COVERAGE.md:63`. The *rule* — last wins — is in force either way; only
-the shape of the message is open.
+`tests/COVERAGE.md` row `strings.redefined_report`. Changing either is a code
+change.
 
 **Macros are scoped to the file that defines them.** Each `.bib` file is
-parsed with its own parser, so a macro defined in one file is undefined in
-the next (`labdata/parsers/bibtex.py:193-204`). A use of an undefined macro
-is reported and expands to the empty string; the entry itself is kept, not
+parsed with its own parser instance in `parse_bibtex_file()`, so a macro
+defined in one file is undefined in the next. A use of an undefined macro is
+reported and expands to the empty string; the entry itself is kept, not
 dropped. Verified directly. Making that diagnostic name the file, entry key
 and field — rather than relaying the parser's own wording — is #26
-(`tests/COVERAGE.md:67`).
+(`tests/COVERAGE.md` row `strings.undefined`).
 
 ---
 
@@ -422,16 +544,18 @@ schema_version, lab, people, publications, projects, collaborators (derived)
 deliberately: a document needs a header, and it is where contact information
 lives.
 
-The boundary is a finding, not an omission. Two independent surveys of real
-academic lab websites — 27 groups and 18 groups, spanning robotics, biology,
-chemistry, physics, economics and public health, across six countries — found
-only three content types at or above **85% prevalence**: people, publications,
-and projects or research areas. Everything else fell below **70%**. The types
-that recur most often below that line — news, openings, teaching — are prose
-or institution-specific, with no shared structure to compile: there is no
-schema for them that two labs would both accept, and nothing for a compiler
-to check. The full reasoning is #38; #60 is the one experiment that could
-later change it.
+The boundary is a finding, not an omission. The project's stated evidence is
+two independent surveys of real academic lab websites — 27 groups and 18
+groups, spanning robotics, biology, chemistry, physics, economics and public
+health, across six countries — which found only three content types at or
+above **85% prevalence**: people, publications, and projects or research
+areas. Everything else fell below **70%**. The types that recur most often
+below that line — news, openings, teaching — are prose or
+institution-specific, with no shared structure to compile: there is no schema
+for them that two labs would both accept, and nothing for a compiler to
+check. The surveys themselves are not in this repository and are not
+independently reproducible from it; the reasoning is recorded in #38, and #60
+is the one experiment that could later change it.
 
 So each rejected type is rejected for a stated reason, and each has a home:
 
@@ -445,26 +569,25 @@ So each rejected type is rejected for a stated reason, and each has a home:
 | Awards and honours | An attribute of the work, today `publication.note`; #27 moves it out of `note`. |
 | Funding and grants | Your site repository. Nothing in the document depends on it. |
 | Software and datasets | Not a separate collection — they are kinds of *work*, added by #31. |
-| Alumni | Not a collection — a `status` on a person (`labdata/models.py:115`). |
+| Alumni | Not a collection — a `status` on a person (`labdata.models.Person.status`). |
 | Robots, platforms, facilities | Your site repository; one of 27 surveyed sites had such a page. |
 
-**There is no generic extension mechanism and no `collections` escape
-hatch.** What one would carry is mostly prose, and its one real service —
-catching references that point at nothing — is delivered by #58 without the
-document owning the payload.
+**There is no generic extension mechanism and no `collections` escape hatch.**
+What one would carry is mostly prose, and its one real service — catching
+references that point at nothing — is delivered by #58 without the document
+owning the payload.
 
 ---
 
 ## 9. What this file is not
 
-It does not list the document's fields; `schema/output.schema.json` does,
-and #56 revises that list for `schema_version` 4. It does not describe the
-Jekyll templates in `site/`, which are one downstream consumer and move to
-their own repository in #57. It does not describe the input formats
-`lab.yaml`, `people.yaml` and `projects.yaml` beyond what §5 needs; schemas
-for those are #37.
+It does not list the document's fields; `schema/output.schema.json` does, and
+#56 revises that list for `schema_version` 4. It does not describe the Jekyll
+templates in `site/`, which are one downstream consumer and move to their own
+repository in #57. It does not describe the input formats `lab.yaml`,
+`people.yaml` and `projects.yaml` beyond what §5 needs; schemas for those are
+#37.
 
 `tests/COVERAGE.md` is the case-by-case record of what labdata does with each
-input, with the fixture and the test for each. Where it and this file
-disagree about current behaviour, `tests/COVERAGE.md` is the one backed by a
-test.
+input, with the fixture and the test for each. Where it and this file disagree
+about current behaviour, `tests/COVERAGE.md` is the one backed by a test.

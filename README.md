@@ -7,8 +7,9 @@ can read.
 Most academics already keep good BibTeX. What they do not have is that
 bibliography as *data*: authors linked to the people in the group, papers
 linked to the projects they belong to, names normalised, LaTeX resolved to
-plain Unicode text. labdata does that one job, checks the result against a
-published schema, and writes it to a single YAML or JSON file.
+plain Unicode text. labdata does that one job and writes the result to a
+single YAML or JSON file, specified by a published JSON Schema you can check
+it against.
 
 ```bash
 labdata --config lab.yaml --output lab.yml
@@ -72,8 +73,12 @@ labdata --config lab.yaml --output lab.yml      # write the document
 labdata --config lab.yaml --format json --output lab.json
 ```
 
-`--validate` exits `1` when it finds an error, `0` otherwise. The exit codes
-are part of the contract; [`SPEC.md` §1](SPEC.md) lists them.
+`--validate` exits `1` when it finds an error, `0` otherwise. An author who
+matched nobody is reported but is not an error — most are external
+collaborators. `--validate` does not check the output against the JSON
+Schema; it checks counts and unknown project ids. The exit codes are part of
+the contract; [`SPEC.md` §1](SPEC.md) lists them, along with the precedence
+rule when you pass more than one mode.
 
 ## Inputs
 
@@ -94,9 +99,11 @@ Standard `.bib` files. labdata reads these fields:
 | `url` | `video_url` when it points at YouTube or Vimeo, otherwise `url` |
 | `project` | `project_ids` (see below) |
 
-The whole entry is also emitted verbatim as `bibtex`, so fields labdata does
-not read are not lost. The full list of bibliographic fields the document does
-not yet carry as first-class properties is tracked in
+The entry is also re-serialized into a `bibtex` field, so fields labdata does
+not read are still carried. It is a re-serialization, not a copy: field order,
+braces and quoting are normalised, `@string` macros are expanded, and fields
+inherited through `crossref` are not included. The full list of bibliographic
+fields the document does not yet carry as first-class properties is tracked in
 [#56](https://github.com/siddhss5/labdata/issues/56).
 
 ### The `project` tag
@@ -162,29 +169,44 @@ author names to people:
 labdata matches BibTeX author names to lab members in two passes:
 
 1. **Exact alias match** against the `aliases` list in `people.yaml`, after
-   normalising case, accents and punctuation.
+   lowercasing, stripping accents, removing periods and collapsing
+   whitespace. Other punctuation — apostrophes, hyphens — is kept, so
+   `O'Neill` and `Zhang-Smith` must match on those characters.
 2. **Fuzzy fallback** on string similarity, threshold 0.85, for minor spelling
-   variations. Single-initial names such as `S. Zhang` are never fuzzy-matched:
-   there is not enough there to match on.
+   variations. A name that is exactly one initial and one surname, such as
+   `S. Zhang`, is skipped: there is not enough there to match on. The guard is
+   that narrow, so `S. Zhang-Smith` and `S. J. Zhang` are still fuzzy-matched.
 
 A name that matches nobody keeps `person_id: null` and appears in the derived
-`collaborators` list. `labdata --config lab.yaml --unresolved` shows those
-names so you can add aliases.
+`collaborators` list. `labdata --config lab.yaml --unresolved` lists those
+names so you can add aliases — or, if you have configured no `people_file`,
+tells you resolution was never attempted.
 
 `collaborators` is keyed by display name, which is not an identity: three
-people who all write as `J. Smith` are one entry. Read it as an index of
-unresolved authorships, not as a list of humans.
+people who all write as `J. Smith` are one entry. Its `publication_count` is
+the number of unresolved authorship occurrences, not distinct publications.
+Read it as an index of unresolved authorships, not as a list of humans.
 
 ## Reading the document
 
-The output is one YAML or JSON file. Every string in it is plain Unicode text
-— not HTML, not Markdown, not escaped — and it is untrusted, so **escape it
-when you render it**. Math is the one exception and stays delimited by `$…$`.
-[`SPEC.md` §2](SPEC.md) states the rule and its exceptions.
+The output is one YAML or JSON file. Every string in it is meant to be plain
+Unicode text — not HTML, not Markdown, not escaped — and it is untrusted, so
+**escape it when you render it**. Math is the one markup exception and stays
+delimited by `$…$`.
 
-Validate a document against the schema with any JSON Schema tool:
+labdata *enforces* that rule only where it converts: the BibTeX prose fields
+it reads. Strings you supply directly in YAML — names and roles in
+`people.yaml`, titles and descriptions in `projects.yaml`, the `category` of
+each `bib_files` entry, and everything under `lab` — are copied through
+exactly as written and are never checked. Keeping them plain is on you.
+[`SPEC.md` §2](SPEC.md) draws the line precisely.
+
+Validate a document against the schema with any JSON Schema tool. labdata
+does not do this for you, and does not depend on a validator — `jsonschema`
+is a test-only dependency, so install it first:
 
 ```bash
+pip install jsonschema
 python -c "
 import json, yaml, jsonschema
 schema = json.load(open('schema/output.schema.json'))
