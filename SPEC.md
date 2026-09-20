@@ -52,8 +52,7 @@ the document; the fix belongs in the schema, not in the consumer. Recovering
 the property from `publication.bibtex` does not close the gap, because that
 record is an opaque re-serialization of the entry rather than a set of
 first-class properties (§5), and neither does taking a composed string such
-as `venue` apart.
-`examples/consumers/` holds four such probes — a plain HTML page, a LaTeX CV
+as `venue` apart. `examples/consumers/` holds four such probes — a plain HTML page, a LaTeX CV
 fragment, a CSL-JSON export and a person/project/work edge list — each reading
 the document and nothing else, and `tests/conformance/test_consumer_probes.py`
 runs every one of them against the demo output. Three cannot produce correct
@@ -63,8 +62,8 @@ something the probe already does correctly, so each of those tests is kept to
 the assertions that name the missing properties — and, for the prerequisites
 it cannot avoid relying on, the rule is: **every prerequisite an xfailed test
 already satisfies is independently enforced by a test that passes.** The
-xfailed CV test looks up one publication by id and that publication's one
-`\item`, and both lookups assert. The passing CV test calls the same `\item`
+xfailed CV test looks up one publication by id, then that publication's one
+`\item` by title, and both lookups assert. The passing CV test calls the same `\item`
 lookup for every publication, and the passing HTML and graph tests both fail
 on a duplicated id, so neither prerequisite is checked only inside a marker.
 `examples/consumers/README.md` lists the three gaps.

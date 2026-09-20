@@ -262,6 +262,9 @@ HOSTILE_LAB = '</title><script>alert("lab")</script>'
 # `person.id` and `project.id` only to a non-empty string
 # (`/$defs/person/properties/id`), so this one is valid output of v3.
 HOSTILE_ID = 'x" onmouseover="alert(1)'
+# Two ids that differ only by an escape. Unescaped they both reach the parser
+# as `x&y` and the page has lost the difference between two entities.
+AMBIGUOUS_IDS = ("x&y", "x&amp;y")
 
 
 class Collector(HTMLParser):
@@ -296,6 +299,8 @@ def hostile_page(tmp_path_factory, demo_document):
     hostile["publications"][0]["bib_id"] = HOSTILE_ID
     hostile["people"][0]["id"] = HOSTILE_ID
     hostile["projects"][0]["id"] = HOSTILE_ID
+    for offset, value in enumerate(AMBIGUOUS_IDS):
+        hostile["people"][offset + 1]["id"] = value
     path = tmp_path_factory.mktemp("hostile") / "lab.json"
     with open(path, "w", encoding="utf-8") as f:
         json.dump(hostile, f, ensure_ascii=False)
@@ -325,6 +330,8 @@ def test_plain_html_escapes_hostile_text(hostile_page):
     ids = [value for _, name, value in collector.attrs if name == "id"]
     assert [prefix for prefix in ("work-", "person-", "project-")
             if prefix + HOSTILE_ID not in ids] == []
+    assert {"person-" + value for value in AMBIGUOUS_IDS} <= set(ids)
+    assert len(set(ids)) == len(ids), "two entities share an id"
 
     # Tags still nest, and every `&` is an entity reference.
     balance = TagBalance()

@@ -44,7 +44,8 @@ red instead of being absorbed by the expected `#56` xfail.
 
 A strict `xfail` swallows *every* failure in its test, and an xfailed test
 cannot help relying on some things that already work: the CV one looks up a
-publication by id and that publication's one `\item`, and both lookups assert.
+publication by id, then that publication's one `\item` by title, and both
+lookups assert.
 The rule that covers those is: **every prerequisite an xfailed test already
 satisfies is independently enforced by a test that passes.** Here the passing
 CV test calls the same `tex_entry()` for every publication, and the passing
@@ -52,19 +53,18 @@ HTML and graph tests both fail on a duplicated id, so nothing the xfailed test
 leans on is checked only inside the marker. The three xfails turn into passes
 in #56 and lose their markers there.
 
-The passing tests match **per record, keyed by the id the document supplies**,
-rather than counting or searching the page for a substring. A count passes
-with two works' author lists swapped, and a substring search for a year is
-satisfied by a DOI that happens to contain it; both are exactly the kind of
-regression #56 could introduce. So the HTML page carries each work's `bib_id`
-as an element id and is compared field by field; each CSL record is compared
-against
-the fields `schema_version` 3 can supply, matched by `id`; each CV entry's
-author, title and year lines are compared as lines; and the graph's `authored`,
-`part_of` and `member_of` edges are all compared as complete tuples. The one
-exception is the page's collaborators, compared as a multiset because the
-document gives them no id to key on — which is the gap `graph.py` fails on,
-showing up a second time.
+The passing tests match **per record**, rather than counting or searching the
+page for a substring. A count passes with two works' author lists swapped, and
+a substring search for a year is satisfied by a DOI that happens to contain
+it; both are exactly the kind of regression #56 could introduce. What each
+test matches a record *by* differs, because the artifacts differ:
+
+| Probe | Records matched by |
+|---|---|
+| `plain_html.py` | the `bib_id`, person id and project id the page carries as element ids — except collaborators, compared as a **multiset**, because the document gives them no id at all, which is the gap `graph.py` fails on showing up a second time |
+| `csl_json.py` | the record's `id`, against the fields `schema_version` 3 can supply |
+| `cv_tex.py` | the entry's **title**, because a LaTeX fragment carries no ids; a duplicate title fails loudly rather than matching the wrong entry |
+| `graph.py` | nothing — every `authored`, `part_of` and `member_of` edge is compared as a complete tuple |
 
 ## What a probe may read
 
@@ -133,12 +133,14 @@ reaching the `id` attribute this page gives each entity — and runs the
 **unmodified** probe on that. It then parses the output and asserts the markup
 never became markup: no `script` or `b` element, the hostile text coming back
 out of the parser as the characters that went in, no `on*` attribute anywhere,
-and the URL arriving as one intact attribute value. #36 owns escaping across
-the rest of the project; this is the part this probe can settle.
+and the URL and each id arriving as one intact attribute value, with two ids
+that differ only by an escape (`x&y` and `x&amp;y`) staying distinct.
 
 ## What blocks the three failing probes
 
-Verified against the demo record `brown2025tidy`:
+Verified against the demo output. The first two are shown by the record
+`brown2025tidy`; the third by the five co-authors the demo cannot resolve,
+none of whom is on that record:
 
 - **`cv_tex.py`** — `pages`, `volume` and `number` are not emitted as
   first-class properties, and `venue` is a composed Markdown string rather
