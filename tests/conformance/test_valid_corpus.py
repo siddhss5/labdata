@@ -121,6 +121,10 @@ NAME_PARTS = [
          "Example Robotics Consortium"),
     case("names.structured", "name-corporate", "authors.0.given", None),
     case("names.structured", "name-corporate", "authors.0.family", None),
+    case("names.structured", "name-corporate-amp", "authors.0.literal", "AT&T Research"),
+    case("names.structured", "name-corporate-amp", "authors.1.given", "Alice"),
+    case("names.structured", "name-corporate-amp", "authors.1.family", "Adams"),
+    case("names.structured", "name-corporate-amp", "authors.1.literal", None),
 ]
 
 
@@ -128,6 +132,30 @@ NAME_PARTS = [
 def test_name_parts(valid_output, case_id, bib_key, path, expected):
     """The structured parts survive on the author, not only the display name."""
     check_publication(valid_output, bib_key, path, expected)
+
+
+@covers("names.structured")
+def test_every_display_name_agrees_with_its_parts(valid_output):
+    """Across the whole corpus, the display name follows from the parts.
+
+    A row-by-row check of the parts would still pass if the parts were filled
+    in beside a display name built some other way; this fails if they ever
+    disagree.
+    """
+    for publication in valid_output["publications"]:
+        for author in publication["authors"]:
+            where = f"{publication['bib_id']}: {author}"
+            if author["literal"]:
+                assert author["name"] == author["literal"], where
+                assert [author[part] for part in ("given", "von", "family", "suffix")] \
+                    == [None, None, None, None], where
+                continue
+            assert author["family"], where
+            assert author["family"] in author["name"], where
+            if author["von"]:
+                assert author["von"] in author["name"], where
+            if author["suffix"]:
+                assert author["name"].endswith(", " + author["suffix"]), where
 
 
 @covers("names.initials_ambiguous", xfail="#24", owns=("name-kim-initial",))
@@ -220,6 +248,7 @@ STRUCTURE = [
     case("structure.value_numeric", "struct-numeric", "year", 2019),
     case("structure.value_numeric", "struct-numeric", "venue", Contains("7(2)")),
     case("structure.crossref", "struct-child", "year", 2018),
+    case("structure.crossref", "struct-child", "title", "A Child Paper"),
     case("structure.crossref", "struct-child", "venue",
          Contains("Proceedings of the Fictional Workshop")),
     case("structure.bom_crlf", "enc-bom-crlf", "title", "Byte Order Mark and CRLF"),

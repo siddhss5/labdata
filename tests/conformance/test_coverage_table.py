@@ -113,6 +113,11 @@ def test_only_the_adapter_imports_a_parser_library():
             if module.split(".")[0] in PARSER_LIBRARIES:
                 offenders.append(f"{relative}: {module}")
     assert offenders == []
+    # An empty list has to mean "looked and found none": the adapter itself
+    # imports both libraries, so the search above can see one when it is there.
+    found = {module.split(".")[0] for path in ADAPTER
+             for module, _ in imports(REPO_ROOT / path)}
+    assert {"pybtex", "pylatexenc"} <= found
 
 
 def test_only_unit_tests_import_labdata_internals():

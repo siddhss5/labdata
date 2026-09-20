@@ -22,7 +22,8 @@ from typing import Dict, List, Optional, Tuple
 
 import pybtex.errors
 from pybtex.database import Entry, Person
-from pybtex.database.input.bibtex import Parser as PybtexParser
+from pybtex.database.input.bibtex import LowLevelParser, Parser as PybtexParser, SkipEntry
+from pybtex.scanner import PybtexSyntaxError
 
 from .latex import latex_to_text, strip_braces
 from ..models import Author, Publication
@@ -40,9 +41,6 @@ OTHERS = "others"
 
 _STRING_DEFINITION = re.compile(r'@string\s*[{(]\s*([^\s=,{}()"]+)\s*=', re.IGNORECASE)
 
-_NAME_CHARS = re.compile(r'[A-Za-z0-9_]*')
-_DELIMITERS = {"{": "}", "(": ")"}
-
 
 def _warn(message: str) -> None:
     """Report a problem with an input file in labdata's own voice.
@@ -54,78 +52,6 @@ def _warn(message: str) -> None:
 
 
 # --- Reading the files -------------------------------------------------------
-
-def _end_of_group(text: str, start: int) -> Optional[int]:
-    """The index just past the delimiter matching the one at ``start``.
-
-    ``None`` when it never closes, which is the caller's signal to leave the
-    text exactly as it is.
-    """
-    opening = text[start]
-    closing = _DELIMITERS[opening]
-    depth = 0
-    for i in range(start, len(text)):
-        if text[i] == opening:
-            depth += 1
-        elif text[i] == closing:
-            depth -= 1
-            if depth == 0:
-                return i + 1
-    return None
-
-
-def _blank_comment_blocks(text: str) -> str:
-    """Blank out ``@comment{...}`` bodies, keeping the line structure.
-
-    BibTeX itself reads on to the next ``@`` after a ``@comment``, so an entry
-    written inside one is a real entry to it. labdata treats a commented-out
-    entry as commented out. Blanking rather than deleting keeps the line
-    numbers in the parser's messages honest.
-
-    The scan walks the file the way BibTeX reads it, so that only a real
-    command is taken for one: a ``%`` comment runs to the end of its line, and
-    any other ``@command{...}`` is stepped over whole rather than looked
-    inside. Nothing is blanked unless its group closes, so no input can make
-    this remove more than one balanced ``@comment`` group — and never a valid
-    entry outside one.
-    """
-    out: Optional[List[str]] = None
-    i, end_of_text = 0, len(text)
-    while i < end_of_text:
-        character = text[i]
-        if character == "%":
-            newline = text.find("\n", i)
-            i = end_of_text if newline == -1 else newline + 1
-            continue
-        if character != "@":
-            i += 1
-            continue
-
-        name_end = _NAME_CHARS.match(text, i + 1).end()
-        body = name_end
-        while body < end_of_text and text[body].isspace():
-            body += 1
-        if body >= end_of_text or text[body] not in _DELIMITERS:
-            i = name_end
-            continue
-
-        group_end = _end_of_group(text, body)
-        if text[i + 1:name_end].lower() != "comment":
-            # Some other command: step over its body so that an @comment
-            # written inside a field value is not mistaken for a command.
-            i = group_end if group_end is not None else name_end
-            continue
-        if group_end is None:
-            i = name_end          # never closes: leave it to the parser
-            continue
-
-        out = list(text) if out is None else out
-        for position in range(i, group_end):
-            if out[position] != "\n":
-                out[position] = " "
-        i = group_end
-    return text if out is None else "".join(out)
-
 
 def _redefined_macros(text: str) -> List[str]:
     """The ``@string`` macros this text defines more than once, in source order.
@@ -146,21 +72,91 @@ def _redefined_macros(text: str) -> List[str]:
     return repeated
 
 
+class _CommentSkippingParser(LowLevelParser):
+    """pybtex's tokenizer, with a balanced ``@comment{...}`` group stepped over.
+
+    pybtex raises ``SkipEntry`` for ``@comment`` before reading the body, so
+    the scanner resumes just inside the group and an entry written there is a
+    real entry to it — BibTeX behaves the same way. labdata treats a
+    commented-out entry as commented out, so the group is consumed here, at
+    the parser's own position and with the parser's own scanner. Nothing else
+    in the file is read by labdata, which is why the shape of a value or of a
+    neighbouring command cannot be got wrong.
+
+    Only a *balanced* group is consumed. Prose that merely mentions
+    ``@comment{`` does not close, so the position is put back and pybtex reads
+    the file as it always would: at worst a commented-out entry stays visible,
+    never a real entry disappears.
+    """
+
+    def parse_command(self):
+        try:
+            return super().parse_command()
+        except SkipEntry:
+            position, lineno = self.pos, self.lineno
+            if not self._skip_comment_group():
+                self.pos, self.lineno = position, lineno
+            raise
+
+    def _skip_comment_group(self) -> bool:
+        """Consume the ``@comment`` body just opened. False if it never closes."""
+        closing = self.RBRACE if self.text[self.pos - 1] == "{" else self.RPAREN
+        while True:
+            token = self.skip_to([closing, self.LBRACE])
+            if token is None:
+                return False
+            if token.pattern is closing:
+                return True
+            try:
+                for _ in self.parse_string(self.RBRACE):
+                    pass
+            except PybtexSyntaxError:
+                return False
+
+
+class _Parser(PybtexParser):
+    """pybtex's BibTeX parser, reading ``@comment`` groups as comments.
+
+    ``Parser.parse_string`` names ``LowLevelParser`` directly, so swapping the
+    tokenizer means restating that loop. It is the one place labdata touches a
+    pybtex internal; ``pybtex~=0.26`` is pinned, which is the mitigation #23
+    already names for this.
+    """
+
+    def parse_string(self, text: str):
+        self.unnamed_entry_counter = 1
+        self.command_start = 0
+        commands = _CommentSkippingParser(
+            text,
+            keyless_entries=self.keyless_entries,
+            handle_error=self.handle_error,
+            want_entry=self.data.want_entry,
+            filename=self.filename,
+            macros=self.macros,
+        )
+        for command, arguments in commands:
+            kind = command.lower()
+            if kind == "preamble":
+                self.process_preamble(*arguments)
+            elif kind != "string":
+                self.process_entry(command, *arguments)
+        return self.data
+
+
 def parse_bibtex_file(path: str) -> Dict[str, Entry]:
     """Parse one BibTeX file into pybtex entries, keyed by citation key.
 
     Anything the parser has to say is captured and reported by labdata, so no
     library logging reaches the user.
     """
-    text = _blank_comment_blocks(Path(path).read_text(encoding="utf-8-sig"))
+    text = Path(path).read_text(encoding="utf-8-sig")
 
     for name in _redefined_macros(text):
         _warn(f"@string macro '{name}' is defined more than once; "
               "the last definition is used")
 
-    parser = PybtexParser()
     with pybtex.errors.capture() as errors:
-        data = parser.parse_string(text)
+        data = _Parser().parse_string(text)
     for error in errors:
         _warn(str(error))
 
