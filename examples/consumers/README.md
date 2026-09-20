@@ -48,9 +48,10 @@ passes in #56 and lose their markers there.
 The passing tests match **per record, keyed by the id the document supplies**,
 rather than counting or searching the page for a substring. A count passes
 with two works' author lists swapped, and a substring search for a year is
-satisfied by a DOI that happens to contain it; both are exactly the regression
-#56 would introduce. So the HTML page carries each work's `bib_id` as an
-element id and is compared field by field; each CSL record is compared against
+satisfied by a DOI that happens to contain it; both are exactly the kind of
+regression #56 could introduce. So the HTML page carries each work's `bib_id`
+as an element id and is compared field by field; each CSL record is compared
+against
 the fields `schema_version` 3 can supply, matched by `id`; each CV entry's
 author, title and year lines are compared as lines; and the graph's `authored`,
 `part_of` and `member_of` edges are all compared as complete tuples.
@@ -159,10 +160,12 @@ what it emits. `test_every_probe_is_exercised` fails if you do the first
 without the second, so a probe cannot sit here and never run.
 
 If your probe cannot be written, that is the finding. Leave the probe emitting
-the best artifact it can and put the correctness assertions in the tests. Keep
-everything the probe *can* establish in a test that passes, and give the
+the best artifact it can and put the correctness assertions in the tests. Every
+assertion the probe already satisfies goes in a test that passes; give the
 missing properties a test of their own marked
-`xfail(strict=True, reason="#N")` whose marker names them. Do not weaken the
-probe until it passes: a probe edited to assert its own incompleteness proves
+`xfail(strict=True, reason="#N")` whose marker names them. Match per record on
+an id the document supplies rather than counting or searching for a substring,
+or the assertion will establish less than its wording. Do not weaken the probe
+until it passes: a probe edited to assert its own incompleteness proves
 nothing, and `strict=True` makes the marker fall over as soon as the property
 lands.
