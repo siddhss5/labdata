@@ -4,6 +4,7 @@ import pytest
 from pathlib import Path
 
 from labdata.parsers.bibtex import (
+    _Parser,
     _convert,
     format_authors_string,
     format_venue,
@@ -331,3 +332,27 @@ class TestLatexFallback:
         assert pubs[0].year == 2024
         assert [a.name for a in pubs[0].authors] == ["A. Adams"]
         assert "hazard.bib:kept:title" in capsys.readouterr().err
+
+
+class TestEntryFiltering:
+    """pybtex raises SkipEntry for a filtered entry too, not only for @comment.
+
+    labdata passes ``wanted_entries`` straight through, so recovering from the
+    wrong SkipEntry would corrupt a filtered read — and would do it silently,
+    because the scanner is left somewhere quite different from a comment.
+    """
+
+    REJECTED = "@article{drop, title = {D}, year = {2024}}\n"
+    WANTED = "@article{keep, title = {K}, year = {2024}}\n"
+
+    def parse(self, text):
+        return _Parser(wanted_entries=["keep"]).parse_string(text)
+
+    def test_a_filtered_entry_does_not_swallow_the_next_one(self):
+        data = self.parse(self.REJECTED + "@article(keep, title = {K}, year = {2024})\n")
+        assert list(data.entries) == ["keep"]
+
+    def test_a_filtered_entry_does_not_swallow_a_preamble(self):
+        data = self.parse(self.REJECTED + '@preamble("a preamble")\n' + self.WANTED)
+        assert list(data.entries) == ["keep"]
+        assert data.preamble == "a preamble"

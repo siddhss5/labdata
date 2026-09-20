@@ -41,6 +41,9 @@ OTHERS = "others"
 
 _STRING_DEFINITION = re.compile(r'@string\s*[{(]\s*([^\s=,{}()"]+)\s*=', re.IGNORECASE)
 
+# The command name pybtex is about to read, when that name is `comment`.
+_COMMENT_COMMAND = re.compile(r'\s*comment\s*[{(]', re.IGNORECASE)
+
 
 def _warn(message: str) -> None:
     """Report a problem with an input file in labdata's own voice.
@@ -90,12 +93,18 @@ class _CommentSkippingParser(LowLevelParser):
     """
 
     def parse_command(self):
+        # pybtex raises SkipEntry for a @comment, and also for an entry that
+        # `wanted_entries` filters out — which leaves the scanner somewhere
+        # quite different. Only the first is ours to recover from, so the
+        # command is identified before the parser reads it.
+        comment = _COMMENT_COMMAND.match(self.text, self.pos) is not None
         try:
             return super().parse_command()
         except SkipEntry:
-            position, lineno = self.pos, self.lineno
-            if not self._skip_comment_group():
-                self.pos, self.lineno = position, lineno
+            if comment:
+                position, lineno = self.pos, self.lineno
+                if not self._skip_comment_group():
+                    self.pos, self.lineno = position, lineno
             raise
 
     def _skip_comment_group(self) -> bool:

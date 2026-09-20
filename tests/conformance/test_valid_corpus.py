@@ -134,14 +134,30 @@ def test_name_parts(valid_output, case_id, bib_key, path, expected):
     check_publication(valid_output, bib_key, path, expected)
 
 
+def display_name_from_parts(author):
+    """The display form the parts imply: ``F. M. van Last, Jr.``
+
+    Each given name is abbreviated to its initial, and each half of a
+    hyphenated one keeps its own: ``Grace-Ann`` is ``G.-A.``, ``Dave M.`` is
+    ``D. M.``
+    """
+    initials = " ".join(
+        "-".join(f"{piece[0]}." for piece in part.split("-") if piece)
+        for part in (author["given"] or "").split())
+    name = " ".join(part for part in (initials, author["von"], author["family"]) if part)
+    return f"{name}, {author['suffix']}" if author["suffix"] else name
+
+
 @covers("names.structured")
 def test_every_display_name_agrees_with_its_parts(valid_output):
     """Across the whole corpus, the display name follows from the parts.
 
     A row-by-row check of the parts would still pass if the parts were filled
-    in beside a display name built some other way; this fails if they ever
-    disagree.
+    in beside a display name built some other way, and a containment check
+    would still pass if the initials were dropped. This rebuilds the whole
+    name from the parts and compares it.
     """
+    checked = 0
     for publication in valid_output["publications"]:
         for author in publication["authors"]:
             where = f"{publication['bib_id']}: {author}"
@@ -149,13 +165,12 @@ def test_every_display_name_agrees_with_its_parts(valid_output):
                 assert author["name"] == author["literal"], where
                 assert [author[part] for part in ("given", "von", "family", "suffix")] \
                     == [None, None, None, None], where
-                continue
-            assert author["family"], where
-            assert author["family"] in author["name"], where
-            if author["von"]:
-                assert author["von"] in author["name"], where
-            if author["suffix"]:
-                assert author["name"].endswith(", " + author["suffix"]), where
+            else:
+                assert author["family"], where
+                assert author["name"] == display_name_from_parts(author), where
+            checked += 1
+    # The loop has to have run over the names the corpus is built from.
+    assert checked > 40, checked
 
 
 @covers("names.initials_ambiguous", xfail="#24", owns=("name-kim-initial",))
