@@ -222,17 +222,17 @@ rule does not apply to the input itself — only to whatever it produces.
 | `author` | Parsed into the `authors` list (`parse_author_list()`); the name parts are converted under heading 1. |
 | `year` | Emitted as the integer `year` — not a string — and drives the publication order (§3) and `venue`. |
 | `volume`, `number` | Outside `TEXT_FIELDS`, so unconverted; consumed by `format_venue()` and not emitted separately. |
-| `crossref` | Resolved by `resolve_crossref()`, which fills the child's missing fields from the parent. Not emitted as a property. |
+| `crossref` | Resolved by `resolve_crossref()`, which fills the child's missing fields from the parent and turns the parent's `title` into the child's `booktitle`. **`author` is not inherited**: `parse_author_list()` reads the raw entry rather than the resolved fields, so a child with no `author` of its own has an empty `authors` list. Verified directly. Not emitted as a property. |
 | The citation key and the entry type | Become `bib_id` and `entry_type` (`entry_fields()`); see heading 4. |
 | `journal`, `booktitle`, `school`, `institution`, `type` | Converted under heading 1, then consumed by `format_venue()`. |
 | `series`, `publisher`, `address`, `organization` | Converted under heading 1, then used by nothing. |
 | `person.aliases` | Read for matching by `labdata.resolver.build_alias_index()`, never emitted — `Person.to_dict()` has no `aliases` key. |
 | `bib_dir`, `bib_files[].name`, `people_file`, `projects_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed `pdf_url`. |
-| Any BibTeX field not named anywhere in this table or heading 1 — `pages`, `editor`, `month`, `isbn` and the rest | Not read by labdata at all. It affects nothing and survives only inside the `bibtex` record (§5). Emitting more of them as first-class properties is #56. |
+| Any BibTeX field not named anywhere in this table or heading 1 — `pages`, `editor`, `month`, `isbn` and the rest | Not interpreted by labdata outside the `bibtex` record. `entry_fields()` copies it and `format_bibtex()` serializes it, but nothing reads its value, so it affects no other property (§5). Emitting more of them as first-class properties is #56. |
 
 The fields named in that table and in heading 1 are the complete set labdata
-reads from a `.bib` entry; everything else falls in the last row. Verified by
-enumerating the field names `labdata/parsers/bibtex.py` looks up.
+*interprets* from a `.bib` entry; everything else falls in the last row.
+Verified by enumerating the field names `labdata/parsers/bibtex.py` looks up.
 
 "Not emitted" throughout that table means *not emitted as a property of the
 publication*. Every field of the entry, read or not, also survives inside the

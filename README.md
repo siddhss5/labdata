@@ -73,7 +73,8 @@ labdata --config lab.yaml --output lab.yml      # write the document
 labdata --config lab.yaml --format json --output lab.json
 ```
 
-`--validate` exits `1` when it finds an error, `0` otherwise. An author who
+`--validate` exits `0` when it finds no errors and `1` when it does, or when
+the run fails outright. An author who
 matched nobody is reported but is not an error — most are external
 collaborators. `--validate` does not check the output against the JSON
 Schema; it checks counts and unknown project ids. The exit codes are part of
@@ -84,7 +85,8 @@ rule when you pass more than one mode.
 
 ### BibTeX (required)
 
-Standard `.bib` files. labdata reads these fields:
+Standard `.bib` files. These are the fields labdata interprets; every other
+field is carried through in `bibtex` but affects nothing:
 
 | Field | Becomes |
 |-------|---------|
@@ -98,9 +100,10 @@ Standard `.bib` files. labdata reads these fields:
 | `note` | `note` |
 | `url` | `video_url` when it points at YouTube or Vimeo, otherwise `url` |
 | `project` | `project_ids` (see below) |
+| `crossref` | Nothing directly: the named parent entry supplies fields this entry omits, and the parent's `title` becomes this entry's `booktitle`. `author` is **not** inherited |
 
 The entry is also re-serialized into a `bibtex` field, so fields labdata does
-not read are still carried. It is a re-serialization, not a copy: field order,
+not interpret are still carried. It is a re-serialization, not a copy: field order,
 braces and quoting are normalised, `@string` macros are expanded, and fields
 inherited through `crossref` are not included. The full list of bibliographic
 fields the document does not yet carry as first-class properties is tracked in
@@ -192,10 +195,18 @@ Read it as an index of unresolved authorships, not as a list of humans.
 
 ## Reading the document
 
-The output is one YAML or JSON file. Every string in it is meant to be plain
-Unicode text — not HTML, not Markdown, not escaped — and it is untrusted, so
-**escape it when you render it**. Math is the one markup exception and stays
-delimited by `$…$`.
+The output is one YAML or JSON file. Strings in it that are meant for display
+— titles, abstracts, notes, names, project descriptions, each publication's
+`category` — are plain Unicode text: not HTML, not Markdown, not escaped. They
+are untrusted, and a title really may contain `<`, `&`, `"` or `*`, so
+**escape them when you render them**. Math is the one intended markup
+exception and stays delimited by `$…$`.
+
+Two strings sit outside that rule. `bibtex` is a machine-oriented BibTeX
+record that deliberately keeps its LaTeX — copy it, do not display it as text.
+And `venue` contains generated Markdown today, a known deviation tracked in
+[#18](https://github.com/siddhss5/labdata/issues/18). Identifiers and URLs are
+not display text either. [`SPEC.md` §2](SPEC.md) treats all of this properly.
 
 labdata *enforces* that rule only where it converts: the BibTeX prose fields
 it reads. Strings you supply directly in YAML — names and roles in
