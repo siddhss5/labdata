@@ -28,6 +28,8 @@ bib_files:
     category: "Conference Papers"
   - name: "other.bib"
     category: "Other Papers"
+  - name: "books.bib"
+    category: "Books and Chapters"
 
 pdf_base_url: "https://example.org/publications"
 people_file: "examples/demo/people.yaml"

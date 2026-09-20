@@ -1,0 +1,69 @@
+% Example Lab: books, chapters and manuals (fictional)
+%
+% These four entries exist for two reasons, both of them #69's.
+%
+% They are the four entry types labdata has no venue rule for -- an entry
+% in a collection, an entry in a book, a book and a manual -- and they carry
+% the fields nothing in the compiler reads: editor, publisher, address,
+% series, chapter, pages, edition, isbn, month and organization. So the
+% round-trip probe in examples/consumers/ has something to lose.
+%
+% They also carry the external-collaborator fixtures. Priya Patel is one
+% person on three works, written `Patel, Priya` on two of them and
+% `Patel, P.` on the third. Pradeep Patel is a different person, sharing her
+% first initial and her family name. The fourth scenario -- two different
+% people listed on one work under one written name -- is the pair of
+% `Lee, Lin` authors on nolan2020stairs, in conference.bib.
+
+@incollection{adams2022survey,
+  title     = {Household Robots in Everyday Settings: A Practical Survey},
+  author    = {Adams, Alice and Patel, Priya and C{\^o}t{\'e}, Carol},
+  booktitle = {Handbook of Robots in the Home},
+  editor    = {Quinn, Quentin and Silva, Sofia},
+  publisher = {Example Academic Press},
+  address   = {Exampleton},
+  series    = {Studies in Applied Robotics},
+  chapter   = {4},
+  pages     = {77--104},
+  isbn      = {978-1-00-000001-1},
+  month     = {March},
+  year      = {2022},
+  abstract  = {Robots that work in homes meet clutter, pets and people who have never read a manual. We survey what has been deployed, what was measured and what the field still cannot do.},
+  project   = {homebot}
+}
+
+@book{adams2023handbook,
+  title     = {Robot Learning for the Home: Methods and Case Studies},
+  author    = {Adams, Alice and Patel, Priya},
+  publisher = {Example Academic Press},
+  address   = {Exampleton},
+  series    = {Studies in Applied Robotics},
+  edition   = {Second},
+  isbn      = {978-1-00-000002-8},
+  year      = {2023},
+  project   = {homebot}
+}
+
+@inbook{hughes2021gaits,
+  title     = {Legged Robots in Practice},
+  author    = {Hughes, Heidi and Patel, Pradeep},
+  chapter   = {9},
+  pages     = {203--228},
+  publisher = {Example Technical Publishing},
+  address   = {Exampleton},
+  edition   = {Third},
+  isbn      = {978-1-00-000003-5},
+  year      = {2021},
+  project   = {legged}
+}
+
+@manual{ingram2019toolkit,
+  title        = {Example Lab Manipulation Toolkit: User Guide},
+  author       = {Ingram, Ivan and Patel, P. and Adams, Alice},
+  organization = {Example University Personal Robotics Laboratory},
+  address      = {Exampleton},
+  edition      = {1.2},
+  month        = {September},
+  year         = {2019},
+  project      = {homebot}
+}

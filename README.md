@@ -94,7 +94,7 @@ nothing else:
 | `title` | `title`, LaTeX converted to plain Unicode text; `$...$` math kept as TeX |
 | `author` | `authors`, each with a display `name`, its `given` / `von` / `family` / `suffix` parts (or `literal` for a corporate name), a `person_id` when it matched someone in `people.yaml`, and `equal_contribution` |
 | `year` | `year`, and the sort order of the publication list |
-| `journal` / `booktitle` / `school` / `institution`, with `volume`, `number`, `type` | `venue`, composed according to the entry type ([`SPEC.md` §5](SPEC.md)) |
+| `journal` / `booktitle` / `school` / `institution`, with `volume`, `number`, `type` | `venue`, composed according to the entry type ([`SPEC.md` §5](SPEC.md)). For an entry type there is no rule for — `@book`, `@incollection`, `@inbook`, `@manual` — the venue is the bare year and none of these fields reaches the document |
 | `doi` | `doi_url` |
 | `eprint` + `archivePrefix` | `arxiv_url` |
 | `abstract` | `abstract` |
@@ -109,7 +109,8 @@ not interpret are still carried. It is a re-serialization, not a copy: field ord
 braces and quoting are normalised, `@string` macros are expanded, and fields
 inherited through `crossref` are not included. The full list of bibliographic
 fields the document does not yet carry as first-class properties is tracked in
-[#56](https://github.com/siddhss5/labdata/issues/56).
+[#56](https://github.com/siddhss5/labdata/issues/56), and measured against the
+demo by `examples/consumers/bibtex_roundtrip.py`.
 
 ### The `project` tag
 

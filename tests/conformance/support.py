@@ -35,8 +35,18 @@ REPO_ROOT = TESTS_DIR.parent
 SCHEMA_PATH = REPO_ROOT / "schema" / "output.schema.json"
 
 
-def _xfail_marks(xfail):
-    return [pytest.mark.xfail(strict=True, reason=xfail)] if xfail else []
+def _xfail_marks(xfail, because=None):
+    """The xfail mark for ``xfail="#N"``, with ``because`` spelled into it.
+
+    The issue number alone is what tests/COVERAGE.md's status column is
+    matched against, so it stays the argument. ``because`` names the specific
+    property the fix has to deliver, which is what a reader of the failure
+    sees.
+    """
+    if not xfail:
+        return []
+    reason = "%s: %s" % (xfail, because) if because else xfail
+    return [pytest.mark.xfail(strict=True, reason=reason)]
 
 
 # Corpus entries whose values an open issue owns, declared by the xfailed
@@ -65,13 +75,16 @@ def case(case_id, *values, xfail=None, owns=None):
     return pytest.param(case_id, *values, id=label, marks=_xfail_marks(xfail))
 
 
-def covers(*case_ids, xfail=None, owns=None):
+def covers(*case_ids, xfail=None, because=None, owns=None):
     """Decorate a test that checks the given case IDs.
 
     An xfailed test must say what it ``owns``: the corpus entries whose values
     issue ``xfail`` will change, or ``()`` when it owns none, because a
     covers() test has no entry to infer one from. Leaving it out is an error,
     so an omission cannot pass for "owns nothing".
+
+    ``because`` is the rest of the xfail reason: the specific property the
+    issue has to deliver, rather than "not supported yet".
     """
     if xfail:
         if owns is None:
@@ -81,7 +94,7 @@ def covers(*case_ids, xfail=None, owns=None):
         _record_ownership(case_ids, owns)
 
     def decorate(func):
-        for mark in _xfail_marks(xfail):
+        for mark in _xfail_marks(xfail, because):
             func = mark(func)
         return func
     return decorate

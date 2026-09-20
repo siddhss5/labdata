@@ -42,6 +42,7 @@ what matters; this is a guard against drift, not a sandbox.
 import ast
 import copy
 import html
+import inspect
 import json
 import re
 import subprocess
@@ -52,7 +53,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-from .support import REPO_ROOT, export, publication
+from .support import REPO_ROOT, covers, export, publication
 
 
 PROBES = REPO_ROOT / "examples" / "consumers"
@@ -70,7 +71,12 @@ PROBE_TESTS = {
     "csl_json.py": ("test_csl_json_export_is_schema_valid",
                     "test_csl_json_records_are_citable"),
     "graph.py": ("test_graph_is_well_formed",
-                 "test_graph_covers_every_co_author"),
+                 "test_graph_covers_every_co_author",
+                 "test_graph_joins_one_co_author_written_two_ways",
+                 "test_graph_separates_co_authors_sharing_an_initial",
+                 "test_graph_separates_two_people_written_alike"),
+    "bibtex_roundtrip.py": ("test_bibtex_roundtrip_entry_is_well_formed",
+                            "test_bibtex_roundtrip_loses_no_field"),
 }
 
 # The demo record #56 is written against, and what a consumer must be able to
@@ -419,7 +425,9 @@ def csl_errors(validator, records):
 # unmapped.
 CSL_TYPE = {"article": "article-journal", "inproceedings": "paper-conference",
             "phdthesis": "thesis", "mastersthesis": "thesis",
-            "techreport": "report", "misc": "document"}
+            "techreport": "report", "misc": "document",
+            "incollection": "chapter", "inbook": "chapter",
+            "book": "book", "manual": "report"}
 
 # The CSL fields a record can be built from `schema_version` 3 alone. The
 # comparison is restricted to these, so #56 adding `container-title` and the
@@ -547,6 +555,355 @@ def test_graph_covers_every_co_author(probe_output, demo_document):
     assert len([e for e in edges if e[0] == "authored"]) == authorships
 
 
+# --- bibtex_roundtrip.py -----------------------------------------------------
+#
+# The field-loss probe of #69. It re-emits one BibTeX entry per work from the
+# document's first-class properties, and the two tests below ask the two
+# separate questions that artifact answers.
+#
+# It is deliberately **not** a value round trip. LaTeX is converted to Unicode
+# on the way in and the conversion is one-way, so `C{\^o}t{\'e}` comes back as
+# `Côté` and comparing values would assert something false. What the loss test
+# asks instead is whether every *field name* the input carried is still
+# reachable, which is the list #56's field list has to be built from.
+#
+# The reader below is used on both sides: on what the probe wrote, and on the
+# demo's own .bib files. Only the test reads those; the probe never does.
+
+DEMO_BIB = REPO_ROOT / "examples" / "demo" / "bib"
+
+ENTRY_RE = re.compile(r"@(\w+)\s*\{\s*([^,\s{}]+)\s*,")
+FIELD_RE = re.compile(r"^\s*(\w+)\s*=\s*(.*)$", re.S)
+NOT_ENTRIES = ("string", "comment", "preamble")
+
+
+def balanced(text, start):
+    """The body of the brace group already open at ``start``."""
+    depth = 1
+    for i in range(start, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i]
+    return text[start:]
+
+
+def split_top(text, separator):
+    """``text`` split on ``separator``, at brace depth zero only."""
+    parts, depth, current = [], 0, []
+    for char in text:
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+        if char == separator and depth == 0:
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    parts.append("".join(current))
+    return parts
+
+
+def unwrap(value):
+    """One field value, with its delimiters off and its whitespace collapsed."""
+    value = value.strip()
+    if len(value) >= 2 and value[0] + value[-1] in ("{}", '""'):
+        value = value[1:-1]
+    return " ".join(value.split())
+
+
+def read_entries(text):
+    """{citation key: (entry type, {field name: value})}.
+
+    Enough of a BibTeX reader for the demo's own files and for what the probe
+    writes, and nothing more is asked of it. `test_bibtex_roundtrip_entry_is_
+    well_formed` checks it can see the fields the loss test looks for, so an
+    empty answer cannot pass for "nothing was lost".
+    """
+    entries = {}
+    for match in ENTRY_RE.finditer(text):
+        kind = match.group(1).lower()
+        if kind in NOT_ENTRIES:
+            continue
+        fields = {}
+        for chunk in split_top(balanced(text, match.end()), ","):
+            found = FIELD_RE.match(chunk)
+            if found:
+                fields[found.group(1).lower()] = unwrap(found.group(2))
+        entries[match.group(2)] = (kind, fields)
+    return entries
+
+
+def source_entries():
+    """Every entry of the demo's input, read from the .bib files themselves."""
+    found = {}
+    for path in sorted(DEMO_BIB.glob("*.bib")):
+        found.update(read_entries(path.read_text(encoding="utf-8")))
+    return found
+
+
+def expected_bibtex_name(author):
+    """One name back in BibTeX's own order, from the document's parts."""
+    if author.get("literal"):
+        return "{%s}" % author["literal"]
+    family = " ".join(p for p in (author.get("von"), author.get("family")) if p)
+    return ", ".join(p for p in (family, author.get("suffix"), author.get("given")) if p)
+
+
+def expected_entry_fields(pub):
+    """Exactly the fields `schema_version` 3 can still put in an entry."""
+    values = {
+        "author": " and ".join(expected_bibtex_name(a) for a in pub["authors"]),
+        "title": pub["title"],
+        "year": str(pub["year"]),
+        "abstract": pub["abstract"],
+        "note": pub["note"],
+        # One input field the compiler routes to one of two properties by
+        # looking at the host, so both hold part of the answer.
+        "url": pub["url"] or pub["video_url"],
+    }
+    return {name: " ".join(str(value).split())
+            for name, value in values.items() if value}
+
+
+@covers("probe.roundtrip_shape")
+def test_bibtex_roundtrip_entry_is_well_formed(probe_output, demo_document):
+    """One entry per work, keyed and typed by the document, carrying exactly
+    the fields the document can still supply -- matched per work, because a
+    count would pass with two works' fields swapped."""
+    _, doc = demo_document
+    entries = read_entries(probe_output["bibtex_roundtrip.py"])
+
+    assert {key: kind for key, (kind, _) in entries.items()} == {
+        p["bib_id"]: p["entry_type"] for p in doc["publications"]}
+    assert {key: fields for key, (_, fields) in entries.items()} == {
+        p["bib_id"]: expected_entry_fields(p) for p in doc["publications"]}
+
+    # The reader has to be able to see a field in the demo's own input, or
+    # the loss test below would pass by finding nothing at all to lose.
+    source = source_entries()
+    assert sorted(source) == sorted(entries)
+    assert source["brown2025tidy"][0] == "article"
+    assert {"pages", "volume", "number", "doi", "month", "issn"} <= set(
+        source["brown2025tidy"][1])
+    assert source["adams2022survey"][1]["editor"] == "Quinn, Quentin and Silva, Sofia"
+
+
+# The one field the probe is not asked to put back. It is named here on its
+# own, never matched by a pattern, so a field that stops reaching the document
+# has to show up in the failure below rather than be absorbed by a wildcard.
+#
+#   project   labdata's own tag field, not part of BibTeX. It does reach the
+#             document, as `project_ids`, and the `fields.project` row of
+#             tests/COVERAGE.md asserts that; this probe re-emits
+#             bibliographic fields, so it is not expected back here.
+IGNORED_SOURCE_FIELDS = ("project",)
+
+
+@covers("probe.field_loss", xfail="#56", owns=(), because=(
+    "a work carries no `pages`, `volume`, `number`, `publisher`, `address`, "
+    "`series`, `edition`, `editor`, `chapter`, `month`, `organization`, "
+    "`isbn`, `issn` or `howpublished` property; its `doi` and `eprint` reach "
+    "the document only as the links built from them, which are not "
+    "invertible; and the name of its journal, proceedings, collection, "
+    "school, institution or issuing body is fused into the composed `venue` "
+    "string, which a probe may not take apart"))
+def test_bibtex_roundtrip_loses_no_field(probe_output, demo_document):
+    """Every field name of every source entry reaches a first-class property.
+
+    The message is the deliverable: it names each entry that lost a field and
+    every field name lost across the demo, which is the list #56 builds its
+    field list from.
+    """
+    entries = read_entries(probe_output["bibtex_roundtrip.py"])
+    lost = {}
+    for key, (kind, fields) in source_entries().items():
+        missing = sorted(set(fields) - set(IGNORED_SOURCE_FIELDS)
+                         - set(entries[key][1]))
+        if missing:
+            lost[key] = (kind, missing)
+    every = sorted({name for _, names in lost.values() for name in names})
+    assert lost == {}, "\n".join(
+        ["%d of %d demo entries lose at least one field." % (len(lost), len(entries)),
+         "",
+         "Every field name lost, across the demo (%d):" % len(every),
+         "  " + ", ".join(every),
+         "",
+         "Per entry:"]
+        + ["  %s (%s): %s" % (key, kind, ", ".join(names))
+           for key, (kind, names) in sorted(lost.items())])
+
+
+# --- The demo's four entry types with no venue rule --------------------------
+#
+# `format_venue()` has a rule for article, inproceedings, the two theses,
+# techreport and misc, and falls through to the bare year for everything else.
+# The demo now contains four such types, and what that fallthrough costs is
+# the whole container: the collection, the book, the publisher and the issuing
+# organization reach no property at all. It is recorded here because it is the
+# same loss the probe above reports, seen from the compiler's side.
+
+NO_VENUE_RULE = {
+    "adams2022survey": "incollection",
+    "hughes2021gaits": "inbook",
+    "adams2023handbook": "book",
+    "ingram2019toolkit": "manual",
+}
+
+
+@covers("types.incollection", "types.inbook", "types.book", "types.manual")
+def test_entry_types_without_a_venue_rule_degrade_to_the_year(demo_document):
+    """Each of the four is emitted, and its venue is the year and nothing else."""
+    _, doc = demo_document
+    for bib_id, entry_type in sorted(NO_VENUE_RULE.items()):
+        pub = publication(doc, bib_id)
+        assert pub["entry_type"] == entry_type, bib_id
+        assert pub["venue"] == str(pub["year"]), bib_id
+    # A type that does have a rule still composes one, so the check above is
+    # about these four rather than about every venue in the demo.
+    article = publication(doc, ARTICLE)
+    assert article["venue"] != str(article["year"])
+
+
+# --- graph.py: who the co-authors are ----------------------------------------
+#
+# The four identity scenarios of #69, taken from examples/demo/bib/books.bib
+# and examples/demo/bib/conference.bib, which no probe reads. They are stated
+# here because the document cannot state them: that is the finding.
+#
+# Priya Patel is one external co-author on three works, written `Patel, Priya`
+# on two of them and `Patel, P.` on the third. Pradeep Patel is a different
+# person on a fourth work, sharing her first initial and her family name. The
+# two `Lee, Lin` co-authors of `nolan2020stairs` are two different people
+# written identically on one work.
+#
+# The scenarios are asserted over the node and edge sets `graph.py` already
+# builds, per #69's own recommendation, rather than in a fifth probe. Nothing
+# below reads a node's label or a collaborator's spelling: a contributor is
+# identified only by the works it authored, so the assertions survive #56
+# changing what the display form of a name is.
+
+ONE_PERSON_WORKS = ("adams2022survey", "adams2023handbook", "ingram2019toolkit")
+OTHER_PERSON_WORK = "hughes2021gaits"
+SHARED_FAMILY = "Patel"
+SAME_NAME_WORK = "nolan2020stairs"
+SAME_NAME_FAMILY, SAME_NAME_GIVEN = "Lee", "Lin"
+
+
+def authors_named(pub, family, given=None):
+    return [a for a in pub["authors"] if a["family"] == family
+            and (given is None or a["given"] == given)]
+
+
+@covers("probe.identity_fixtures")
+def test_identity_fixtures_are_present(demo_document):
+    """The document carries all four scenarios the graph tests assert over.
+
+    A strict xfail keeps failing when its fixture is deleted, so without this
+    the three markers below could go on looking like findings about the
+    schema after the works they are about had gone.
+    """
+    _, doc = demo_document
+
+    # One person on three works in two spellings, and a second person with
+    # the same first initial and family name on a fourth.
+    spellings = {}
+    for bib_id in ONE_PERSON_WORKS + (OTHER_PERSON_WORK,):
+        found = authors_named(publication(doc, bib_id), SHARED_FAMILY)
+        assert len(found) == 1, bib_id
+        assert found[0]["person_id"] is None, bib_id
+        spellings.setdefault(found[0]["given"], []).append(bib_id)
+    assert {given: sorted(works) for given, works in spellings.items()} == {
+        "Priya": ["adams2022survey", "adams2023handbook"],
+        "P.": ["ingram2019toolkit"],
+        "Pradeep": ["hughes2021gaits"],
+    }
+
+    # Two different people under one written name, on one work.
+    alike = authors_named(publication(doc, SAME_NAME_WORK),
+                          SAME_NAME_FAMILY, SAME_NAME_GIVEN)
+    assert len(alike) == 2
+    assert [a["person_id"] for a in alike] == [None, None]
+    # They are the only external co-authors of that work, which is what lets
+    # the test below count nodes rather than read a label off one.
+    assert [a for a in publication(doc, SAME_NAME_WORK)["authors"]
+            if a["person_id"] is None] == alike
+
+
+def external_authorship(doc, edges):
+    """{node: the works it authored} for every node that is not a lab member.
+
+    A lab member has an `id` in `people`; anyone else reaches the graph only
+    if the document gave the authorship something to follow.
+    """
+    members = {"person:" + person["id"] for person in doc["people"]}
+    authored = {}
+    for kind, source, target in edges:
+        if kind == "authored" and source not in members:
+            authored.setdefault(source, set()).add(target.split(":", 1)[1])
+    return authored
+
+
+@covers("probe.identity_one_person", xfail="#56", owns=(), because=(
+    "a `collaborators` entry carries no identifier, and an authorship carries "
+    "no field that could reference one, so the three works of one external "
+    "co-author written `Patel, Priya` twice and `Patel, P.` once produce no "
+    "node and no `authored` edge at all"))
+def test_graph_joins_one_co_author_written_two_ways(probe_output, demo_document):
+    """One external person on three works is one node with three edges."""
+    _, doc = demo_document
+    _, edges = read_graph(probe_output["graph.py"])
+    authored = external_authorship(doc, edges)
+
+    joined = [node for node, works in authored.items()
+              if works == set(ONE_PERSON_WORKS)]
+    assert len(joined) == 1, sorted(authored.items())
+
+
+@covers("probe.identity_distinct_people", xfail="#56", owns=(), because=(
+    "`collaborators` is keyed on the abbreviated display name, so `P. Patel` "
+    "the author of three works and `P. Patel` the author of a fourth are one "
+    "entry with one count; the document keeps their given names apart on the "
+    "authorships but offers no key that does, so a consumer cannot build two "
+    "nodes from it"))
+def test_graph_separates_co_authors_sharing_an_initial(probe_output, demo_document):
+    """Two external people who share a first initial and family name are two
+    nodes, and neither borrows the other's works."""
+    _, doc = demo_document
+    _, edges = read_graph(probe_output["graph.py"])
+    authored = external_authorship(doc, edges)
+
+    joined = {node for node, works in authored.items()
+              if works == set(ONE_PERSON_WORKS)}
+    other = {node for node, works in authored.items()
+             if OTHER_PERSON_WORK in works}
+    assert len(joined) == 1, sorted(authored.items())
+    assert len(other) == 1, sorted(authored.items())
+    assert joined & other == set()
+
+
+@covers("probe.identity_same_written_name", xfail="#56", owns=(), because=(
+    "two different people listed on one work under one written name are "
+    "counted twice into a single `collaborators` entry -- the grouping is by "
+    "display name and there is nothing else to group by -- so the two "
+    "authorships cannot be told apart, let alone made into two nodes"))
+def test_graph_separates_two_people_written_alike(probe_output, demo_document):
+    """Two different people written identically on one work are two nodes,
+    with one edge each to that work."""
+    _, doc = demo_document
+    _, edges = read_graph(probe_output["graph.py"])
+    authored = external_authorship(doc, edges)
+
+    on_work = {node for node, works in authored.items() if SAME_NAME_WORK in works}
+    assert len(on_work) == 2, sorted(authored.items())
+    assert sorted(source for kind, source, target in edges
+                  if kind == "authored" and target == "work:" + SAME_NAME_WORK
+                  and source in on_work) == sorted(on_work)
+
+
 # --- The probes themselves ---------------------------------------------------
 
 @pytest.mark.parametrize("name", sorted(PROBE_TESTS))
@@ -556,14 +913,25 @@ def test_probe_runs_on_the_demo_document(probe_output, name):
 
 
 def test_every_probe_is_exercised():
-    """No probe can be added to the directory and silently never run."""
+    """No probe can be added to the directory and silently never run, and
+    none can be wired to tests that never look at what it wrote.
+
+    The second half is what `PROBE_TESTS` alone cannot promise: its keys are
+    how `probe_output` is keyed, so a probe whose named tests never mention
+    it is a probe that ran and was never read.
+    """
     on_disk = sorted(p.name for p in PROBES.glob("*.py"))
     assert on_disk == sorted(PROBE_TESTS)
     module = sys.modules[__name__]
     for name, tests in sorted(PROBE_TESTS.items()):
         assert tests, "%s names no test" % name
+        sources = []
         for test in tests:
-            assert callable(getattr(module, test, None)), "%s: no %s" % (name, test)
+            found = getattr(module, test, None)
+            assert callable(found), "%s: no %s" % (name, test)
+            sources.append(inspect.getsource(found))
+        assert [s for s in sources if name in s], \
+            "%s: none of %s reads its output" % (name, ", ".join(tests))
 
 
 def imported_modules(tree):

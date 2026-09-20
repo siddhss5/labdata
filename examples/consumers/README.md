@@ -6,7 +6,7 @@ is a schema bug, not a probe bug.**
 That rule is why this directory exists. The bundled Jekyll site in `site/` is
 the only other evidence that the emitted document is enough to build anything
 with, and it is weak evidence: it grew up alongside the data and quietly
-absorbed its quirks. These four probes are the falsification test. Each one is
+absorbed its quirks. These five probes are the falsification test. Each one is
 a different kind of consumer, and each is written against the document and
 nothing else, so a quirk the demo absorbed shows up here as a probe that
 cannot be written.
@@ -22,6 +22,7 @@ to build a site. Nobody should copy them. They are small and ugly on purpose.
 | `cv_tex.py` | a LaTeX CV fragment, publications grouped by year | **fails** — see below |
 | `csl_json.py` | a CSL-JSON export | **fails** — see below |
 | `graph.py` | a person / project / work edge list | **fails** — see below |
+| `bibtex_roundtrip.py` | one BibTeX entry per work, from structured properties | **fails** — see below |
 
 Each takes the document as its one argument and writes to standard output:
 
@@ -31,16 +32,17 @@ python examples/consumers/plain_html.py lab.json > lab.html
 python examples/consumers/cv_tex.py    lab.json > publications.tex
 python examples/consumers/csl_json.py  lab.json > lab.csl.json
 python examples/consumers/graph.py     lab.json > graph.tsv
+python examples/consumers/bibtex_roundtrip.py lab.json > works.bib
 ```
 
-`tests/conformance/test_consumer_probes.py` runs all four against the demo
+`tests/conformance/test_consumer_probes.py` runs all five against the demo
 output in CI, the same way: as a subprocess handed a path.
 
 Each **failing** probe's obligations are split across two tests. The assertions
 naming the missing properties carry `xfail(strict=True, reason="#56")`, and
 everything the probe already does — schema validity, year grouping, edge
-endpoints — goes in a test that passes, so a regression in it turns the suite
-red instead of being absorbed by the expected `#56` xfail.
+endpoints, one entry per work — goes in a test that passes, so a regression in
+it turns the suite red instead of being absorbed by the expected `#56` xfail.
 
 A strict `xfail` swallows *every* failure in its test, and an xfailed test
 cannot help relying on some things that already work: the CV one looks up a
@@ -64,7 +66,8 @@ test matches a record *by* differs, because the artifacts differ:
 | `plain_html.py` | the `bib_id`, person id and project id the page carries as element ids — except collaborators, compared as a **multiset**, because the document gives them no id at all, which is the gap `graph.py` fails on showing up a second time |
 | `csl_json.py` | the record's `id`, against the fields `schema_version` 3 can supply |
 | `cv_tex.py` | the entry's **title**, because a LaTeX fragment carries no ids; a duplicate title fails loudly rather than matching the wrong entry |
-| `graph.py` | nothing — every `authored`, `part_of` and `member_of` edge is compared as a complete tuple |
+| `graph.py` | nothing — every `authored`, `part_of` and `member_of` edge is compared as a complete tuple. The identity tests match a contributor by **the set of works it authored**, never by a node's label, so they survive #56 changing what the display form of a name is |
+| `bibtex_roundtrip.py` | the entry's citation key. Field **names** are compared, never values: the LaTeX-to-Unicode conversion is deliberately one-way, so comparing values would assert something false |
 
 ## What a probe may read
 
@@ -136,11 +139,11 @@ out of the parser as the characters that went in, no `on*` attribute anywhere,
 and the URL and each id arriving as one intact attribute value, with two ids
 that differ only by an escape (`x&y` and `x&amp;y`) staying distinct.
 
-## What blocks the three failing probes
+## What blocks the four failing probes
 
 Verified against the demo output. The first two are shown by the record
-`brown2025tidy`; the third by the five co-authors the demo cannot resolve,
-none of whom is on that record:
+`brown2025tidy`; the third and fourth by the co-authors the demo cannot
+resolve, none of whom is on that record:
 
 - **`cv_tex.py`** — `pages`, `volume` and `number` are not emitted as
   first-class properties, and `venue` is a composed Markdown string rather
@@ -168,6 +171,43 @@ none of whom is on that record:
   derived index, or something else — is #56's to decide, and this probe names
   no field for it to adopt.
 
+  Three further tests ask what the grouping would have to promise, against
+  fixtures added for them: one external co-author on three works written
+  `Patel, Priya` twice and `Patel, P.` once is **one** node; `Patel, Pradeep`
+  on a fourth work is a **different** node, though the two share a first
+  initial and a family name and today share one `collaborators` entry; and
+  the two `Lee, Lin` co-authors of `nolan2020stairs`, two different people
+  written identically on one work, are **two** nodes rather than one entry
+  counted twice. None of the three can be satisfied today, for the same
+  reason: the only thing the document offers to key on is the display name.
+
+- **`bibtex_roundtrip.py`** — nothing structural blocks the *entry*; what is
+  missing is most of what goes in it. Re-emitting from first-class properties
+  yields `author`, `title`, `year`, `abstract`, `note` and `url`, and every
+  one of the demo's 19 entries loses at least one field. Over the whole demo,
+  21 distinct field names do not reach a property:
+
+  ```
+  address, archiveprefix, booktitle, chapter, doi, edition, editor, eprint,
+  howpublished, institution, isbn, issn, journal, month, number,
+  organization, pages, publisher, school, series, volume
+  ```
+
+  They fail in three distinct ways, which is why the list matters more than
+  the count. `pages`, `volume`, `number`, `publisher`, `address`, `series`,
+  `edition`, `editor`, `chapter`, `month`, `organization`, `isbn`, `issn` and
+  `howpublished` are read by nothing and emitted nowhere. `journal`,
+  `booktitle`, `school` and `institution` are read, and then fused into the
+  composed `venue` string — or, for the four entry types `format_venue()` has
+  no rule for, dropped outright. `doi` and `eprint` are read and turned into
+  links that cannot be inverted back into the identifiers they came from, and
+  `archiveprefix` is read only to decide and then discarded.
+
+  The probe re-emits `project` nowhere, and that one field is the whole ignore
+  set of its test, named there on its own with its reason: it is labdata's own
+  tag field rather than a bibliographic one, and it does reach the document,
+  as `project_ids`.
+
 Note that CSL-JSON schema validation is not what fails in `csl_json.py`.
 Almost every CSL field is optional, so a record with no `page`, `volume`,
 `issue` or `container-title` is still schema-valid, and today's export is. The
@@ -180,7 +220,10 @@ can map a journal article to a complete reference.
 Drop it in this directory and add it to `PROBE_TESTS` in
 `tests/conformance/test_consumer_probes.py`, mapped to the tests that check
 what it emits. `test_every_probe_is_exercised` fails if you do the first
-without the second, so a probe cannot sit here and never run.
+without the second, so a probe cannot sit here and never run — and it also
+fails if none of the tests you named so much as mentions the probe's file
+name, which is how `probe_output` is keyed, so a probe cannot be listed
+against tests that never read what it wrote.
 
 If your probe cannot be written, that is the finding. Leave the probe emitting
 the best artifact it can and put the correctness assertions in the tests. Every

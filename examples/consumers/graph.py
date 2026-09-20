@@ -11,6 +11,17 @@ Output is tab separated, one record per line:
 
     node	person:aadams	Alice Adams
     edge	authored	person:aadams	work:brown2025tidy
+
+This is also where the identity questions are asked, because the node and
+edge sets below are already what those questions are about. A graph has to
+decide, for every co-author, whether two authorships are one contributor or
+two -- the same external person written two ways is one node with two edges,
+and two different people who write their names alike are two nodes. The tests
+in tests/conformance/test_consumer_probes.py put those cases to this probe.
+It answers none of them, and it does not try: without an identifier on a
+collaborator and a field on an authorship that references one, the only thing
+left to key on is the display name, and keying on that is exactly the merge
+the document itself warns against.
 """
 
 import json

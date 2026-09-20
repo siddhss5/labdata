@@ -36,7 +36,7 @@ class TestDemoLab:
     def test_assembles(self, demo_result):
         data = demo_result.data
         assert data.lab["name"] == "Example Lab"
-        assert 13 <= len(data.publications) <= 17
+        assert 17 <= len(data.publications) <= 21
         assert 2 <= len(data.projects) <= 3
         assert demo_result.unknown_projects == []
 
@@ -94,9 +94,16 @@ class TestDemoLab:
         assert pub.authors[-1].equal_contribution is False
 
     def test_only_outside_collaborators_are_unresolved(self, demo_result):
-        """Every unresolved name is an outside co-author, not a marked member."""
+        """Every unresolved name is an outside co-author, not a marked member.
+
+        Two of these names are each shared by more than one person, which is
+        the identity fixture #69 added: `P. Patel` is Priya Patel on three
+        works and Pradeep Patel on a fourth, and `L. Lee` is the two
+        different people `nolan2020stairs` lists under one written name.
+        """
         assert demo_result.unresolved_authors == [
-            "O. Ortiz", "P. Park", "R. Reed", "S. Stone", "T. Turner"]
+            "L. Lee", "O. Ortiz", "P. Park", "P. Patel", "R. Reed",
+            "S. Stone", "T. Turner"]
 
 
 class TestGenerateSiteConfig:
