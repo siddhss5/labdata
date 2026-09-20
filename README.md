@@ -1,8 +1,8 @@
 # labdata
 
-labdata compiles BibTeX and a little YAML into one validated document — works,
-people, projects and the links between them — that any website, CV or script
-can read.
+labdata compiles BibTeX and a little YAML into one schema-specified document —
+works, people, projects and the links between them — that any website, CV or
+script can read.
 
 Most academics already keep good BibTeX. What they do not have is that
 bibliography as *data*: authors linked to the people in the group, papers
@@ -169,13 +169,16 @@ author names to people:
 labdata matches BibTeX author names to lab members in two passes:
 
 1. **Exact alias match** against the `aliases` list in `people.yaml`, after
-   lowercasing, stripping accents, removing periods and collapsing
-   whitespace. Other punctuation — apostrophes, hyphens — is kept, so
-   `O'Neill` and `Zhang-Smith` must match on those characters.
+   normalising both sides: lowercase, strip accents, remove periods, strip
+   `<sup>…</sup>` tags, collapse whitespace. Other punctuation — apostrophes,
+   hyphens — is kept, so `O'Neill` and `Zhang-Smith` must match on those
+   characters.
 2. **Fuzzy fallback** on string similarity, threshold 0.85, for minor spelling
    variations. A name that is exactly one initial and one surname, such as
-   `S. Zhang`, is skipped: there is not enough there to match on. The guard is
-   that narrow, so `S. Zhang-Smith` and `S. J. Zhang` are still fuzzy-matched.
+   `S. Zhang`, is skipped entirely: there is not enough there to match on. The
+   guard is that narrow, so `S. Zhang-Smith` and `S. J. Zhang` remain eligible
+   for fuzzy matching — which is not the same as matching: they can still fall
+   below the threshold and resolve to nobody.
 
 A name that matches nobody keeps `person_id: null` and appears in the derived
 `collaborators` list. `labdata --config lab.yaml --unresolved` lists those

@@ -63,8 +63,8 @@ not exactly one. `labdata.cli.main()` rejects only the case where all three
 are absent, so combinations are accepted and resolved by **precedence**:
 `--validate` is handled first and returns; `--unresolved` next; `--output`
 only if neither was given. So `labdata --config c.yaml --validate --output
-out.yml` reports and writes **nothing**, exiting `0`. Verified by running
-both combinations.
+out.yml` runs validation and reports normally, but **does not write
+`out.yml`**, and exits `0`. Verified by running both combinations.
 
 Exit codes, as `labdata.cli.main()` returns them:
 
@@ -74,10 +74,11 @@ Exit codes, as `labdata.cli.main()` returns them:
 | `1` | Error. Configuration file missing, configuration failed to load, or `--validate` found unknown project ids. |
 | `2` | Usage error from the argument parser: a missing or unrecognised flag, or none of `--output` / `--validate` / `--unresolved`. |
 
-**Streams and message shapes.** Counts, unresolved names and unknown project
-ids — the ordinary reporting of `--validate` and `--unresolved` — go to
-**standard output**. Everything else goes to **standard error**, in one of
-three shapes:
+**Streams and message shapes.** Ordinary reporting goes to **standard
+output**: the counts, unresolved names and unknown project ids of
+`--validate` and `--unresolved`, and, in output mode, the `Wrote …` line and
+the entity counts that follow it. **Diagnostics** go to **standard error**,
+in one of three shapes:
 
 | Shape | Source |
 |---|---|
@@ -136,9 +137,10 @@ can be derived from the other.
 
 ## 2. The text rule
 
-**Every string in the emitted document is plain Unicode text.** Not HTML, not
-Markdown, not escaped, not LaTeX. A consumer may treat any string it reads as
-text to be displayed.
+**Every string in the emitted document that is meant for display is plain
+Unicode text.** Not HTML, not Markdown, not escaped, not LaTeX. The document
+also carries strings that are not display text at all — identifiers, URLs and
+the `bibtex` record — and category 4 below lists them.
 
 **Text is untrusted.** A title may contain `<`, `&`, `"`, `*` or `$`, and
 often does: `Informed RRT*` and `BIT*` are real paper titles. labdata does
@@ -149,56 +151,77 @@ HTML attributes, for shell arguments, for whatever they emit.
 ### What labdata converts, and what it does not
 
 This is the part that must be read carefully, because labdata enforces the
-rule in one place only.
+rule in one place only. Every string is in exactly one of four categories.
 
-**Converted.** Prose fields read from BibTeX are converted from LaTeX to
-Unicode by `labdata.parsers.latex.latex_to_text()`, so `C{\^o}t{\'e}` arrives
-as `Côté` and `\textbf{Best Paper}` arrives as `Best Paper`. Exactly the
-fields in `labdata.parsers.bibtex.TEXT_FIELDS` are converted — `title`,
-`abstract`, `note`, `journal`, `booktitle`, `school`, `institution`, `type`,
-`series`, `publisher`, `address`, `organization` — applied in
-`entry_fields()`. Author name parts are converted the same way, in
-`person_name_parts()`.
+**1. Converted prose — the rule is enforced here.** Prose fields read from
+BibTeX are converted from LaTeX to Unicode by
+`labdata.parsers.latex.latex_to_text()`, so `C{\^o}t{\'e}` arrives as `Côté`
+and `\textbf{Best Paper}` arrives as `Best Paper`. Exactly the fields in
+`labdata.parsers.bibtex.TEXT_FIELDS` are converted — `title`, `abstract`,
+`note`, `journal`, `booktitle`, `school`, `institution`, `type`, `series`,
+`publisher`, `address`, `organization` — applied in `entry_fields()`. Author
+name parts are converted the same way, in `person_name_parts()`.
 
-**Not converted, and not checked.** Every other string reaches the document
-as written:
+Being converted is not the same as being emitted. Of these fields, `title`,
+`abstract` and `note` are emitted under their own names; `journal`,
+`booktitle`, `school`, `institution` and `type` are consumed by
+`format_venue()` (§5) and reach the document only through `venue`; and
+`series`, `publisher`, `address` and `organization` are converted and then
+used by nothing, so they fall into category 3 below.
 
-- BibTeX fields outside `TEXT_FIELDS` — `url`, `doi`, `eprint`, `project`.
-  These are data, not prose.
+**2. Emitted without conversion — the rule is a requirement on the input.**
+These strings do reach the document, exactly as written, and labdata neither
+converts nor checks them:
+
 - **Every string supplied in YAML.** `labdata.loaders.load_people()` and
   `load_projects()` perform no conversion of any kind, so a person's `name`,
   `role`, `current_position` or `thesis_title`, and a project's `title` or
-  `description`, are copied verbatim from `people.yaml` and `projects.yaml`.
+  `description`, are copied straight from `people.yaml` and `projects.yaml`.
 - **`publication.category`**, which comes from the `category` of the
   `bib_files` entry in `lab.yaml`, not from the `.bib` file
   (`labdata.config.LabDataConfig.from_yaml()`, then
   `labdata.parsers.bibtex.parse_all_publications()`).
 - **`lab`**, copied through from `lab.yaml` unchanged
   (`LabDataConfig.from_yaml()`, then `LabData.to_dict()`).
+- **`publication.url`**, the BibTeX `url` field, when it is not a video URL.
 
-For all of these the plain-Unicode rule is a **requirement on the input, not
-a guarantee labdata enforces**. If `people.yaml` says
-`name: "<b>Alice</b>"`, or a `bib_files` category is `"**Journal** Papers"`,
-that string appears in the document exactly as written and no diagnostic is
-raised. Verified directly: a category of `<b>Cat</b> & **md**` is emitted
-unchanged.
+For these the plain-Unicode rule is a **requirement on the input, not a
+guarantee labdata enforces**. If `people.yaml` says `name: "<b>Alice</b>"`,
+or a `bib_files` category is `"**Journal** Papers"`, that string appears in
+the document exactly as written and no diagnostic is raised. Verified
+directly: a category of `<b>Cat</b> & **md**` is emitted unchanged. Authors
+of input files are responsible for keeping these plain, and renderers should
+escape them as they escape everything else.
 
-Authors of input files are therefore responsible for keeping YAML strings
-plain, and renderers should escape them as they escape everything else.
+**3. Transformed, parsed, or never emitted.** These inputs do *not* appear in
+the document under their own names, so the rule does not apply to them at
+all. `/$defs/publication/properties` declares no `doi`, `eprint` or `project`:
+
+| Input | What becomes of it |
+|---|---|
+| `doi` | Transformed into `doi_url` (`construct_doi_url()`). |
+| `eprint` | Transformed into `arxiv_url` (`construct_arxiv_url()`). |
+| `project` | Parsed into the list `project_ids` (`parse_project_ids()`). |
+| `url`, for a video host | Emitted as `video_url` instead of `url` (`extract_video_url()`); `url` is then `null`. |
+| `person.aliases` | Read for matching by `labdata.resolver.build_alias_index()`, never emitted — `Person.to_dict()` has no `aliases` key. |
+| `bib_dir`, `bib_files[].name`, `people_file`, `projects_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed `pdf_url`. |
+| Any other BibTeX field | Dropped from the first-class properties, surviving only inside `bibtex` (§5). Emitting more of them is #56. |
+
+**4. Not display text.** Some emitted strings are identifiers or machine
+values, and the plain-text rule is beside the point for them: `bib_id`,
+`entry_type`, `category`'s role as a grouping key, every `*_url`, every id in
+`project_ids`, `publication_ids` and `people_ids`, and `person_id`. Also here
+is **`publication.bibtex`**, which is a BibTeX record meant to be copied
+rather than displayed, and which still contains LaTeX — see §5 for what it
+does and does not preserve. `lab` is a YAML mapping rather than a string; its
+*values* fall under category 2.
 
 ### The one markup exception
 
 **Math is left as TeX**, delimited by `$…$`, so that KaTeX or MathJax can
 typeset it (`labdata.parsers.latex._CONVERTER` is built with
 `math_mode='verbatim'`). This is the one place a text field is expected to
-contain markup, and it applies only to fields labdata converts.
-
-### Two fields that are not text at all
-
-- **`publication.bibtex` is a BibTeX record**, not prose, and is meant to be
-  copied rather than displayed. See §5 for what it does and does not preserve.
-- **`lab` is a YAML mapping**, not a string, and its values are whatever the
-  author wrote.
+contain markup, and it applies only to category 1.
 
 ### Two degraded cases
 
@@ -323,14 +346,14 @@ which emits every declared key unconditionally.
 > nullability of the affected properties, which is breaking under §6. #56 is
 > the consolidated breaking change that normalises them.
 
-**Where "absent" cannot happen at all.** Five of the six objects in the
-schema are closed — `/additionalProperties` at the top level and
-`additionalProperties` on each of `/$defs/author`, `/$defs/publication`,
-`/$defs/person`, `/$defs/project` and `/$defs/collaborator` are all `false` —
-so within those objects a property that is not declared cannot appear, and
-"absent" always means a declared property with no value.
+**Where "absent" cannot happen at all.** The schema defines seven object
+schemas. **Six are closed:** the document itself (`/additionalProperties`) and
+each of `/$defs/author`, `/$defs/publication`, `/$defs/person`,
+`/$defs/project` and `/$defs/collaborator` set `additionalProperties: false`.
+Within those six, a property that is not declared cannot appear, and "absent"
+always means a declared property with no value.
 
-**`lab` is the exception: it is open.** `/properties/lab` declares only
+**The seventh, `lab`, is open.** `/properties/lab` declares only
 `description` and `type: object`. It has no `properties` and no
 `additionalProperties`, so any keys whatever validate inside it. The policy
 above does not apply within `lab`: its keys are whatever `lab.yaml` supplied,
@@ -433,14 +456,17 @@ I still read this".
 **A major change increments `schema_version`.** A change is major — breaking —
 when it can make a conforming consumer reject the output or misinterpret it:
 
-- **Adding, removing or renaming a property** of any of the five closed
-  objects. *Adding* is breaking there because those objects set
-  `additionalProperties: false`, so a consumer validating against the
-  previous version rejects a document carrying a new key. **Inside `lab` this
-  does not hold**: `/properties/lab` is open (§4), nothing inside it is
-  declared, and adding a key there breaks no conforming consumer. Giving
-  `lab` a declared structure would itself be a breaking change, because it
-  would close a door that is currently open.
+- **Adding, removing or renaming a property** of any of the six closed
+  objects — the document itself and the five entity types (§4). *Adding* is
+  breaking there because those objects set `additionalProperties: false`, so
+  a consumer validating against the previous version rejects a document
+  carrying a new key. That includes a new **top-level** property beside
+  `publications`, `people`, `projects` and `collaborators`: the document is
+  closed too, so a new entity collection is a breaking change on its own.
+  **Inside `lab` this does not hold**: `/properties/lab` is the one open
+  object, nothing inside it is declared, and adding a key there breaks no
+  conforming consumer. Giving `lab` a declared structure would itself be a
+  breaking change, because it would close a door that is currently open.
 - **Changing a type**, including making a string an object or a scalar a list.
 - **Changing nullability** — a property that could not be `null` now can, or
   the reverse.
