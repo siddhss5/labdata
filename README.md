@@ -85,8 +85,9 @@ rule when you pass more than one mode.
 
 ### BibTeX (required)
 
-Standard `.bib` files. These are the fields labdata interprets; every other
-field is carried through in `bibtex` but affects nothing:
+Standard `.bib` files. These are the fields labdata interprets. A field not
+listed here is carried through in `bibtex` but is not interpreted and affects
+nothing else:
 
 | Field | Becomes |
 |-------|---------|
@@ -101,6 +102,7 @@ field is carried through in `bibtex` but affects nothing:
 | `url` | `video_url` when it points at YouTube or Vimeo, otherwise `url` |
 | `project` | `project_ids` (see below) |
 | `crossref` | Nothing directly: the named parent entry supplies fields this entry omits, and the parent's `title` becomes this entry's `booktitle`. `author` is **not** inherited |
+| `series`, `publisher`, `address`, `organization` | Nothing. They are LaTeX-converted like any other prose field — a malformed one is reported, naming the field — but the converted value is then used by nothing, so they reach the document only inside `bibtex` |
 
 The entry is also re-serialized into a `bibtex` field, so fields labdata does
 not interpret are still carried. It is a re-serialization, not a copy: field order,

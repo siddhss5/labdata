@@ -411,7 +411,7 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 | `schema_version` | Derived — a constant of the compiler (`labdata.models.SCHEMA_VERSION`). |
 | `lab` | Input — the `lab` section of `lab.yaml`, copied unchanged (`LabDataConfig.from_yaml()`). |
 | `publication.bib_id` | Input — the BibTeX citation key, **as written**. `labdata.parsers.bibtex.entry_fields()` preserves its case. |
-| `publication.entry_type` | Input — the BibTeX entry type, **lowercased** by `entry_fields()`. It is the one of the two that is case-folded. |
+| `publication.entry_type` | Input — the BibTeX entry type, **lowercased** by `entry_fields()`. Of it and `bib_id`, it is the only one that is case-folded. |
 | `publication.title`, `abstract`, `note` | Input — BibTeX fields, converted from LaTeX to text (§2). `note` additionally has trailing `.` and whitespace trimmed (`labdata.parsers.bibtex.extract_note()`). |
 | `publication.year` | Input — the BibTeX `year`, as an integer; `0` when absent (`entry_to_publication()`). |
 | `publication.category` | Input — the `category` of the `bib_files` entry the file was listed under, not anything in the `.bib` file (`labdata.config.BibFile`, read by `parse_all_publications()`). |
