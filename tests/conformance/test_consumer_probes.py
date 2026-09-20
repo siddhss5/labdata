@@ -40,6 +40,7 @@ what matters; this is a guard against drift, not a sandbox.
 """
 
 import ast
+import copy
 import html
 import json
 import re
@@ -62,7 +63,8 @@ CSL_SCHEMA = REPO_ROOT / "tests" / "vendor" / "csl-data.json"
 # today, then what it cannot. `test_every_probe_is_exercised` fails if a probe
 # is added to the directory and left out of here.
 PROBE_TESTS = {
-    "plain_html.py": ("test_plain_html_page_is_complete",),
+    "plain_html.py": ("test_plain_html_page_is_complete",
+                      "test_plain_html_escapes_hostile_text"),
     "cv_tex.py": ("test_cv_tex_fragment_is_well_formed",
                   "test_cv_tex_entry_is_citable"),
     "csl_json.py": ("test_csl_json_export_is_schema_valid",
@@ -163,14 +165,23 @@ def esc(text):
     return html.escape(str(text), quote=True)
 
 
-def items(markup, class_name):
-    """The contents of each `<li class="...">`. They do not nest."""
-    return re.findall(r'<li class="%s">(.*?)</li>' % class_name, markup, re.S)
+def keyed_items(markup, class_name):
+    """{id: contents} for each `<li class="..." id="...">`. They do not nest."""
+    found = re.findall(r'<li class="%s" id="([^"]*)">(.*?)</li>' % class_name,
+                       markup, re.S)
+    assert len({key for key, _ in found}) == len(found), "duplicate id"
+    return dict(found)
 
 
 def fields(markup, class_name):
     """The contents of each `<span class="...">`. They do not nest either."""
     return re.findall(r'<span class="%s">(.*?)</span>' % class_name, markup, re.S)
+
+
+def one(markup, class_name):
+    found = fields(markup, class_name)
+    assert len(found) == 1, "expected one %r, found %d" % (class_name, len(found))
+    return found[0]
 
 
 def shown(markup):
@@ -179,8 +190,8 @@ def shown(markup):
 
 
 def test_plain_html_page_is_complete(probe_output, demo_document):
-    """Tags nest, entities are escaped, every entity appears exactly once, and
-    every authorship shows the parts the document carries."""
+    """Tags nest, and every entity appears once with the fields the document
+    gives it, matched to that entity by the id the document supplies."""
     _, doc = demo_document
     page = probe_output["plain_html.py"]
 
@@ -189,45 +200,120 @@ def test_plain_html_page_is_complete(probe_output, demo_document):
     balance.close()
     assert balance.problems == []
     assert balance.open_tags == []
-    assert BARE_AMPERSAND.findall(page) == []
 
-    # Exactly the document's entities, each once: sorted, because the page
-    # groups works by category rather than keeping the document's order.
-    assert sorted(fields(page, "title")) == sorted(
-        esc(p["title"]) for p in doc["publications"])
-    assert sorted(shown(n) for n in name_fields(page, "person")) == sorted(
-        esc(p["name"]) for p in doc["people"])
-    assert sorted(shown(n) for n in name_fields(page, "collaborator")) == sorted(
+    # Per work, keyed by `bib_id`: a global count would pass with two works'
+    # author lists swapped, which is the whole failure mode worth catching.
+    assert {key: {name: one(item, name) for name in ("authors", "title", "year")}
+            for key, item in keyed_items(page, "publication").items()} == {
+        "work-" + pub["bib_id"]: {
+            "authors": ", ".join(esc(expected_name_from_parts(a))
+                                 for a in pub["authors"]),
+            "title": esc(pub["title"]),
+            "year": esc(pub["year"]),
+        } for pub in doc["publications"]}
+
+    assert {key: shown(one(item, "name"))
+            for key, item in keyed_items(page, "person").items()} == {
+        "person-" + person["id"]: esc(person["name"]) for person in doc["people"]}
+    assert {key: shown(one(item, "name"))
+            for key, item in keyed_items(page, "project").items()} == {
+        "project-" + project["id"]: esc(project["title"])
+        for project in doc["projects"]}
+
+    # Collaborators are compared as a multiset, not per record: the document
+    # gives them no id to key on. That absence is what graph.py fails on.
+    assert sorted(shown(one(item, "name"))
+                  for item in re.findall(r'<li class="collaborator">(.*?)</li>',
+                                         page, re.S)) == sorted(
         esc(c["name"]) for c in doc["collaborators"])
-    assert sorted(shown(n) for n in name_fields(page, "project")) == sorted(
-        esc(p["title"]) for p in doc["projects"])
-
-    # Every authorship, as the document's parts have it: `Bob Brown` where the
-    # entry wrote `Brown, Bob`, and `A. Adams` where it wrote `Adams, A.`.
-    assert sorted(fields(page, "authors")) == sorted(
-        ", ".join(esc(expected_name_from_parts(a)) for a in p["authors"])
-        for p in doc["publications"])
 
     # The venue's Markdown emphasis is rendered, not printed. Scoped to the
     # venue: a title may legitimately contain an asterisk (SPEC.md section 2
     # names `Informed RRT*`), and that is not this probe's business.
-    venues = fields(page, "venue")
-    assert len(venues) == len(doc["publications"])
-    assert [v for v in venues if "*" in v] == []
-    entry = html_item(page, publication(doc, ARTICLE)["title"])
-    assert "<em>%s</em>" % JOURNAL in fields(entry, "venue")[0]
+    venues = {key: one(item, "venue")
+              for key, item in keyed_items(page, "publication").items()}
+    assert sorted(venues) == sorted("work-" + p["bib_id"] for p in doc["publications"])
+    assert [v for v in venues.values() if "*" in v] == []
+    assert "<em>%s</em>" % JOURNAL in venues["work-" + ARTICLE]
 
 
-def name_fields(page, item_class):
-    """The name of each `<li>` of one class, still marked up."""
-    return [fields(item, "name")[0] for item in items(page, item_class)]
+# --- plain_html.py: escaping -------------------------------------------------
+#
+# SPEC.md section 2 is emphatic that text in the document is untrusted -- a
+# title may contain `<`, `&`, `"`, `*` or `$`, and `Informed RRT*` is a real
+# one -- and that escaping is the renderer's job. Nothing in the demo contains
+# any of those characters, so running the probe on the demo establishes
+# nothing about escaping. These values are put into a copy of the document
+# instead, and the unmodified probe is run on that. #55 names this probe as
+# the Ruby-free renderer where escaping behaviour can be asserted; #36 owns
+# escaping across the rest of the project.
+
+HOSTILE_TITLE = '</span></li><script>alert("x")</script> & <b>bold</b>'
+HOSTILE_NAME = 'Ada <b>"Lovelace"</b> & Co'
+HOSTILE_URL = 'https://example.org/?a=1&b=2" onmouseover="alert(1)'
+HOSTILE_LAB = '</title><script>alert("lab")</script>'
 
 
-def html_item(page, title):
-    """The one publication `<li>` that carries ``title``."""
-    found = [i for i in items(page, "publication") if esc(title) in i]
-    assert len(found) == 1, "expected one entry for %r, found %d" % (title, len(found))
-    return found[0]
+class Collector(HTMLParser):
+    """Every tag, attribute and run of text a browser would see."""
+
+    def __init__(self):
+        HTMLParser.__init__(self, convert_charrefs=True)
+        self.tags = []
+        self.attrs = []
+        self.text = []
+
+    def handle_starttag(self, tag, attrs):
+        self.tags.append(tag)
+        self.attrs += [(tag, name, value) for name, value in attrs]
+
+    def handle_data(self, data):
+        self.text.append(data)
+
+
+@pytest.fixture(scope="module")
+def hostile_page(tmp_path_factory, demo_document):
+    """The unmodified probe, run on a document carrying hostile text."""
+    _, doc = demo_document
+    hostile = copy.deepcopy(doc)
+    hostile["lab"]["name"] = HOSTILE_LAB
+    hostile["publications"][0]["title"] = HOSTILE_TITLE
+    hostile["people"][0]["name"] = HOSTILE_NAME
+    hostile["people"][0]["website"] = HOSTILE_URL
+    hostile["projects"][0]["description"] = HOSTILE_TITLE
+    path = tmp_path_factory.mktemp("hostile") / "lab.json"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(hostile, f, ensure_ascii=False)
+    return run_probe("plain_html.py", path)
+
+
+def test_plain_html_escapes_hostile_text(hostile_page):
+    """Hostile text stays text, in the body and inside an attribute."""
+    collector = Collector()
+    collector.feed(hostile_page)
+    collector.close()
+
+    # Body context: the markup in the values never became markup, and came
+    # back out as the characters that went in.
+    assert "script" not in collector.tags
+    assert "b" not in collector.tags
+    assert HOSTILE_TITLE in collector.text
+    assert HOSTILE_NAME in collector.text
+    assert HOSTILE_LAB in collector.text
+
+    # Attribute context: the value is one attribute, not an attribute plus an
+    # event handler, and its text survives intact.
+    handlers = [a for a in collector.attrs if a[1].startswith("on")]
+    assert handlers == []
+    assert ("a", "href", HOSTILE_URL) in collector.attrs
+
+    # Tags still nest, and every `&` is an entity reference.
+    balance = TagBalance()
+    balance.feed(hostile_page)
+    balance.close()
+    assert balance.problems == []
+    assert balance.open_tags == []
+    assert BARE_AMPERSAND.findall(hostile_page) == []
 
 
 # --- cv_tex.py ---------------------------------------------------------------
@@ -261,10 +347,14 @@ def test_cv_tex_fragment_is_well_formed(probe_output, demo_document):
     assert fragment.count(r"\item ") == len(doc["publications"])
 
     for pub in doc["publications"]:
-        entry = tex_entry(fragment, pub["title"])
-        assert str(pub["year"]) in entry, pub["bib_id"]
-        expected = ", ".join(expected_name_from_parts(a) for a in pub["authors"])
-        assert entry.splitlines()[0] == tex(expected) + ".", pub["bib_id"]
+        lines = tex_entry(fragment, pub["title"]).splitlines()
+        authors = ", ".join(expected_name_from_parts(a) for a in pub["authors"])
+        assert lines[0] == tex(authors) + ".", pub["bib_id"]
+        assert r"\newblock %s." % tex(pub["title"]) in lines, pub["bib_id"]
+        # The year closes a block of its own. Searching the whole entry for it
+        # would be satisfied by a DOI that happens to contain the year.
+        assert [l for l in lines if l.startswith(r"\newblock")
+                and l.endswith("%s." % pub["year"])], pub["bib_id"]
 
 
 @pytest.mark.xfail(strict=True, reason=(
@@ -297,9 +387,38 @@ def csl_errors(validator, records):
     return [e.message for e in validator.iter_errors(records)]
 
 
+# The CSL type for each entry type the demo contains, stated here rather than
+# read from the probe. `test_csl_json_export_is_schema_valid` checks the demo
+# still contains exactly these, so a new entry type cannot slip through
+# unmapped.
+CSL_TYPE = {"article": "article-journal", "inproceedings": "paper-conference",
+            "phdthesis": "thesis", "mastersthesis": "thesis",
+            "techreport": "report", "misc": "document"}
+
+# The CSL fields a record can be built from `schema_version` 3 alone. The
+# comparison is restricted to these, so #56 adding `container-title` and the
+# rest does not have to be anticipated here.
+CSL_CORE = ("id", "type", "title", "author", "issued", "abstract", "note", "URL")
+
+
+def expected_csl_core(pub):
+    """What every field of CSL_CORE must hold for ``pub``, or None for absent."""
+    return {
+        "id": pub["bib_id"],
+        "type": CSL_TYPE[pub["entry_type"]],
+        "title": pub["title"],
+        "author": [expected_csl_name(a) for a in pub["authors"]],
+        "issued": {"date-parts": [[pub["year"]]]},
+        "abstract": pub["abstract"],
+        "note": pub["note"],
+        "URL": (pub["url"] or pub["pdf_url"] or pub["doi_url"]
+                or pub["arxiv_url"]),
+    }
+
+
 def test_csl_json_export_is_schema_valid(probe_output, demo_document, csl_validator):
-    """Valid against the published CSL-JSON schema, one record per work, with
-    the entry type mapped and every name as the document's parts have it."""
+    """Valid against the published CSL-JSON schema, and every record carrying
+    the fields `schema_version` 3 can supply, matched to its work by id."""
     _, doc = demo_document
     records = json.loads(probe_output["csl_json.py"])
 
@@ -309,13 +428,12 @@ def test_csl_json_export_is_schema_valid(probe_output, demo_document, csl_valida
     assert csl_errors(csl_validator, [{"id": "x", "type": "not-a-csl-type"}]) != []
 
     assert [r["id"] for r in records] == [p["bib_id"] for p in doc["publications"]]
+    assert {p["entry_type"] for p in doc["publications"]} == set(CSL_TYPE)
     by_id = {r["id"]: r for r in records}
-    assert by_id[ARTICLE]["type"] == "article-journal"
-    assert by_id["davis2025handover"]["type"] == "paper-conference"
-    assert by_id["jones2023thesis"]["type"] == "thesis"
     for pub in doc["publications"]:
-        assert by_id[pub["bib_id"]]["author"] == [
-            expected_csl_name(a) for a in pub["authors"]], pub["bib_id"]
+        record = by_id[pub["bib_id"]]
+        assert {k: record.get(k) for k in CSL_CORE} == expected_csl_core(pub), \
+            pub["bib_id"]
 
 
 @pytest.mark.xfail(strict=True, reason=(
@@ -351,9 +469,26 @@ def read_graph(text):
     return nodes, edges
 
 
+def expected_edges(doc):
+    """Every edge the document implies, given the ids it carries today."""
+    projects = {p["id"] for p in doc["projects"]}
+    edges = []
+    for pub in doc["publications"]:
+        work = "work:" + pub["bib_id"]
+        for author in pub["authors"]:
+            if author["person_id"]:
+                edges.append(("authored", "person:" + author["person_id"], work))
+        edges += [("part_of", work, "project:" + i) for i in pub["project_ids"]
+                  if i in projects]
+    for project in doc["projects"]:
+        edges += [("member_of", "person:" + i, "project:" + project["id"])
+                  for i in project["people_ids"]]
+    return edges
+
+
 def test_graph_is_well_formed(probe_output, demo_document):
-    """Every edge endpoint resolves to a declared node, one node per work and
-    per project, and the work-to-project edges are the document's."""
+    """One node per work and per project, and exactly the edges the document
+    implies -- every one matched by both endpoints, not counted."""
     _, doc = demo_document
     nodes, edges = read_graph(probe_output["graph.py"])
 
@@ -364,9 +499,9 @@ def test_graph_is_well_formed(probe_output, demo_document):
         "work:" + p["bib_id"] for p in doc["publications"])
     assert sorted(n for n in nodes if n.startswith("project:")) == sorted(
         "project:" + p["id"] for p in doc["projects"])
-    assert sorted(e for e in edges if e[0] == "part_of") == sorted(
-        ("part_of", "work:" + p["bib_id"], "project:" + i)
-        for p in doc["publications"] for i in p["project_ids"])
+    # All three kinds compared as complete tuples. Counting `authored` would
+    # pass with two valid edges' endpoints swapped.
+    assert sorted(edges) == sorted(expected_edges(doc))
 
 
 @pytest.mark.xfail(strict=True, reason=(

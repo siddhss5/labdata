@@ -57,10 +57,13 @@ as `venue` apart.
 fragment, a CSL-JSON export and a person/project/work edge list — each reading
 the document and nothing else, and `tests/conformance/test_consumer_probes.py`
 runs every one of them against the demo output. Three cannot produce correct
-output against `schema_version` 3. What each of those three *can* produce is
-asserted in a test that passes; only the assertions naming the properties it
-lacks are marked `xfail(strict=True)` against #56, so a marker covers exactly
-the gap it names. `examples/consumers/README.md` lists the three gaps.
+output against `schema_version` 3. **No assertion a probe already satisfies is
+allowed to sit under an `xfail`:** those live in a test that passes, and only
+the assertions naming the properties the probe lacks are marked
+`xfail(strict=True)` against #56. So a marker covers exactly the gap it names,
+and a regression in what a probe can already do turns the suite red instead of
+being absorbed by the marker. `examples/consumers/README.md` lists the three
+gaps.
 
 **The CLI is the reference compiler.** Its flags, its exit codes and the
 stream each kind of message goes to are public API.

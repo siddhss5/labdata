@@ -62,9 +62,10 @@ def link(url, label):
 
 
 def publication_html(pub):
-    # Each field gets a class, so the test can check this entry's authors
+    # Each entry gets the document's id and each field a class, so a reader
+    # can link to one work and the test can check this entry's authors
     # against this entry's authors rather than searching the whole page.
-    out = ['<li class="publication">']
+    out = ['<li class="publication" id="work-%s">' % esc(pub["bib_id"])]
     out.append('<span class="authors">%s</span>'
                % ", ".join(esc(name_from_parts(a)) for a in pub["authors"]))
     out.append('<span class="title">%s</span>' % esc(pub["title"]))
@@ -84,7 +85,7 @@ def publication_html(pub):
 
 
 def person_html(person):
-    out = ['<li class="person">']
+    out = ['<li class="person" id="person-%s">' % esc(person["id"])]
     out.append('<span class="name">%s</span>'
                % (link(person["website"], person["name"]) if person.get("website")
                   else esc(person["name"])))
@@ -97,7 +98,7 @@ def person_html(person):
 
 
 def project_html(project):
-    out = ['<li class="project">']
+    out = ['<li class="project" id="project-%s">' % esc(project["id"])]
     out.append('<span class="name">%s</span>'
                % (link(project["website"], project["title"]) if project.get("website")
                   else esc(project["title"])))
@@ -143,6 +144,8 @@ def render(doc):
 
     out.append("<h2>Collaborators</h2>")
     out.append("<ul>")
+    # No id on these: the document gives a collaborator none. That is the
+    # gap graph.py fails on, and this page shows it rather than inventing one.
     out += ['<li class="collaborator"><span class="name">%s</span></li>' % esc(c["name"])
             for c in doc["collaborators"]]
     out.append("</ul>")

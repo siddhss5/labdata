@@ -36,15 +36,24 @@ python examples/consumers/graph.py     lab.json > graph.tsv
 `tests/conformance/test_consumer_probes.py` runs all four against the demo
 output in CI, the same way: as a subprocess handed a path.
 
-Each probe's obligations are split across two tests. What it *can* do today —
-the CSL export validating against the published schema, the CV grouping by
-year, the graph's edges resolving to declared nodes — is asserted in a test
-that passes. Only the assertions naming the missing properties sit under
-`xfail(strict=True, reason="#56")`, so each xfail fails for exactly the
-property its marker names. Putting them together would neuter the first group:
-a regression in, say, schema validity would surface as the already-expected
-`#56` xfail and CI would stay green. The three xfails turn into passes in #56
-and lose their markers there.
+Each **failing** probe's obligations are split across two tests. No assertion
+a probe already satisfies is allowed to sit under an `xfail`: those go in a
+test that passes, and only the assertions naming the missing properties carry
+`xfail(strict=True, reason="#56")`. So each xfail fails for exactly the
+property its marker names, and a regression in what the probe can already do —
+schema validity, year grouping, edge endpoints — turns the suite red instead
+of being absorbed by the expected `#56` xfail. The three xfails turn into
+passes in #56 and lose their markers there.
+
+The passing tests match **per record, keyed by the id the document supplies**,
+rather than counting or searching the page for a substring. A count passes
+with two works' author lists swapped, and a substring search for a year is
+satisfied by a DOI that happens to contain it; both are exactly the regression
+#56 would introduce. So the HTML page carries each work's `bib_id` as an
+element id and is compared field by field; each CSL record is compared against
+the fields `schema_version` 3 can supply, matched by `id`; each CV entry's
+author, title and year lines are compared as lines; and the graph's `authored`,
+`part_of` and `member_of` edges are all compared as complete tuples.
 
 ## What a probe may read
 
@@ -87,6 +96,23 @@ from an initial — and the tests assert that over every authorship rather than
 spot-checking one. (The published schema describes `given` as
 "unabbreviated", which those seven authors contradict; that wording is #68,
 and it is a description to correct, not data to change.)
+
+### Escaping
+
+`SPEC.md` §2 says text in the document is untrusted — a title may contain `<`,
+`&`, `"`, `*` or `$`, and `Informed RRT*` is a real one — and that escaping is
+the renderer's job. Nothing in the demo contains any of those characters, so
+running `plain_html.py` on the demo proves nothing about escaping, and #55
+names this probe as the renderer we own where escaping can be asserted.
+
+`test_plain_html_escapes_hostile_text` therefore puts hostile values into a
+copy of the document — markup and quotes in a title, a person's name and the
+lab name, and a `"`-bearing URL that reaches an `href` — and runs the
+**unmodified** probe on that. It then parses the output and asserts the markup
+never became markup: no `script` or `b` element, the hostile text coming back
+out of the parser as the characters that went in, no `on*` attribute anywhere,
+and the URL arriving as one intact attribute value. #36 owns escaping across
+the rest of the project; this is the part this probe can settle.
 
 ## What blocks the three failing probes
 
