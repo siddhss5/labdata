@@ -57,13 +57,17 @@ as `venue` apart.
 fragment, a CSL-JSON export and a person/project/work edge list — each reading
 the document and nothing else, and `tests/conformance/test_consumer_probes.py`
 runs every one of them against the demo output. Three cannot produce correct
-output against `schema_version` 3. **No assertion a probe already satisfies is
-allowed to sit under an `xfail`:** those live in a test that passes, and only
-the assertions naming the properties the probe lacks are marked
-`xfail(strict=True)` against #56. So a marker covers exactly the gap it names,
-and a regression in what a probe can already do turns the suite red instead of
-being absorbed by the marker. `examples/consumers/README.md` lists the three
-gaps.
+output against `schema_version` 3, and are marked `xfail(strict=True)` against
+#56. A strict `xfail` swallows every failure in its test, including one in
+something the probe already does correctly, so each of those tests is kept to
+the assertions that name the missing properties — and, for the prerequisites
+it cannot avoid relying on, the rule is: **every prerequisite an xfailed test
+already satisfies is independently enforced by a test that passes.** The
+xfailed CV test looks up one publication by id and that publication's one
+`\item`, and both lookups assert. The passing CV test calls the same `\item`
+lookup for every publication, and the passing HTML and graph tests both fail
+on a duplicated id, so neither prerequisite is checked only inside a marker.
+`examples/consumers/README.md` lists the three gaps.
 
 **The CLI is the reference compiler.** Its flags, its exit codes and the
 stream each kind of message goes to are public API.

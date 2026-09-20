@@ -36,14 +36,21 @@ python examples/consumers/graph.py     lab.json > graph.tsv
 `tests/conformance/test_consumer_probes.py` runs all four against the demo
 output in CI, the same way: as a subprocess handed a path.
 
-Each **failing** probe's obligations are split across two tests. No assertion
-a probe already satisfies is allowed to sit under an `xfail`: those go in a
-test that passes, and only the assertions naming the missing properties carry
-`xfail(strict=True, reason="#56")`. So each xfail fails for exactly the
-property its marker names, and a regression in what the probe can already do —
-schema validity, year grouping, edge endpoints — turns the suite red instead
-of being absorbed by the expected `#56` xfail. The three xfails turn into
-passes in #56 and lose their markers there.
+Each **failing** probe's obligations are split across two tests. The assertions
+naming the missing properties carry `xfail(strict=True, reason="#56")`, and
+everything the probe already does — schema validity, year grouping, edge
+endpoints — goes in a test that passes, so a regression in it turns the suite
+red instead of being absorbed by the expected `#56` xfail.
+
+A strict `xfail` swallows *every* failure in its test, and an xfailed test
+cannot help relying on some things that already work: the CV one looks up a
+publication by id and that publication's one `\item`, and both lookups assert.
+The rule that covers those is: **every prerequisite an xfailed test already
+satisfies is independently enforced by a test that passes.** Here the passing
+CV test calls the same `tex_entry()` for every publication, and the passing
+HTML and graph tests both fail on a duplicated id, so nothing the xfailed test
+leans on is checked only inside the marker. The three xfails turn into passes
+in #56 and lose their markers there.
 
 The passing tests match **per record, keyed by the id the document supplies**,
 rather than counting or searching the page for a substring. A count passes
@@ -54,7 +61,10 @@ as an element id and is compared field by field; each CSL record is compared
 against
 the fields `schema_version` 3 can supply, matched by `id`; each CV entry's
 author, title and year lines are compared as lines; and the graph's `authored`,
-`part_of` and `member_of` edges are all compared as complete tuples.
+`part_of` and `member_of` edges are all compared as complete tuples. The one
+exception is the page's collaborators, compared as a multiset because the
+document gives them no id to key on — which is the gap `graph.py` fails on,
+showing up a second time.
 
 ## What a probe may read
 
@@ -102,13 +112,24 @@ and it is a description to correct, not data to change.)
 
 `SPEC.md` §2 says text in the document is untrusted — a title may contain `<`,
 `&`, `"`, `*` or `$`, and `Informed RRT*` is a real one — and that escaping is
-the renderer's job. Nothing in the demo contains any of those characters, so
-running `plain_html.py` on the demo proves nothing about escaping, and #55
-names this probe as the renderer we own where escaping can be asserted.
+the renderer's job. Running `plain_html.py` on the demo establishes almost
+nothing about escaping, because of what the demo contains. Outside the
+`bibtex` record, which no probe reads, its **only** HTML-sensitive character
+is the apostrophe — in two abstracts and one project description — and an
+apostrophe in element text is harmless. No `<`, `>`, `&` or double quote
+appears in any field the page renders, and no demo value reaches an attribute
+carrying a character that could break out of one. Its venues are full of `*`,
+but `*` is not HTML-sensitive: it is the Markdown emphasis the page
+deliberately renders. So #55 names this probe as the renderer we own where
+escaping can be asserted, and the assertion needs values the demo does not
+supply. (#55 mentions #36 alongside this; #36 is about testing the rendered
+Jekyll site — snapshots, internal links, accessibility — and says nothing
+about escaping, so nothing here depends on it.)
 
 `test_plain_html_escapes_hostile_text` therefore puts hostile values into a
 copy of the document — markup and quotes in a title, a person's name and the
-lab name, and a `"`-bearing URL that reaches an `href` — and runs the
+lab name, a `"`-bearing URL that reaches an `href`, and a `"`-bearing id
+reaching the `id` attribute this page gives each entity — and runs the
 **unmodified** probe on that. It then parses the output and asserts the markup
 never became markup: no `script` or `b` element, the hostile text coming back
 out of the parser as the characters that went in, no `on*` attribute anywhere,

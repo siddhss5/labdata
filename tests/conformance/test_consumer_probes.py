@@ -241,17 +241,27 @@ def test_plain_html_page_is_complete(probe_output, demo_document):
 #
 # SPEC.md section 2 is emphatic that text in the document is untrusted -- a
 # title may contain `<`, `&`, `"`, `*` or `$`, and `Informed RRT*` is a real
-# one -- and that escaping is the renderer's job. Nothing in the demo contains
-# any of those characters, so running the probe on the demo establishes
-# nothing about escaping. These values are put into a copy of the document
-# instead, and the unmodified probe is run on that. #55 names this probe as
-# the Ruby-free renderer where escaping behaviour can be asserted; #36 owns
-# escaping across the rest of the project.
+# one -- and that escaping is the renderer's job. The demo establishes almost
+# nothing about it: outside the `bibtex` record, which no probe reads, its
+# only HTML-sensitive character is the apostrophe, in two abstracts and one
+# project description, and an apostrophe in element text is harmless. No `<`,
+# `>`, `&` or double quote appears in any field the page renders, and no demo
+# value reaches an attribute carrying a character that could break out of one.
+# (Its venues are full of `*`, which HTML does not treat specially: that is
+# the Markdown the page deliberately renders.) So these values are put into a
+# copy of the document instead, and the unmodified probe is run on that. #55
+# names this probe as the Ruby-free renderer where escaping behaviour can be
+# asserted. It mentions #36 alongside, but #36 is about testing the rendered
+# Jekyll site and says nothing about escaping, so nothing here relies on it.
 
 HOSTILE_TITLE = '</span></li><script>alert("x")</script> & <b>bold</b>'
 HOSTILE_NAME = 'Ada <b>"Lovelace"</b> & Co'
 HOSTILE_URL = 'https://example.org/?a=1&b=2" onmouseover="alert(1)'
 HOSTILE_LAB = '</title><script>alert("lab")</script>'
+# An id reaches an `id="..."` attribute. The schema constrains `bib_id`,
+# `person.id` and `project.id` only to a non-empty string
+# (`/$defs/person/properties/id`), so this one is valid output of v3.
+HOSTILE_ID = 'x" onmouseover="alert(1)'
 
 
 class Collector(HTMLParser):
@@ -281,6 +291,11 @@ def hostile_page(tmp_path_factory, demo_document):
     hostile["people"][0]["name"] = HOSTILE_NAME
     hostile["people"][0]["website"] = HOSTILE_URL
     hostile["projects"][0]["description"] = HOSTILE_TITLE
+    # The ids too. Nothing that refers to them is updated, because the page
+    # follows none of those references -- it renders each entity on its own.
+    hostile["publications"][0]["bib_id"] = HOSTILE_ID
+    hostile["people"][0]["id"] = HOSTILE_ID
+    hostile["projects"][0]["id"] = HOSTILE_ID
     path = tmp_path_factory.mktemp("hostile") / "lab.json"
     with open(path, "w", encoding="utf-8") as f:
         json.dump(hostile, f, ensure_ascii=False)
@@ -301,11 +316,15 @@ def test_plain_html_escapes_hostile_text(hostile_page):
     assert HOSTILE_NAME in collector.text
     assert HOSTILE_LAB in collector.text
 
-    # Attribute context: the value is one attribute, not an attribute plus an
-    # event handler, and its text survives intact.
+    # Attribute context: each value is one attribute, not an attribute plus an
+    # event handler, and its text survives intact. Both surfaces the page puts
+    # a document value into -- `href` and the `id` it gives each entity.
     handlers = [a for a in collector.attrs if a[1].startswith("on")]
     assert handlers == []
     assert ("a", "href", HOSTILE_URL) in collector.attrs
+    ids = [value for _, name, value in collector.attrs if name == "id"]
+    assert [prefix for prefix in ("work-", "person-", "project-")
+            if prefix + HOSTILE_ID not in ids] == []
 
     # Tags still nest, and every `&` is an entity reference.
     balance = TagBalance()
