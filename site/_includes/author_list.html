@@ -1,1 +1,6 @@
-{% for author in include.authors %}{% if author.person_id %}<a href="{{ '/people/' | relative_url }}#{{ author.person_id }}">{{ author.name }}</a>{% else %}{{ author.name }}{% endif %}{% unless forloop.last %}, {% endunless %}{% endfor %}
+{%- comment -%}
+Authors of one publication, linked to their people page when they resolved.
+An author the BibTeX entry marked as an equal contributor gets a superscript
+star, and the list is followed by a note saying what the star means.
+{%- endcomment -%}
+{% for author in include.authors %}{% if author.person_id %}<a href="{{ '/people/' | relative_url }}#{{ author.person_id }}">{{ author.name }}</a>{% else %}{{ author.name }}{% endif %}{% if author.equal_contribution %}<sup>*</sup>{% endif %}{% unless forloop.last %}, {% endunless %}{% endfor %}{% assign equal_authors = include.authors | where: "equal_contribution", true %}{% if equal_authors.size > 0 %}<span class="equal-contribution" style="font-size: 0.85em;"> &mdash; <sup>*</sup> equal contribution</span>{% endif %}

@@ -47,7 +47,7 @@ Cases that fail today are not fixed here (that is the linked issue's job):
 #20 (unverified PDF links), #21 (one `@string` summary), #22 (`--unresolved`
 with no people file), #24 (structured-name matching), #26 (precise
 diagnostics), #27 (explicit link and award fields), #28 (`keywords` project
-tags), #46 (equal-contribution markers in the output). #18 is still open for
+tags). #18 is still open for
 the template side — `| escape`, attribute-safe escaping and the checks on
 rendered output — but every LaTeX-to-text row below passes.
 
@@ -136,8 +136,10 @@ field of the output.
 | `names.accent_tex` | `C{\^o}t{\'e}, Carol` | Name `C. Côté`, resolved to the person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.accent_utf8` | `Côté, Carol` in raw UTF-8 | Same output as the TeX spelling, resolved to the same person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.others` | `... and others` | The real authors are resolved; `others` is not emitted as an author | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
-| `names.equal_contribution` | `Brown, Bob$^{*}$ and Davis, Dave*` | The marker does not corrupt the name or block resolution | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
-| `names.equal_contribution_marker` | `$^{*}$` and a trailing `*` on author names | The output records which authors are marked as contributing equally | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #46 |
+| `names.equal_contribution` | Each of `$^{*}$`, `^{*}`, `\textsuperscript{*}` and a trailing `*`, written in turn on the given name, the surname, the particle and the suffix — sixteen combinations | The marker is taken off that part: the display name and the structured parts read as they would without it, and the name resolves to the same person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
+| `names.equal_contribution_marker` | The same sixteen combinations, and every other author name in the corpus | `equal_contribution` is true for each of the sixteen marked authors and false for every other author in the valid corpus | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
+| `names.equal_contribution_normalized` | `Brown$^{*}$*` (the marker twice), `Kim{$^{*}$}` (in a brace group of its own), `Green\textsuperscript {*}` (a space before the argument, which BibTeX splits into two name parts, also written with a second marker after it) and `Davis{*}` (a brace group holding only a star) | The first three come off whole: nothing is left in the name and those authors are marked and resolve. The last is another command's argument rather than a marker, so it stays in the name and marks nobody | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
+| `names.equal_contribution_escaped` | `Brown\*`, `Davis\^{*}`, `Green\$^{*}$` and `Evans\\textsuperscript {*}` — a star, caret, dollar or backslash written with a backslash in front of it | Not a marker: `equal_contribution` stays false for all four, and the name parts keep their own boundaries. What each escaped spelling becomes is the ordinary LaTeX conversion's doing — the star survives in `Davis\^{*}` and `Green\$^{*}$` and is consumed with `\*` in `Brown\*` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
 | `names.same_initial_alex` | `Kim, Alex`, who declares the alias `A. Kim` | Resolves to `akim` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.same_initial_alan` | `Kim, Alan`, who declares no alias | Resolves to `alankim`, not to the other Kim | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #24 |
 | `names.initials_ambiguous` | `Kim, A.`, which fits both Kims | Not resolved to either; listed for a human to resolve | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #24 |
@@ -300,7 +302,7 @@ as a whole. The structure is defined by
 | `output.lab` | A `lab:` section in the config | Copied through to `lab` | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.bib_id` | The citation key | `bib_id` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.title` | `title` | `title`, as plain text | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.authors` | `author` | `authors`: a list of `{name, person_id, given, von, family, suffix, literal}`, in source order | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.publication.authors` | `author` | `authors`: a list of `{name, person_id, given, von, family, suffix, literal, equal_contribution}`, in source order | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.year` | `year` | `year`, as an integer | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.venue` | The venue fields for the entry type | `venue`, the formatted venue string | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.publication.category` | The `bib_files` category of the file the entry came from | `category` | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |

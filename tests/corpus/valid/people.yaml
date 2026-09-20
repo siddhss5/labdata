@@ -71,6 +71,14 @@
   role: "phd_student"
   status: "current"
 
+# A lineage suffix in the declared name, so a suffix-marked author has a
+# person to resolve to.
+- id: "jsmith"
+  name: "John Smith, Jr."
+  aliases: ["J. Smith, Jr."]
+  role: "phd_student"
+  status: "current"
+
 # Surname particles.
 - id: "vvandenberg"
   name: "Victor van den Berg"

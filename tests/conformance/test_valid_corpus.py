@@ -79,12 +79,6 @@ NAMES = [
     case("names.accent_utf8", "name-accent-utf8", "authors.0.person_id", "ccote"),
     case("names.others", "name-others", "authors.*.person_id", Contains("aadams", "bbrown")),
     case("names.others", "name-others", "authors.*.name", Excludes("others")),
-    case("names.equal_contribution", "name-equal", "authors.*.name",
-         ["B. Brown", "D. Davis", "A. Adams"]),
-    case("names.equal_contribution", "name-equal", "authors.*.person_id",
-         ["bbrown", "ddavis", "aadams"]),
-    case("names.equal_contribution_marker", "name-equal", "authors.*.equal_contribution",
-         [True, True, False], xfail="#46"),
     case("names.same_initial_alex", "name-kim-alex", "authors.0.person_id", "akim"),
     case("names.same_initial_alan", "name-kim-alan", "authors.0.person_id", "alankim",
          xfail="#24"),
@@ -100,6 +94,79 @@ NAMES = [
 
 @pytest.mark.parametrize("case_id, bib_key, path, expected", NAMES)
 def test_names(valid_output, case_id, bib_key, path, expected):
+    check_publication(valid_output, bib_key, path, expected)
+
+
+# --- Equal contribution ------------------------------------------------------
+# Four corpus entries differing only in the marker form, each writing it on a
+# different part of a name, give the sixteen combinations of form and part.
+# Every marked author is a lab member, so each one also says the cleaned name
+# still finds its person.
+
+EQUAL_ENTRIES = ["name-equal-dollar", "name-equal-caret",
+                 "name-equal-superscript", "name-equal-star"]
+EQUAL_NAMES = ["B. Brown", "C. Côté", "V. van den Berg", "J. Smith, Jr.", "A. Adams"]
+EQUAL_IDS = ["bbrown", "ccote", "vvandenberg", "jsmith", "aadams"]
+# The part each author carries the marker on, and how that part reads once it
+# is off. The last author is never marked.
+EQUAL_PARTS = [("authors.0.given", "Bob"), ("authors.1.family", "Côté"),
+               ("authors.2.von", "van den"), ("authors.3.suffix", "Jr.")]
+EQUAL_MARKED = [True, True, True, True, False]
+
+EQUAL_CONTRIBUTION = [
+    case("names.equal_contribution", bib_key, path, expected)
+    for bib_key in EQUAL_ENTRIES
+    for path, expected in ([("authors.*.name", EQUAL_NAMES),
+                            ("authors.*.person_id", EQUAL_IDS)] + EQUAL_PARTS)
+] + [
+    case("names.equal_contribution_marker", bib_key, "authors.*.equal_contribution",
+         EQUAL_MARKED)
+    for bib_key in EQUAL_ENTRIES
+] + [
+    # A marker written twice, one in a brace group of its own, and one whose
+    # command and argument BibTeX split into two name parts: each comes off
+    # whole, and the name still resolves. A brace group holding only a star is
+    # another command's argument, not a marker, and is left alone.
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.*.person_id", ["bbrown", "akim", "ggreen", "ddavis", "aadams"]),
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.*.equal_contribution", [True, True, True, False, False]),
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.0.name", "B. Brown"),
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.1.name", "A. Kim"),
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.2.name", "G.-A. Green"),
+    case("names.equal_contribution_normalized", "name-equal-normalized",
+         "authors.3.name", Contains("Davis", "*")),
+    # A spaced marker followed by another, in each of the four forms: the
+    # first is joined back together, the rest is stripped, and nothing of
+    # either is left in the name.
+    case("names.equal_contribution_normalized", "name-equal-stacked",
+         "authors.*.name",
+         ["B. Brown", "D. Davis", "G.-A. Green", "A. Kim", "A. Adams"]),
+    case("names.equal_contribution_normalized", "name-equal-stacked",
+         "authors.*.person_id", ["bbrown", "ddavis", "ggreen", "akim", "aadams"]),
+    case("names.equal_contribution_normalized", "name-equal-stacked",
+         "authors.*.equal_contribution", [True, True, True, True, False]),
+    # An escaped star, caret, dollar or backslash is text: nobody is marked,
+    # and the name parts keep their own boundaries. What each spelling becomes
+    # is the ordinary LaTeX conversion's doing, and is pinned here as it is.
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.*.equal_contribution", [False, False, False, False, False]),
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.0.name", "B. Brown"),
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.1.name", Contains("Davis", "*")),
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.2.name", Contains("Green", "*")),
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.3.name", Contains("Evans", " *")),
+]
+
+
+@pytest.mark.parametrize("case_id, bib_key, path, expected", EQUAL_CONTRIBUTION)
+def test_equal_contribution(valid_output, case_id, bib_key, path, expected):
     check_publication(valid_output, bib_key, path, expected)
 
 
@@ -171,6 +238,27 @@ def test_every_display_name_agrees_with_its_parts(valid_output):
             checked += 1
     # The loop has to have run over the names the corpus is built from.
     assert checked > 40, checked
+
+
+MARKED_ENTRIES = set(EQUAL_ENTRIES) | {"name-equal-normalized", "name-equal-stacked"}
+
+
+@covers("names.equal_contribution_marker")
+def test_only_marked_authors_are_equal_contributors(valid_output):
+    """Across the corpus, equal_contribution is set exactly where a marker was.
+
+    The rows above say the marked authors are marked. This says the unmarked
+    ones are not: no name elsewhere in the corpus — a starred title, a
+    corporate name, an accent written in TeX, an escaped star — picks the flag
+    up. Nor does a marked name keep a star once the marker is off.
+    """
+    marked = {(p["bib_id"], a["name"]) for p in valid_output["publications"]
+              for a in p["authors"] if a["equal_contribution"]}
+    assert {bib_id for bib_id, _ in marked} == MARKED_ENTRIES
+    # Four parts marked in each of the four form entries, three of the five
+    # authors of name-equal-normalized, and four of name-equal-stacked.
+    assert len(marked) == len(EQUAL_ENTRIES) * 4 + 3 + 4, sorted(marked)
+    assert [name for _, name in marked if "*" in name] == []
 
 
 @covers("names.initials_ambiguous", xfail="#24", owns=("name-kim-initial",))
@@ -360,7 +448,7 @@ def test_project_backlinks(valid_output):
 # (case_id, section, lookup key, lookup value, field path, expected)
 
 OUTPUT_FIELDS = [
-    case("output.schema_version", "", "", "", "schema_version", 2),
+    case("output.schema_version", "", "", "", "schema_version", 3),
     case("output.lab", "", "", "", "lab.name", "Corpus Lab"),
     case("output.publication.bib_id", "publications", "bib_id", "type-article", "bib_id",
          "type-article"),
@@ -368,7 +456,8 @@ OUTPUT_FIELDS = [
          "Robots 机器人 and Émoji 🤖"),
     case("output.publication.authors", "publications", "bib_id", "name-last-first", "authors",
          [{"name": "A. Adams", "person_id": "aadams", "given": "Alice", "von": None,
-           "family": "Adams", "suffix": None, "literal": None}]),
+           "family": "Adams", "suffix": None, "literal": None,
+           "equal_contribution": False}]),
     case("output.publication.year", "publications", "bib_id", "type-article", "year", 2020),
     case("output.publication.venue", "publications", "bib_id", "type-article", "venue",
          Contains("Journal of Fictional Robots")),
@@ -410,9 +499,11 @@ OUTPUT_FIELDS = [
          "Learning to Tidy"),
     case("output.person.current_position", "people", "id", "eevans", "current_position",
          "Research Scientist, Example Robotics Inc."),
-    case("output.person.publication_count", "people", "id", "ccote", "publication_count", 4),
+    case("output.person.publication_count", "people", "id", "ccote", "publication_count", 8),
     case("output.person.publication_ids", "people", "id", "ccote", "publication_ids",
-         ["proj-multiple", "name-accent-tex", "name-accent-utf8", "enc-bom-crlf"]),
+         ["proj-multiple", "name-accent-tex", "name-accent-utf8", "name-equal-dollar",
+          "name-equal-caret", "name-equal-superscript", "name-equal-star",
+          "enc-bom-crlf"]),
     case("output.project.id", "projects", "title", "Household Manipulation", "id", "homebot"),
     case("output.project.title", "projects", "id", "sharedarm", "title", "Shared Control"),
     case("output.project.description", "projects", "id", "homebot", "description",

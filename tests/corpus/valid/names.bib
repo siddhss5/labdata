@@ -92,11 +92,94 @@
   year    = {2022}
 }
 
+% Equal contribution: each marker form, on each part of a name. The four
+% entries below differ only in the form, and each one writes it on the given
+% name, the surname, the particle and the lineage suffix in turn. Carol Côté
+% carries it on a surname spelled with TeX accents, as the Example Lab demo
+% does, and Alice Adams is never marked.
+
 % CASE names.equal_contribution
 % CASE names.equal_contribution_marker
-@inproceedings{name-equal,
-  title     = {Equal Contribution Markers},
-  author    = {Brown, Bob$^{*}$ and Davis, Dave* and Adams, Alice},
+@inproceedings{name-equal-dollar,
+  title     = {Equal Contribution Written as $^{*}$},
+  author    = {Brown, Bob$^{*}$ and C{\^o}t{\'e}$^{*}$, Carol and
+               van$^{*}$ den Berg, Victor and Smith, Jr.$^{*}$, John and
+               Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
+% CASE names.equal_contribution
+% CASE names.equal_contribution_marker
+@inproceedings{name-equal-caret,
+  title     = {Equal Contribution Written as ^{*}},
+  author    = {Brown, Bob^{*} and C{\^o}t{\'e}^{*}, Carol and
+               van^{*} den Berg, Victor and Smith, Jr.^{*}, John and
+               Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
+% CASE names.equal_contribution
+% CASE names.equal_contribution_marker
+@inproceedings{name-equal-superscript,
+  title     = {Equal Contribution Written as \textsuperscript{*}},
+  author    = {Brown, Bob\textsuperscript{*} and C{\^o}t{\'e}\textsuperscript{*}, Carol and
+               van\textsuperscript{*} den Berg, Victor and Smith, Jr.\textsuperscript{*}, John and
+               Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
+% CASE names.equal_contribution
+% CASE names.equal_contribution_marker
+@inproceedings{name-equal-star,
+  title     = {Equal Contribution Written as *},
+  author    = {Brown, Bob* and C{\^o}t{\'e}*, Carol and
+               van* den Berg, Victor and Smith, Jr.*, John and
+               Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
+% The same marker written in ways that need putting back together first: twice
+% over, wrapped in a brace group of its own, and with a space between
+% \textsuperscript and its argument, which BibTeX splits into two name parts.
+% All three come off. A brace group holding only a star is not one of them: it
+% is how any other command takes its argument, so Dave Davis is not marked.
+% CASE names.equal_contribution_normalized
+@inproceedings{name-equal-normalized,
+  title     = {Equal Contribution Written Twice, in a Brace Group, and Spaced},
+  author    = {Brown$^{*}$*, Bob and Kim{$^{*}$}, Alex and
+               Green\textsuperscript {*}, Grace-Ann and Davis{*}, Dave and
+               Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
+% A spaced marker followed by another one, in each of the four forms: joining
+% the command to its argument makes the first whole, and the rest comes off
+% the same way an unspaced run of markers does.
+% CASE names.equal_contribution_normalized
+@inproceedings{name-equal-stacked,
+  title     = {A Spaced Marker Followed by Another},
+  author    = {Brown\textsuperscript {*}$^{*}$, Bob and
+               Davis\textsuperscript {*}^{*}, Dave and
+               Green\textsuperscript {*}\textsuperscript{*}, Grace-Ann and
+               Kim\textsuperscript {*}*, Alex and Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2022}
+}
+
+% A star, caret, dollar or backslash with a backslash in front of it is escaped
+% text, not a marker: nobody is marked, and the name parts keep their own
+% boundaries. What the escaped spelling itself becomes is the ordinary LaTeX
+% conversion's business.
+% CASE names.equal_contribution_escaped
+@inproceedings{name-equal-escaped,
+  title     = {Escaped Stars Are Not Markers},
+  author    = {Brown\*, Bob and Davis\^{*}, Dave and Green\$^{*}$, Grace-Ann and
+               Evans\\textsuperscript {*}, Erin and Adams, Alice},
   booktitle = {Proceedings of the Fictional Conference},
   year      = {2022}
 }

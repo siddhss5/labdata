@@ -16,7 +16,7 @@ def sample_data():
         bib_id="adams2024robot",
         title="Robot Gardening",
         authors=[
-            Author(name="A. Adams", person_id="aadams"),
+            Author(name="A. Adams", person_id="aadams", equal_contribution=True),
             Author(name="E. External"),
         ],
         year=2024,
@@ -70,6 +70,8 @@ class TestExportToYaml:
         assert authors[0]["person_id"] == "aadams"
         assert authors[1]["name"] == "E. External"
         assert authors[1]["person_id"] is None
+        assert authors[0]["equal_contribution"] is True
+        assert authors[1]["equal_contribution"] is False
 
     def test_unicode_preserved(self, tmp_path):
         """Unicode characters should survive round-trip."""
@@ -101,6 +103,8 @@ class TestExportToJson:
         assert loaded["publications"][0]["bib_id"] == "adams2024robot"
         assert loaded["people"][0]["publication_count"] == 1
         assert loaded["projects"][0]["people_ids"] == ["aadams"]
+        authors = loaded["publications"][0]["authors"]
+        assert [a["equal_contribution"] for a in authors] == [True, False]
 
     def test_creates_parent_dirs(self, tmp_path, sample_data):
         out = str(tmp_path / "nested" / "dir" / "output.json")
@@ -113,5 +117,5 @@ class TestExportToJson:
         export_to_json(data, out)
         with open(out, 'r') as f:
             loaded = json.load(f)
-        assert loaded == {"schema_version": 2, "publications": [], "people": [],
+        assert loaded == {"schema_version": 3, "publications": [], "people": [],
                           "projects": [], "collaborators": []}

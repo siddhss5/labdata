@@ -13,6 +13,11 @@ class TestAuthor:
         a = Author(name="B. Brown", person_id="bbrown")
         assert a.person_id == "bbrown"
 
+    def test_equal_contribution(self):
+        assert Author(name="B. Brown").equal_contribution is False
+        marked = Author(name="B. Brown", equal_contribution=True)
+        assert marked.to_dict()["equal_contribution"] is True
+
 
 class TestPublication:
     def test_minimal(self):

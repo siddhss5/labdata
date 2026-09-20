@@ -9,7 +9,7 @@
   "properties": {
     "schema_version": {
       "description": "Version of this output format. Bumped when a change could break a consumer.",
-      "const": 2
+      "const": 3
     },
     "lab": {
       "description": "The lab section of lab.yaml, copied through unchanged.",
@@ -40,9 +40,12 @@
       "items": { "type": "string", "minLength": 1 }
     },
     "author": {
-      "description": "One author of a publication: the display name, the parts BibTeX split it into, and the person it resolved to.",
+      "description": "One author of a publication: the display name, the parts BibTeX split it into, the person it resolved to, and whether the entry marked an equal contribution.",
       "type": "object",
-      "required": ["name", "person_id", "given", "von", "family", "suffix", "literal"],
+      "required": [
+        "name", "person_id", "given", "von", "family", "suffix", "literal",
+        "equal_contribution"
+      ],
       "additionalProperties": false,
       "properties": {
         "name": { "type": "string", "minLength": 1 },
@@ -69,6 +72,10 @@
         "literal": {
           "description": "A corporate name written as one brace-protected unit. Null for a personal name, where the four parts above apply instead.",
           "$ref": "#/$defs/optionalString"
+        },
+        "equal_contribution": {
+          "description": "True when the BibTeX entry marked this author with a `*`. The marker itself is not part of the name.",
+          "type": "boolean"
         }
       }
     },

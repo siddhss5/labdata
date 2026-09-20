@@ -39,6 +39,38 @@ TEXT_FIELDS = frozenset({
 # A name list ending in "and others" means "et al."; it is not an author.
 OTHERS = "others"
 
+# Equal contribution is written as a star on one part of a name, in one of
+# these four forms. It is an annotation rather than part of the name, so it is
+# taken off the part before the name is read and recorded on the author
+# instead. Other author annotations — corresponding author, affiliation
+# numbers, daggers — are not read.
+#
+# A star, caret or dollar written with a backslash in front of it is escaped
+# text rather than the start of a marker: `Brown\*` is a name with a star in
+# it. The accent in `C{\^o}t{\'e}$^{*}$` is escaped the same way, and the
+# marker after it is not, which is how that name keeps working.
+_WRITTEN = r"\$\^\{\*\}\$|\^\{\*\}|\\textsuperscript\s*\{\*\}"
+_MARKER = rf"(?<!\\)(?:{_WRITTEN}|\*)"
+
+# A marker at the end of a name part, on its own or in a brace group of its
+# own: BibTeX grouping such as `Brown{$^{*}$}` protects the marker from the
+# name, and does not make it part of it. Only a form that brings its own
+# command is unwrapped, because a lone `{*}` is how any other command takes
+# its argument — the star in `Brown\^{*}` is an accented star, not a marker.
+_ANY_MARKER = rf"(?:(?<!\\)\{{\s*(?:{_WRITTEN})\s*\}}|{_MARKER})"
+EQUAL_CONTRIBUTION = re.compile(rf"{_ANY_MARKER}\s*$")
+
+# `\textsuperscript {*}`, with a space before the argument, is the same form:
+# BibTeX splits a name on spaces, so the command and its argument arrive as two
+# name parts and neither is a marker on its own. Only this one command takes
+# its argument back, written as the command and not as an escaped backslash,
+# and only from a part that is the argument and nothing but further markers —
+# so the accent in `Brown\^ {*}`, a `{*}` after any other command, and a part
+# carrying text of its own all keep their own boundary. What the part carries
+# after `{*}` is left to the stripping below, as it is for an unspaced marker.
+_MARKER_COMMAND = re.compile(r"(?<!\\)\\textsuperscript\s*$")
+_MARKER_ARGUMENT = re.compile(rf"\{{\*\}}(?:{_ANY_MARKER})*")
+
 _STRING_DEFINITION = re.compile(r'@string\s*[{(]\s*([^\s=,{}()"]+)\s*=', re.IGNORECASE)
 
 # The command name pybtex is about to read, when that name is `comment`.
@@ -190,6 +222,60 @@ def _initials(given: str) -> str:
     return "-".join(f"{part[0]}." for part in parts)
 
 
+def _name_part_groups(person: Person) -> List[List[str]]:
+    """A pybtex name's parts, grouped as the BibTeX parts that read them.
+
+    Given and middle names are one group because they are read as one part,
+    and because BibTeX puts the first word of a given name in one list and the
+    rest in the other — which is a split a marker can land across.
+    """
+    return [list(person.first_names) + list(person.middle_names),
+            list(person.prelast_names),
+            list(person.last_names),
+            list(person.lineage_names)]
+
+
+def _with_marker_joined(parts: List[str]) -> List[str]:
+    """One group of name parts, with a marker split across two of them joined."""
+    joined: List[str] = []
+    for part in parts:
+        if (joined and _MARKER_ARGUMENT.fullmatch(part)
+                and _MARKER_COMMAND.search(joined[-1])):
+            joined[-1] += part
+        else:
+            joined.append(part)
+    return joined
+
+
+def _name_parts(person: Person) -> List[str]:
+    """Every part of a pybtex name, as written, with split markers joined."""
+    return [part for group in _name_part_groups(person)
+            for part in _with_marker_joined(group)]
+
+
+def _without_marker(part: str) -> str:
+    """One name part with its equal-contribution markers taken off the end.
+
+    Stripping repeats, because a name written ``Brown$^{*}$*`` carries the
+    marker twice and taking one off would leave the other in the name.
+    """
+    while True:
+        stripped = EQUAL_CONTRIBUTION.sub("", part, count=1)
+        if stripped == part:
+            return part
+        part = stripped
+
+
+def marks_equal_contribution(person: Person) -> bool:
+    """True when any part of this name carries an equal-contribution marker.
+
+    Given, family, von and suffix are all read: BibTeX splits the name before
+    labdata sees it, so which part the star landed on is the author's choice
+    of where to write it, not a different meaning.
+    """
+    return any(_without_marker(part) != part for part in _name_parts(person))
+
+
 def _is_others(person: Person) -> bool:
     """``and others``: BibTeX's "et al.", not a person."""
     return (not person.first_names and not person.middle_names
@@ -213,9 +299,13 @@ def person_name_parts(person: Person, where: str) -> Dict[str, Optional[str]]:
     corporate name comes back as ``literal`` instead, with the other four
     unset. An empty part is ``None`` rather than ``""``, so the output says
     "this name has no such part" rather than "it is blank".
+
+    An equal-contribution marker is not part of the name and does not appear
+    in any part; ``marks_equal_contribution`` reports it separately.
     """
     def text(parts) -> Optional[str]:
-        joined = " ".join(_convert(part, where) for part in parts).strip()
+        joined = " ".join(_convert(_without_marker(part), where)
+                          for part in _with_marker_joined(parts)).strip()
         return joined or None
 
     if _is_literal(person):
@@ -249,8 +339,9 @@ def parse_author_list(entry: Entry, where: str) -> List[Author]:
     """The entry's authors, in source order, with person_id unresolved.
 
     Each author carries the parts BibTeX split its name into as well as the
-    display form. Matching on those parts is #24; the resolver still reads
-    only the display name.
+    display form, and whether the entry marked it as an equal contribution.
+    Matching on those parts is #24; the resolver still reads only the display
+    name, which is why the marker has to come off the name itself.
     """
     persons = list(entry.persons.get("author", []))
     if persons and _is_others(persons[-1]):
@@ -261,7 +352,10 @@ def parse_author_list(entry: Entry, where: str) -> List[Author]:
         parts = person_name_parts(person, where)
         name = format_name(parts)
         if name:
-            authors.append(Author(name=name, **parts))
+            authors.append(Author(
+                name=name,
+                equal_contribution=marks_equal_contribution(person),
+                **parts))
     return authors
 
 
