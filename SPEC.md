@@ -71,7 +71,7 @@ Exit codes, as `labdata.cli.main()` returns them:
 | Code | Meaning |
 |---|---|
 | `0` | Success. `--output` wrote the file; `--validate` found no errors; `--unresolved` reported. |
-| `1` | Error. Configuration file missing, configuration failed to load, or `--validate` found unknown project ids. |
+| `1` | Error. Configuration file missing, configuration failed to load, or `--validate` found unknown project ids or duplicate citation keys. |
 | `2` | Usage error from the argument parser: a missing or unrecognised flag, or none of `--output` / `--validate` / `--unresolved`. |
 
 **Streams and message shapes.** Ordinary reporting goes to **standard
@@ -83,6 +83,7 @@ in one of three shapes:
 | Shape | Source |
 |---|---|
 | `Warning: …` | Problems with the input, from `labdata.parsers.bibtex._warn()` and `labdata.resolver.build_alias_index()`. |
+| `<CODE> <file>:<key>:<field>: …` | A diagnostic carrying a stable code, described under *Diagnostic codes* below. Under `--validate` it appears on standard output beneath `Bibliography errors`; in the other modes the same text is prefixed with `Warning: ` on standard error. |
 | `Error: …` | Configuration failures, from `labdata.cli.main()`: `Error: Configuration file not found: …` and `Error loading configuration: …`. |
 | `usage: …` / `…: error: …` | Argument errors, in the argument parser's own format. |
 
@@ -103,12 +104,47 @@ labdata does own.
 > from a crash. Verified against `labdata.parsers.bibtex.parse_bibtex_file()`,
 > which reads the file with no guard, and `entry_to_publication()`, which
 > calls `int()` on the `year` field.
-> (b) Diagnostic *text* is not stable. Messages relayed from the BibTeX parser
-> are passed through as that library phrased them
-> (`labdata.parsers.bibtex.parse_bibtex_file()` relays each captured error),
-> and labdata's own messages do not consistently name the file, entry key and
-> field. Consumers may depend on the stream and the shapes above, not on the
-> wording.
+> (b) Diagnostic *text* is not stable, except where a diagnostic carries a
+> code. Messages relayed from the BibTeX parser are passed through as that
+> library phrased them (`labdata.parsers.bibtex.parse_bibtex_file()` relays
+> each captured error), and labdata's own messages do not consistently name
+> the file, entry key and field. Consumers may depend on the stream, the
+> shapes above and any code in the registry below, not on the wording around
+> them.
+
+### Diagnostic codes
+
+A diagnostic may carry a **stable code** so that tooling can recognise it
+without depending on English wording. Codes obey three rules:
+
+1. The form is `<COMPONENT>-<CONDITION>` in upper case, for example
+   `BIB-DUPLICATE-KEY`, followed by a space, then `<file>:<key>:<field>`, then
+   a colon and prose.
+2. **Severity is not part of the code.** The same condition is already
+   reported as an error by `--validate` and as a warning by the other modes,
+   and #26 adds a `--strict` mode that raises severity further. A code says
+   *what was found*, never how badly the run took it; severity is carried by
+   the stream and the `Warning: ` prefix.
+3. A published code is permanent. It is never reused for a different
+   condition, and retiring one is a breaking change.
+
+Codes in use:
+
+| Code | Condition |
+|---|---|
+| `BIB-DUPLICATE-KEY` | The same citation key appears twice in one `.bib` file, or in two of the configured files. |
+
+Most diagnostics do not carry a code yet. #26 adds them incrementally, and an
+uncoded diagnostic is not a stable interface.
+
+> **Version note (#26, PR #64).** Duplicate citation keys were invisible
+> through commit `dd06e37`: the parser library kept the first entry, and a key
+> repeated across two configured files passed `--validate` with exit `0`.
+> Since PR #64 merged, `labdata.parsers.bibtex.parse_all_publications()`
+> reports each duplicate under the `BIB-DUPLICATE-KEY` code, `--validate`
+> exits `1`, and the other modes emit the same diagnostic as a warning and
+> continue. The code was introduced as `E-BIB-DUPLICATE-KEY` and renamed to
+> drop the severity prefix before any release, under rule 2 above.
 
 > **Version note (#22, PR #61).** Through commit `cf9e055`, `--unresolved`
 > printed `All authors resolved.` when no `people_file` was configured, where

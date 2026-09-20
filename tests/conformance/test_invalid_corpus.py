@@ -69,11 +69,11 @@ def test_duplicate_keys_warn_but_do_not_block_nonvalidation_modes(tmp_path, case
     unresolved = run_labdata(["--config", "lab.yaml", "--unresolved"],
                               INVALID / spec["dir"])
     assert unresolved.code == 0 and unresolved.crash is None, unresolved.output
-    assert "E-BIB-DUPLICATE-KEY" in unresolved.stderr
+    assert "BIB-DUPLICATE-KEY" in unresolved.stderr
 
     run, data = export(INVALID / spec["dir"], tmp_path)
     assert run.code == 0 and run.crash is None, run.output
-    assert "E-BIB-DUPLICATE-KEY" in run.stderr
+    assert "BIB-DUPLICATE-KEY" in run.stderr
     assert data is not None
 
 
