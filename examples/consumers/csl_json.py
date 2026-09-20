@@ -31,10 +31,12 @@ CSL_TYPES = {
 
 
 def csl_name(author):
-    """One CSL name object, built from the parts the document splits a name into.
+    """One CSL name object, from the parts the document splits a name into.
 
-    `name` is the document's display form and abbreviates given names to
-    initials; CSL wants the parts, and the document emits them.
+    `name` is the document's display form and abbreviates the given name
+    unconditionally, so it is lossy as a source. The parts preserve whatever
+    the input supplied, which may itself be an initial: `given: "A."` where
+    the entry wrote `Adams, A.` is correct CSL and not a missing property.
     """
     if author.get("literal"):
         return {"literal": author["literal"]}
@@ -52,9 +54,9 @@ def venue_parts(pub):
     Today `venue` is one pre-composed string with Markdown emphasis inside
     it -- `*Transactions on Robot Learning*, 4(2), 2025` -- so there is no
     container title to put in `container-title` and no volume or number
-    beside it. Taking that string apart, or reading the verbatim export the
-    document carries alongside it, would prove nothing about the document:
-    see README.md.
+    beside it. Taking that string apart, or reading the opaque re-serialized
+    export the document carries alongside it, would prove nothing about the
+    document: see README.md.
     """
     venue = pub.get("venue")
     return venue if isinstance(venue, dict) else None

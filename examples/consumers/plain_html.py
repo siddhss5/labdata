@@ -28,11 +28,14 @@ ROLES = {
 }
 
 
-def full_name(author):
-    """An author's name in full, from the parts the document splits it into.
+def name_from_parts(author):
+    """An author's name, assembled from the parts the document splits it into.
 
-    `name` is the document's display form and abbreviates given names to
-    initials, so a page that wants "Bob Brown" builds it from the parts.
+    `name` is the document's display form and abbreviates the given name
+    unconditionally, so it is lossy as a source. The parts preserve whatever
+    the input supplied: `Bob Brown` where the entry wrote `Brown, Bob`, and
+    `A. Adams` where it wrote `Adams, A.`. Neither is a gap -- this returns
+    the name the author's files gave, which is what a consumer should show.
     """
     if author.get("literal"):
         return author["literal"]
@@ -59,11 +62,14 @@ def link(url, label):
 
 
 def publication_html(pub):
-    out = ["<li>"]
-    out.append("<span>%s</span>" % ", ".join(esc(full_name(a)) for a in pub["authors"]))
+    # Each field gets a class, so the test can check this entry's authors
+    # against this entry's authors rather than searching the whole page.
+    out = ['<li class="publication">']
+    out.append('<span class="authors">%s</span>'
+               % ", ".join(esc(name_from_parts(a)) for a in pub["authors"]))
     out.append('<span class="title">%s</span>' % esc(pub["title"]))
-    out.append("<span>%s</span>" % venue_html(pub))
-    out.append("<span>%s</span>" % esc(pub["year"]))
+    out.append('<span class="venue">%s</span>' % venue_html(pub))
+    out.append('<span class="year">%s</span>' % esc(pub["year"]))
     if pub.get("note"):
         out.append("<span>%s</span>" % esc(pub["note"]))
     links = [link(pub[key], label) for key, label in
@@ -78,10 +84,10 @@ def publication_html(pub):
 
 
 def person_html(person):
-    out = ["<li>"]
-    name = esc(person["name"])
-    out.append(link(person["website"], person["name"]) if person.get("website")
-               else "<span>%s</span>" % name)
+    out = ['<li class="person">']
+    out.append('<span class="name">%s</span>'
+               % (link(person["website"], person["name"]) if person.get("website")
+                  else esc(person["name"])))
     for key in ("degree", "thesis_title", "co_advisor", "current_position"):
         if person.get(key):
             out.append("<span>%s</span>" % esc(person[key]))
@@ -91,9 +97,10 @@ def person_html(person):
 
 
 def project_html(project):
-    out = ["<li>"]
-    out.append(link(project["website"], project["title"]) if project.get("website")
-               else "<span>%s</span>" % esc(project["title"]))
+    out = ['<li class="project">']
+    out.append('<span class="name">%s</span>'
+               % (link(project["website"], project["title"]) if project.get("website")
+                  else esc(project["title"])))
     if project.get("description"):
         out.append("<p>%s</p>" % esc(project["description"]))
     out.append("<span>%s: %s works, %s people</span>"
@@ -136,7 +143,8 @@ def render(doc):
 
     out.append("<h2>Collaborators</h2>")
     out.append("<ul>")
-    out += ["<li><span>%s</span></li>" % esc(c["name"]) for c in doc["collaborators"]]
+    out += ['<li class="collaborator"><span class="name">%s</span></li>' % esc(c["name"])
+            for c in doc["collaborators"]]
     out.append("</ul>")
 
     out.append("<h2>Projects</h2>")

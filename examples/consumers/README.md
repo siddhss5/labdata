@@ -34,10 +34,17 @@ python examples/consumers/graph.py     lab.json > graph.tsv
 ```
 
 `tests/conformance/test_consumer_probes.py` runs all four against the demo
-output in CI, the same way: as a subprocess handed a path. The three that
-cannot produce correct output are `xfail(strict=True, reason="#56")` there,
-and each marker names the property that blocks it. They turn green in #56 and
-lose their markers there.
+output in CI, the same way: as a subprocess handed a path.
+
+Each probe's obligations are split across two tests. What it *can* do today —
+the CSL export validating against the published schema, the CV grouping by
+year, the graph's edges resolving to declared nodes — is asserted in a test
+that passes. Only the assertions naming the missing properties sit under
+`xfail(strict=True, reason="#56")`, so each xfail fails for exactly the
+property its marker names. Putting them together would neuter the first group:
+a regression in, say, schema validity would surface as the already-expected
+`#56` xfail and CI would stay green. The three xfails turn into passes in #56
+and lose their markers there.
 
 ## What a probe may read
 
@@ -46,23 +53,40 @@ lose their markers there.
   `projects.yaml`. The test module checks both statically: no probe imports
   `labdata`, no probe names an input file, and each probe opens exactly one
   file — the one on its command line.
-- **Structured properties, never `publication.bibtex`.** That record is a
-  verbatim export for a consumer to copy into a reference manager. It is not
-  a source of structured data, even though the fields are visibly sitting in
-  it: `pages = "112--131"` is in the record for `brown2025tidy` and is
-  nowhere else in the document. A probe that reached into it could be made to
-  pass while proving nothing at all about the schema, so the static check
-  forbids that too.
+- **Structured properties, never `publication.bibtex`.** That record is an
+  opaque re-serialization of the entry, for a consumer to copy into a
+  reference manager. It is not a set of first-class properties, and it is not
+  even a faithful copy of what the author wrote: `format_bibtex()` re-typesets
+  the *parsed* entry, so field order, delimiters, whitespace and `@string`
+  macros are all gone (SPEC.md §5). The fields are none the less visibly
+  sitting in it — `pages = "112--131"` is in the record for `brown2025tidy`
+  and is nowhere else in the document — and a probe that reached in could be
+  made to pass while proving nothing at all about the schema. The static
+  check forbids that too.
 - **Structured properties, never a pre-composed string taken apart.**
   `venue` arrives as `*Transactions on Robot Learning*, 4(2), 2025` — one
   string with Markdown emphasis in it and the volume, issue and year fused
   in. A probe renders markup it was handed; it does not parse fields back out
   of a string the compiler composed.
 
-Reconstructing an author's full name *is* allowed and the probes do it.
-`author.name` is the document's display form and abbreviates given names to
-initials (`A. Adams`), but `given`, `von`, `family`, `suffix` and `literal`
-are on every author, so a full name is a join and not a gap.
+Reading an author's name from the parts *is* allowed and the probes do it.
+`author.name` is the document's display form and abbreviates the given name
+**unconditionally** (`Brown, Bob` → `B. Brown`), so it is lossy as a source.
+`given`, `von`, `family`, `suffix` and `literal` are on every author and
+preserve whatever the input supplied — which is a full given name for most of
+the demo, and an initial in nine of its authorships, across seven distinct
+authors, whose entry wrote `Brown, B.` rather than `Brown, Bob`
+(`brown2024blend`, `ingram2021affordances`, `jones2021timing`).
+
+So the parts are not a promise of a full name; they are a promise of the
+input's name. That is the right guarantee and no property is missing: where
+the input wrote an initial, an initial is the correct value, and a CSL record
+carrying `given: "P."` is correct CSL. The probes therefore reproduce the
+parts as they find them — neither abbreviating a full name nor inventing one
+from an initial — and the tests assert that over every authorship rather than
+spot-checking one. (The published schema describes `given` as
+"unabbreviated", which those seven authors contradict; that wording is #68,
+and it is a description to correct, not data to change.)
 
 ## What blocks the three failing probes
 
@@ -78,30 +102,41 @@ Verified against the demo record `brown2025tidy`:
   input is passed through unchanged, so there is no prefix a consumer can
   reliably strip. The record therefore has no `container-title`, `volume`,
   `issue`, `page` or `DOI`.
-- **`graph.py`** — a `collaborators` entry carries no `id`, and an
-  unresolved author carries no reference to one: only `person_id: null` and a
-  display name that SPEC.md section 5 states is *not* an identity, because
-  three different people who all write as `J. Smith` become one entry. So the
-  five co-authors of the demo who are not lab members cannot be nodes, and
-  their five authorships cannot be edges.
+- **`graph.py`** — a `collaborators` entry carries no `id`, so there is
+  nothing to make a node out of; and no field of an authorship could point at
+  one if it did. `author.person_id` is not that field: the schema defines it
+  at `/$defs/author/properties/person_id` as "the id of the matching person in
+  `people.yaml`", which a collaborator by definition is not, and for these
+  authors it is `null`. What is left is the display name, which SPEC.md §5
+  states is *not* an identity — three different people who all write as
+  `J. Smith` are one entry — so keying a node on it would merge people the
+  document itself warns are distinct. The five co-authors of the demo who are
+  not lab members are therefore neither nodes nor edge endpoints.
+
+  That is the gap as it stands. How #56 closes it — an `id` on the entry plus
+  some authorship reference, a demotion of `collaborators` to an explicitly
+  derived index, or something else — is #56's to decide, and this probe names
+  no field for it to adopt.
 
 Note that CSL-JSON schema validation is not what fails in `csl_json.py`.
 Almost every CSL field is optional, so a record with no `page`, `volume`,
-`issue` or `container-title` is still schema-valid. The schema check in the
-test is a real check on the part the probe *can* produce; what fails is the
-separate assertion that the probe can map a journal article to a complete
-reference.
+`issue` or `container-title` is still schema-valid, and today's export is. The
+schema check therefore lives in the *passing* test, where a regression in it
+turns CI red; what sits under `xfail` is the separate assertion that the probe
+can map a journal article to a complete reference.
 
 ## Adding a probe
 
 Drop it in this directory and add it to `PROBE_TESTS` in
-`tests/conformance/test_consumer_probes.py` with the test that checks what it
-emits. `test_every_probe_is_exercised` fails if you do the first without the
-second, so a probe cannot sit here and never run.
+`tests/conformance/test_consumer_probes.py`, mapped to the tests that check
+what it emits. `test_every_probe_is_exercised` fails if you do the first
+without the second, so a probe cannot sit here and never run.
 
-If your probe cannot be written, that is the finding. Leave the probe
-emitting the best artifact it can, put the correctness assertion in the test,
-and mark that test `xfail(strict=True, reason="#N")` naming the missing
-property. Do not weaken the probe until it passes: a probe edited to assert
-its own incompleteness proves nothing, and `strict=True` makes the marker
-fall over as soon as the property lands.
+If your probe cannot be written, that is the finding. Leave the probe emitting
+the best artifact it can and put the correctness assertions in the tests. Keep
+everything the probe *can* establish in a test that passes, and give the
+missing properties a test of their own marked
+`xfail(strict=True, reason="#N")` whose marker names them. Do not weaken the
+probe until it passes: a probe edited to assert its own incompleteness proves
+nothing, and `strict=True` makes the marker fall over as soon as the property
+lands.

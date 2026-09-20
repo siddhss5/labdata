@@ -23,12 +23,14 @@ def tex(text):
     return "".join(TEX_ESCAPES.get(c, c) for c in str(text))
 
 
-def full_name(author):
-    """An author's name in full, from the parts the document splits it into.
+def name_from_parts(author):
+    """An author's name, assembled from the parts the document splits it into.
 
-    `name` is the document's display form and abbreviates given names to
-    initials. A CV wants the full name, so this builds it from the parts,
-    which the document emits on every author.
+    `name` is the document's display form and abbreviates the given name
+    unconditionally, so it is lossy as a source. The parts preserve whatever
+    the input supplied: `Bob Brown` where the entry wrote `Brown, Bob`, and
+    `A. Adams` where it wrote `Adams, A.`. Neither is a gap -- this returns
+    the name the author's files gave, which is what a consumer should show.
     """
     if author.get("literal"):
         return author["literal"]
@@ -43,8 +45,8 @@ def venue_parts(pub):
     it -- `*Transactions on Robot Learning*, 4(2), 2025` -- so a LaTeX
     consumer has no venue name to put in `\\emph{}` and no volume or number
     to typeset beside it. Recovering them by taking that string apart, or by
-    reading the verbatim export the document carries alongside it, would
-    prove nothing about the document: see README.md.
+    reading the opaque re-serialized export the document carries alongside
+    it, would prove nothing about the document: see README.md.
     """
     venue = pub.get("venue")
     return venue if isinstance(venue, dict) else None
@@ -59,7 +61,7 @@ def bibliographic(pub, key):
 
 
 def entry(pub):
-    out = [r"\item %s." % tex(", ".join(full_name(a) for a in pub["authors"]))]
+    out = [r"\item %s." % tex(", ".join(name_from_parts(a) for a in pub["authors"]))]
     out.append(r"\newblock %s." % tex(pub["title"]))
 
     where = []

@@ -32,6 +32,9 @@ def person_nodes(doc):
     three different people who all write as `J. Smith` are one entry. So
     keying a node on that name would merge people the document itself warns
     are distinct, and this probe does not do it.
+
+    `collaborators[].id` is read here because that is where an identifier
+    would naturally sit; it is absent today, so those entries yield no node.
     """
     nodes = {}
     for person in doc["people"]:
@@ -56,6 +59,10 @@ def render(doc):
     for pub in doc["publications"]:
         work = "work:" + pub["bib_id"]
         for author in pub["authors"]:
+            # `person_id` is the only field of an authorship that points at a
+            # person. The schema defines it as the id of a matching person in
+            # people.yaml, so for a co-author who is not a lab member it is
+            # null and there is nothing else here to follow.
             node = "person:" + author["person_id"] if author.get("person_id") else None
             if node in people:
                 edges.append(("authored", node, work))

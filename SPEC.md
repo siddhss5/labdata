@@ -50,15 +50,17 @@ is a schema bug, not a probe bug.** The document is the whole contract, so a
 consumer that needs a property the document does not carry has found a gap in
 the document; the fix belongs in the schema, not in the consumer. Recovering
 the property from `publication.bibtex` does not close the gap, because that
-record is a verbatim export rather than a set of first-class properties (§5),
-and neither does taking a composed string such as `venue` apart.
+record is an opaque re-serialization of the entry rather than a set of
+first-class properties (§5), and neither does taking a composed string such
+as `venue` apart.
 `examples/consumers/` holds four such probes — a plain HTML page, a LaTeX CV
 fragment, a CSL-JSON export and a person/project/work edge list — each reading
-the document and nothing else, and
-`tests/conformance/test_consumer_probes.py` runs every one of them against the
-demo output. Three cannot produce correct output against `schema_version` 3
-and are marked `xfail(strict=True)` against #56, each marker naming the
-property that blocks it; `examples/consumers/README.md` lists them.
+the document and nothing else, and `tests/conformance/test_consumer_probes.py`
+runs every one of them against the demo output. Three cannot produce correct
+output against `schema_version` 3. What each of those three *can* produce is
+asserted in a test that passes; only the assertions naming the properties it
+lacks are marked `xfail(strict=True)` against #56, so a marker covers exactly
+the gap it names. `examples/consumers/README.md` lists the three gaps.
 
 **The CLI is the reference compiler.** Its flags, its exit codes and the
 stream each kind of message goes to are public API.
