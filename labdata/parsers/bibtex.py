@@ -39,6 +39,10 @@ TEXT_FIELDS = frozenset({
 # A name list ending in "and others" means "et al."; it is not an author.
 OTHERS = "others"
 
+# A stable code makes validation output suitable for CI and tooling without
+# making callers depend on its English wording.
+DUPLICATE_CITATION_KEY = "E-BIB-DUPLICATE-KEY"
+
 # Equal contribution is written as a star on one part of a name, in one of
 # these four forms. It is an annotation rather than part of the name, so it is
 # taken off the part before the name is read and recorded on the author
@@ -164,6 +168,21 @@ class _Parser(PybtexParser):
     already names for this.
     """
 
+    def __init__(self, *args, duplicate_keys=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.duplicate_keys = duplicate_keys if duplicate_keys is not None else []
+
+    def process_entry(self, entry_type, key, fields):
+        """Remember duplicate keys before pybtex discards the later entry.
+
+        ``BibliographyData.add_entry`` reports a parser-library warning and
+        keeps the first entry. Recording the key here lets labdata surface a
+        stable, file-qualified diagnostic instead of exposing that wording.
+        """
+        if key is not None and key in self.data.entries:
+            self.duplicate_keys.append(key)
+        super().process_entry(entry_type, key, fields)
+
     def parse_string(self, text: str):
         self.unnamed_entry_counter = 1
         self.command_start = 0
@@ -184,7 +203,25 @@ class _Parser(PybtexParser):
         return self.data
 
 
-def parse_bibtex_file(path: str) -> Dict[str, Entry]:
+def _duplicate_key_error(
+    path: str,
+    key: str,
+    first_path: Optional[str] = None,
+    first_key: Optional[str] = None,
+) -> str:
+    """One stable duplicate-key diagnostic, with both locations when known."""
+    location = f"{path}:{key}:citation_key"
+    message = f"{DUPLICATE_CITATION_KEY} {location}: duplicate citation key"
+    if first_path is not None:
+        first_location = f"{first_path}:{first_key or key}:citation_key"
+        message += f"; first defined in {first_location}"
+    return message
+
+
+def parse_bibtex_file(
+    path: str,
+    duplicate_errors: Optional[List[str]] = None,
+) -> Dict[str, Entry]:
     """Parse one BibTeX file into pybtex entries, keyed by citation key.
 
     Anything the parser has to say is captured and reported by labdata, so no
@@ -196,9 +233,19 @@ def parse_bibtex_file(path: str) -> Dict[str, Entry]:
         _warn(f"@string macro '{name}' is defined more than once; "
               "the last definition is used")
 
+    duplicate_keys: List[str] = []
     with pybtex.errors.capture() as errors:
-        data = _Parser().parse_string(text)
+        data = _Parser(duplicate_keys=duplicate_keys).parse_string(text)
+    for key in duplicate_keys:
+        message = _duplicate_key_error(path, key)
+        if duplicate_errors is None:
+            _warn(message)
+        else:
+            duplicate_errors.append(message)
     for error in errors:
+        # The duplicate has already been recorded with labdata's stable code.
+        if str(error).startswith("repeated bibliography entry:"):
+            continue
         _warn(str(error))
 
     return data.entries
@@ -569,6 +616,7 @@ def parse_all_publications(
     bib_dir: str,
     bib_files: list,
     pdf_base_url: Optional[str] = None,
+    duplicate_errors: Optional[List[str]] = None,
 ) -> List[Publication]:
     """Parse all configured BibTeX files and return a flat list of Publications.
 
@@ -579,19 +627,39 @@ def parse_all_publications(
         bib_dir: Directory containing the BibTeX files
         bib_files: List of dicts with 'name' and 'category' keys
         pdf_base_url: Base URL/path for PDFs
+        duplicate_errors: Optional list that receives stable duplicate-key
+            diagnostics. Without one, diagnostics are emitted as warnings.
 
     Returns:
         List of Publication objects, sorted by year descending
     """
     read: List[Tuple[str, str, Entry, str]] = []
     entries: Dict[str, Entry] = {}
+    first_source: Dict[str, Tuple[str, str]] = {}
+
+    def report(message: str) -> None:
+        if duplicate_errors is None:
+            _warn(message)
+        else:
+            duplicate_errors.append(message)
+
     for bib_file in bib_files:
         name = bib_file['name'] if isinstance(bib_file, dict) else bib_file.name
         category = bib_file['category'] if isinstance(bib_file, dict) else bib_file.category
         path = f"{bib_dir}/{name}"
-        for bib_id, entry in parse_bibtex_file(path).items():
+        file_errors: List[str] = []
+        parsed = parse_bibtex_file(path, duplicate_errors=file_errors)
+        for error in file_errors:
+            report(error)
+        for bib_id, entry in parsed.items():
+            normalized = bib_id.lower()
+            if normalized in first_source:
+                previous_path, previous_key = first_source[normalized]
+                report(_duplicate_key_error(path, bib_id, previous_path, previous_key))
+            else:
+                first_source[normalized] = (path, bib_id)
             read.append((path, bib_id, entry, category))
-            entries.setdefault(bib_id.lower(), entry)
+            entries.setdefault(normalized, entry)
 
     publications = [
         entry_to_publication(bib_id, entry, category, entries, pdf_base_url, path)

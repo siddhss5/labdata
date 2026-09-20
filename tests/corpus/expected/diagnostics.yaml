@@ -24,14 +24,14 @@ structure.unclosed_brace:
 structure.duplicate_key_file:
   dir: duplicate_key_same_file
   exit: error
-  locates: [dup.bib, dup-key]
-  xfail: {exit: "#26", locates: "#26"}
+  reports: [E-BIB-DUPLICATE-KEY]
+  locates: [dup.bib, dup-key, citation_key]
 
 structure.duplicate_key_across:
   dir: duplicate_key_across_files
   exit: error
-  locates: [first.bib, second.bib, shared-key]
-  xfail: {exit: "#26", locates: "#26"}
+  reports: [E-BIB-DUPLICATE-KEY]
+  locates: [first.bib, second.bib, shared-key, citation_key]
 
 structure.missing_year:
   dir: missing_year

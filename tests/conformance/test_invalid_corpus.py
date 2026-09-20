@@ -57,6 +57,26 @@ def test_locates(case_id, spec):
     assert not missing, f"output does not locate {missing}:\n{run.output}"
 
 
+@pytest.mark.parametrize(
+    "case_id",
+    ("structure.duplicate_key_file", "structure.duplicate_key_across"),
+)
+@covers("structure.duplicate_key_file", "structure.duplicate_key_across",
+        "diag.duplicate_citation_key")
+def test_duplicate_keys_warn_but_do_not_block_nonvalidation_modes(tmp_path, case_id):
+    """Exports and author reports stay available while naming malformed input."""
+    spec = DIAGNOSTICS[case_id]
+    unresolved = run_labdata(["--config", "lab.yaml", "--unresolved"],
+                              INVALID / spec["dir"])
+    assert unresolved.code == 0 and unresolved.crash is None, unresolved.output
+    assert "E-BIB-DUPLICATE-KEY" in unresolved.stderr
+
+    run, data = export(INVALID / spec["dir"], tmp_path)
+    assert run.code == 0 and run.crash is None, run.output
+    assert "E-BIB-DUPLICATE-KEY" in run.stderr
+    assert data is not None
+
+
 @pytest.mark.parametrize("case_id, spec", params("kept"))
 def test_kept(tmp_path, case_id, spec):
     run, data = export(INVALID / spec["dir"], tmp_path)
