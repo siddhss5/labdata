@@ -26,6 +26,12 @@ _CONVERTER = LatexNodes2Text(math_mode='verbatim')
 # with any braced argument after it read as a group of plain text.
 _KNOWN = get_default_latex_context_db()
 
+# Two commands outside that table whose conversion labdata documents, so they
+# are known rather than unknown (tests/COVERAGE.md, `names.equal_contribution`
+# and `names.equal_contribution_escaped`): `\textsuperscript{...}` becomes its
+# argument as plain text, and an escaped star `\*` is consumed.
+_DOCUMENTED = frozenset({"textsuperscript", "*"})
+
 # pylatexenc 2.11 raises IndexError on every \href, so the link is rewritten
 # to "text (url)" before conversion. The URL itself is set aside first: it is
 # not LaTeX, and characters such as _ or % would not survive the converter.
@@ -87,6 +93,7 @@ def unknown_commands(text: str) -> list:
             if node is None or isinstance(node, LatexMathNode):
                 continue
             if (isinstance(node, LatexMacroNode)
+                    and node.macroname not in _DOCUMENTED
                     and _KNOWN.get_macro_spec(node.macroname) is None
                     and node.macroname not in found):
                 found.append(node.macroname)

@@ -741,22 +741,21 @@ class TestPeopleAndProjectsFiles:
     def test_an_empty_file_is_no_records(self, tmp_path):
         assert self.load(tmp_path, load_people, "") == ([], [], [], [])
 
-    def test_a_record_that_is_not_a_mapping(self, tmp_path):
+    def test_a_person_that_is_not_a_mapping(self, tmp_path):
         records, errors, _, _ = self.load(
-            tmp_path, load_projects, "- just a string\n- {id: p, title: T}\n")
+            tmp_path, load_people, "- just a string\n- {id: p, name: P, role: r}\n")
         assert [r.id for r in records] == ["p"]
-        assert errors == ["PROJECTS-NOT-A-LIST f.yaml::: entry 1 is not a mapping"]
+        assert errors == ["PEOPLE-NOT-A-LIST f.yaml::: entry 1 is not a mapping"]
 
-    def test_a_projects_file_that_is_not_a_list(self, tmp_path):
-        records, errors, _, _ = self.load(tmp_path, load_projects, "p: {title: T}\n")
-        assert records == [] and errors[0].startswith("PROJECTS-NOT-A-LIST f.yaml::: ")
-
-    def test_missing_id_and_title(self, tmp_path):
+    def test_missing_id_and_name(self, tmp_path):
         records, errors, _, _ = self.load(
-            tmp_path, load_projects, "- {title: T}\n- {id: p, title: ' '}\n")
+            tmp_path, load_people, "- {name: N}\n- {id: p, name: ' '}\n")
         assert records == []
-        assert errors == ["PROJECTS-FIELD-MISSING f.yaml::id: entry 1 has no id",
-                          "PROJECTS-FIELD-MISSING f.yaml:p:title: entry 2 has no title"]
+        assert errors == ["PEOPLE-FIELD-MISSING f.yaml::id: entry 1 has no id",
+                          "PEOPLE-FIELD-MISSING f.yaml:p:name: entry 2 has no name"]
+
+    def test_a_projects_file_that_is_not_a_list_is_no_projects(self, tmp_path):
+        assert self.load(tmp_path, load_projects, "p: {title: T}\n") == ([], [], [], [])
 
     def test_duplicate_ids_are_kept_and_reported(self, tmp_path):
         records, _, diagnostics, _ = self.load(

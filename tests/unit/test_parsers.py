@@ -596,9 +596,19 @@ class TestLocatedParserDiagnostics:
         assert "after the value" not in line
 
     def test_text_outside_any_entry_is_located_at_the_file(self, tmp_path):
-        found, works = located(tmp_path, "% mentions @article in prose\n" + entry("e"))
+        found, works = located(tmp_path, "@article with no body\n" + entry("e"))
         [line] = found[SYNTAX_ERROR]
         assert f"{tmp_path}/hazard.bib::: " in line and "line 1" in line
+        assert list(works) == ["e"]
+
+    @pytest.mark.parametrize("comment", [
+        "% mentions @article in prose",
+        "  % indented, and mentions @string{ too",
+        "%@misc",
+    ])
+    def test_a_percent_comment_line_is_ignored(self, tmp_path, comment):
+        found, works = located(tmp_path, f"{comment}\n" + entry("e"))
+        assert found == {}
         assert list(works) == ["e"]
 
     def test_without_a_list_a_syntax_error_goes_to_standard_error(self, tmp_path, capsys):
@@ -621,10 +631,7 @@ class TestLocatedParserDiagnostics:
         assert works["e"].year is None
 
     @pytest.mark.parametrize("entry_type, field", [
-        ("article", "journal"), ("inproceedings", "booktitle"),
-        ("conference", "booktitle"), ("incollection", "booktitle"),
-        ("phdthesis", "school"), ("mastersthesis", "school"),
-        ("techreport", "institution")])
+        ("article", "journal"), ("inproceedings", "booktitle")])
     def test_a_missing_container_is_named(self, tmp_path, entry_type, field):
         found, works = located(
             tmp_path, f"@{entry_type}{{e, title = {{T}}, year = 2024}}\n")
@@ -632,8 +639,9 @@ class TestLocatedParserDiagnostics:
         assert f"{tmp_path}/hazard.bib:e:{field}:" in line
         assert works["e"].venue is None
 
-    @pytest.mark.parametrize("entry_type", ["book", "inbook", "manual", "misc",
-                                            "proceedings"])
+    @pytest.mark.parametrize("entry_type", [
+        "book", "inbook", "manual", "misc", "proceedings", "conference",
+        "incollection", "phdthesis", "mastersthesis", "techreport"])
     def test_a_type_with_no_required_container_is_not_reported(self, tmp_path,
                                                                entry_type):
         found, _ = located(tmp_path, f"@{entry_type}{{e, title = {{T}}, year = 2024}}\n")
