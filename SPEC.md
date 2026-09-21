@@ -615,9 +615,10 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 ### How a name is matched
 
 `labdata.resolver.match()` compares a name's structured parts against every
-person's `name` and `aliases`, all read through one normalisation — case,
-accents, periods and stray `*` characters ignored — and decides in this
-order:
+person's `name` and `aliases`, all read through `normalize_name()` — case,
+accents, periods and whitespace ignored, and nothing else, so a `*` that is
+not an equal-contribution marker stays part of the name — and decides in
+this order:
 
 1. **The full name.** The parts joined as `given von family, suffix`, equal to
    exactly one person's name or alias: resolved, `method: exact`. Equal to two
@@ -848,13 +849,16 @@ meaning and guarantees, and each of them is a bump.
 > linked, and `collaborators_file` can join the spellings of one external
 > co-author, as `grouped_by: declared`. `schema_version` stays 4: the shape,
 > namespace and meaning of `person_id` are unchanged, and `ambiguous` and
-> `declared` are new members of open strings. In the valid corpus four
+> `declared` are new members of open strings. In the valid corpus six
 > `person_id` values move — `name-kim-alan` from `akim` to `alankim`,
 > `name-kim-initial` from `akim` to null, `id-full-name` from null to
-> `ffischer`, and `id-fuzzy` from `ddavis` to null — which moves works from
-> `akim` to `alankim`, removes the `Frank Fischer` collaborator and adds
-> `A. Kim` and `Dave M. Davis` ones; two more authorships keep `ddavis` with
-> `method: exact` rather than `fuzzy`. In the demo no `person_id` moves; it now
+> `ffischer`, and three near misses that were linked by fuzzy matching and
+> now are not: `id-fuzzy` author 1 (`Davis, Dave M.`),
+> `name-equal-normalized` author 4 (`Davis{*}`) and `name-equal-escaped`
+> author 2 (`Davis\^{*}`), each from `ddavis` to null. That moves works from
+> `akim` to `alankim` and away from `ddavis`, removes the `Frank Fischer`
+> collaborator, and adds three: `A. Kim`, `Dave M. Davis`, and one grouping
+> the two starred Davis spellings, which normalise alike. In the demo no `person_id` moves; it now
 > declares `P. Patel` as an alias of `Priya Patel` in
 > `examples/demo/collaborators.yaml`, so `P. Patel` joins her grouping and the
 > `P. Patel` collaborator is gone. Exit codes are unchanged.

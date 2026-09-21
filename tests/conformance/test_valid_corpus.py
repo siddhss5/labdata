@@ -127,9 +127,11 @@ EQUAL_CONTRIBUTION = [
     # A marker written twice, one in a brace group of its own, and one whose
     # command and argument BibTeX split into two name parts: each comes off
     # whole, and the name still resolves. A brace group holding only a star is
-    # another command's argument, not a marker, and is left alone.
+    # another command's argument, not a marker, and is left alone -- so
+    # `Dave Davis*` is not Dave Davis's name. It is a near miss, reported as a
+    # suggestion and never linked (`identity.fuzzy`).
     case("names.equal_contribution_normalized", "name-equal-normalized",
-         "authors.*.person_id", ["bbrown", "akim", "ggreen", "ddavis", "aadams"]),
+         "authors.*.person_id", ["bbrown", "akim", "ggreen", None, "aadams"]),
     case("names.equal_contribution_normalized", "name-equal-normalized",
          "authors.*.equal_contribution", [True, True, True, False, False]),
     case("names.equal_contribution_normalized", "name-equal-normalized",
@@ -156,14 +158,14 @@ EQUAL_CONTRIBUTION = [
     # is the ordinary LaTeX conversion's doing, and is pinned here as it is.
     case("names.equal_contribution_escaped", "name-equal-escaped",
          "authors.*.equal_contribution", [False, False, False, False, False]),
-    # Two of these resolve to nobody because the escaped marker stayed in
-    # the family name, which is no person's. The third of them --
-    # `Green\$^{*}$` -- is a near miss on Grace-Ann Green, which is reported
-    # as a suggestion and never linked, so it is pinned here as well as in
-    # `test_resolver.py`'s `MATCHED_ON_THE_FULL_NAME`.
+    # The three whose escaped marker stayed in the family name resolve to
+    # nobody, because a name with a star in it is no person's name. `Davis\^{*}`
+    # and `Green\$^{*}$` are near misses on Dave Davis and Grace-Ann Green,
+    # reported as suggestions and never linked (`identity.fuzzy`); the second
+    # is pinned as well in `test_resolver.py`'s `MATCHED_ON_THE_FULL_NAME`.
     case("names.equal_contribution_escaped", "name-equal-escaped",
          "authors.*.person_id",
-         ["bbrown", "ddavis", None, None, "aadams"]),
+         ["bbrown", None, None, None, "aadams"]),
     case("names.equal_contribution_escaped", "name-equal-escaped",
          "authors.0.name", "Bob Brown"),
     case("names.equal_contribution_escaped", "name-equal-escaped",

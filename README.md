@@ -200,9 +200,10 @@ von, family, suffix — to lab members, in this order:
 
 1. **The full name**, against each person's `name` and any alias written in
    full, after normalising both sides: lowercase, strip accents, remove
-   periods and stray `*` characters, strip `<sup>…</sup>` tags, collapse
-   whitespace. Other punctuation — apostrophes, hyphens — is kept, so
-   `O'Neill` and `Zhang-Smith` must match on those characters. `Kim, Alan`
+   periods, strip `<sup>…</sup>` tags, collapse whitespace. Other
+   punctuation — apostrophes, hyphens, a `*` that is not an equal-contribution
+   marker — is kept, so `O'Neill` and `Zhang-Smith` must match on those
+   characters, and `Davis{*}` is not `Davis`. `Kim, Alan`
    finds `Alan Kim` even when he declares no aliases.
 2. **A declared alias, only when the name is itself abbreviated** — when some
    part of the given name is an initial, as in `Kim, A.` or `Brown, Bob A.`.

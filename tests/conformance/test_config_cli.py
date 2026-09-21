@@ -71,14 +71,24 @@ def test_config_collaborators_file_present(tmp_path, valid_output):
 
 @covers("identity.collaborator_alias_is_member")
 def test_collaborator_alias_that_is_a_member_is_reported(tmp_path, valid_output):
-    """`A. Adams` is also a member's alias: reported, and the member keeps it."""
-    run = run_labdata(["--config", write_variant(
-        tmp_path, collaborators_file="collaborators.yaml"), "--validate"], VALID)
-    assert run.code == 0 and run.crash is None, run.output
-    [line] = [line for line in run.stdout.splitlines()
-              if "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER" in line]
-    assert "collaborators.yaml:Amy Adams:aliases" in line
-    assert "A. Adams" in line and "aadams" in line
+    """`A. Adams` is also a member's alias: reported as a warning in both
+    reporting modes, neither exit code moves, and the member keeps it."""
+    variant = write_variant(tmp_path, collaborators_file="collaborators.yaml")
+    validate = run_labdata(["--config", variant, "--validate"], VALID)
+    unresolved = run_labdata(["--config", variant, "--unresolved"], VALID)
+    # Under --validate the report is on stdout, beneath `Warnings`; in the
+    # other modes a warning is on stderr with the `Warning: ` prefix.
+    for run, stream, prefix in ((validate, validate.stdout, "  - "),
+                                (unresolved, unresolved.stderr, "Warning: ")):
+        assert run.code == 0 and run.crash is None, run.output
+        [line] = [line for line in stream.splitlines()
+                  if "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER" in line]
+        assert line.startswith(prefix + "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER"), line
+        assert "collaborators.yaml:Amy Adams:aliases" in line
+        assert "A. Adams" in line and "aadams" in line
+    report = validate.stdout
+    assert report.index("RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER") > report.index("Warnings (")
+    assert "Bibliography errors" not in report
     _, data = export(VALID, tmp_path,
                      write_variant(tmp_path, collaborators_file="collaborators.yaml"))
     assert [c for c in data["collaborators"] if c["name"] == "Amy Adams"] == []

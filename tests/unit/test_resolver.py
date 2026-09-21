@@ -10,6 +10,7 @@ from labdata.resolver import (
     is_abbreviated,
     build_alias_index,
     fuzzy_match,
+    fuzzy_matches,
     match_form,
     resolve_authors,
     resolve_projects,
@@ -124,6 +125,12 @@ class TestFuzzyMatch:
         result = fuzzy_match("Completely Different Name", index)
         assert result is None
 
+    def test_ties_are_all_returned_sorted(self):
+        index = {"dina lee": "zlee", "dena lee": "alee", "alice adams": "aadams"}
+        assert fuzzy_matches("Dana Lee", index, threshold=0.8) == ["alee", "zlee"]
+        assert fuzzy_match("Dana Lee", index, threshold=0.8) == "alee"
+        assert fuzzy_matches("H. Zhang", {"h zhang": "hz"}) == []
+
 
 class TestMatchForm:
     """The abbreviated form, which the document never shows.
@@ -209,6 +216,26 @@ class TestTheResolverMatchesTheFullName:
         for given, von, family, on_match_form, _ in moved:
             author = Author(name=f"{given} {family}", given=given, family=family)
             assert index.get(normalize_name(match_form(author))) == on_match_form
+
+    @pytest.mark.parametrize(
+        "given,von,family,on_match_form,on_full_name",
+        MATCHED_ON_THE_FULL_NAME,
+        ids=[row[2] for row in MATCHED_ON_THE_FULL_NAME])
+    @pytest.mark.parametrize("display", [
+        "Alice Adams", "Alex Kim", "A. Kim", "Somebody Else", ""])
+    def test_the_display_name_never_decides(
+            self, given, von, family, on_match_form, on_full_name, display):
+        """`name` is display-only: a name that disagrees with the parts --
+        including one that is another member's name -- resolves as the parts
+        say, whatever it is."""
+        author = Author(name=display, position=1, given=given, von=von,
+                        family=family)
+        assert self.resolve(author) == on_full_name
+
+    def test_parts_that_are_nobody_stay_nobody_under_a_members_name(self):
+        author = Author(name="Alice Adams", position=1, given="Quentin",
+                        family="Quinn")
+        assert self.resolve(author) is None
 
     def test_an_abbreviated_name_still_reaches_its_declared_alias(self):
         author = Author(name="A. Adams", position=1, given="A.", family="Adams")
@@ -321,12 +348,33 @@ class TestMatchingPolicy:
             Author(name="Acme Robots", position=2, literal="Acme Robots"))
         assert [a.person_id for a in work.authors] == ["acme", None]
 
-    def test_a_star_left_on_a_name_does_not_hide_the_person(self):
-        people = [Person(id="ddavis", name="Dave Davis")]
-        work, _, warnings = self.run(
-            people, Author(name="Dave Davis*", position=1, given="Dave",
-                           family="Davis*"))
-        assert work.authors[0].person_id == "ddavis" and warnings == []
+    def test_a_star_in_a_name_is_a_near_miss_and_not_linked(self):
+        """A star that is not a marker is part of the name, and a name with a
+        star in it is not the person's name."""
+        people = [Person(id="astar", name="Alice Star")]
+        work, unresolved, warnings = self.run(
+            people, Author(name="Alice Star*", position=1, given="Alice",
+                           family="Star*"))
+        author = work.authors[0]
+        assert author.person_id is None
+        assert (author.resolution_status, author.resolution_method) == ("unresolved", None)
+        assert unresolved == ["Alice Star*"]
+        assert warnings == [
+            "RESOLVE-SUGGESTION bib/w.bib:k1:author: position 1, 'Alice Star*', "
+            "matched no person but may be astar; not linked, declare an alias "
+            "if it is"]
+
+    def test_tied_near_misses_are_all_suggested_in_sorted_order(self):
+        """Two people equally close are both suggested, whatever their order
+        in `people.yaml`."""
+        author = dict(name="Dana Lee", position=1, given="Dana", family="Lee")
+        for people in ([Person(id="zlee", name="Dina Lee"),
+                        Person(id="alee", name="Dena Lee")],
+                       [Person(id="alee", name="Dena Lee"),
+                        Person(id="zlee", name="Dina Lee")]):
+            _, _, warnings = self.run(people, Author(**author))
+            assert len(warnings) == 1
+            assert "may be alee, zlee;" in warnings[0]
 
     def test_editors_are_matched_and_reported_the_same_way(self):
         people = [Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),

@@ -23,7 +23,7 @@ from .loaders import (
 )
 from .resolver import (
     AMBIGUOUS, AMBIGUOUS_NAME, RESOLVED, Candidates, compute_backlinks, given_initials,
-    initials_only, match, match_key, normalize_name, person_candidates,
+    initials_only, match, normalize_name, person_candidates,
     resolve_authors, resolve_projects,
 )
 
@@ -209,7 +209,7 @@ def declared_collaborators(declared: List[DeclaredCollaborator],
         kept = []
         for field_name, name in [("name", collaborator.name)] + [
                 ("aliases", alias) for alias in collaborator.aliases]:
-            owners = members.ids_for(match_key(name))
+            owners = members.ids_for(normalize_name(name))
             if owners:
                 warnings.append(
                     f"{COLLABORATOR_ALIAS_IS_MEMBER} {source}:"

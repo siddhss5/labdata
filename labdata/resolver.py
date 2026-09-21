@@ -72,17 +72,6 @@ def normalize_name(name: str) -> str:
     return name
 
 
-def match_key(name: str) -> str:
-    """`normalize_name()`, also ignoring a star, which no name is spelled with.
-
-    A star left on a name is an equal-contribution marker the parser did not
-    take off, such as `Davis{*}`; the name still names the same person. Only
-    matching reads this form: the emitted name and the collaborator key keep
-    the star.
-    """
-    return re.sub(r'\s+', ' ', normalize_name(name).replace('*', '')).strip()
-
-
 def _given_parts(given: Optional[str]) -> List[str]:
     return [part for part in (given or "").split() if part]
 
@@ -203,27 +192,34 @@ def fuzzy_match(name: str, index: Dict[str, str], threshold: float = FUZZY_THRES
     Skips matching for single-initial abbreviated names (e.g. "S. Zhang")
     since they lack enough information for reliable fuzzy matching.
 
-    Returns the person_id of the best match above the threshold, or None.
-    The resolver reads the answer as a suggestion only.
+    Returns the first of `fuzzy_matches()`, or None. The resolver reads the
+    answer as a suggestion only.
     """
+    matches = fuzzy_matches(name, index, threshold)
+    return matches[0] if matches else None
+
+
+def fuzzy_matches(name: str, index: Dict[str, str],
+                  threshold: float = FUZZY_THRESHOLD) -> List[str]:
+    """Every person_id tied at the best similarity at or above the threshold,
+    sorted, so a tie does not depend on the order of `people.yaml`."""
     normalized = normalize_name(name)
 
     # Don't fuzzy-match abbreviated names — too ambiguous
     if is_abbreviated(normalized):
-        return None
+        return []
 
     best_ratio = 0.0
-    best_id = None
+    best_ids: Set[str] = set()
 
     for indexed_name, person_id in index.items():
         ratio = SequenceMatcher(None, normalized, indexed_name).ratio()
         if ratio > best_ratio:
-            best_ratio = ratio
-            best_id = person_id
+            best_ratio, best_ids = ratio, {person_id}
+        elif ratio == best_ratio:
+            best_ids.add(person_id)
 
-    if best_ratio >= threshold:
-        return best_id
-    return None
+    return sorted(best_ids) if best_ratio >= threshold else []
 
 
 def _is_initial_token(token: str) -> bool:
@@ -243,8 +239,8 @@ def _tokens_agree(written: str, declared: str) -> bool:
 class Candidates:
     """The names a matcher compares against: ``(id, [name, *aliases])`` each.
 
-    Every form is read through `match_key()`, so case, accents, periods and
-    stray stars do not matter.
+    Every form is read through `normalize_name()`, so case, accents and
+    periods do not matter.
     """
 
     def __init__(self, entries: Sequence[Tuple[str, Sequence[str]]]):
@@ -252,7 +248,7 @@ class Candidates:
         self.exact: Dict[str, Set[str]] = {}
         for entity_id, names in entries:
             for name in names:
-                key = match_key(name)
+                key = normalize_name(name)
                 if not key:
                     continue
                 self.forms.append((entity_id, key))
@@ -272,11 +268,11 @@ class Candidates:
         """
         if contributor.literal or not contributor.family:
             return set()
-        tail = match_key(" ".join(part for part in (contributor.von,
+        tail = normalize_name(" ".join(part for part in (contributor.von,
                                                      contributor.family) if part))
         if contributor.suffix:
-            tail = f"{tail}, {match_key(contributor.suffix)}"
-        written = [match_key(part) for part in _given_parts(contributor.given)]
+            tail = f"{tail}, {normalize_name(contributor.suffix)}"
+        written = [normalize_name(part) for part in _given_parts(contributor.given)]
         written = [part for part in written if part]
         found = set()
         for entity_id, key in self.forms:
@@ -319,7 +315,7 @@ def match(contributor: Contributor, candidates: Candidates) -> Match:
     3. Otherwise nothing is linked, and every entity the name could be is a
        suggestion.
     """
-    exact = candidates.ids_for(match_key(full_form(contributor)))
+    exact = candidates.ids_for(normalize_name(full_form(contributor)))
     if len(exact) == 1 and not (contributor.given and has_initial(contributor.given)):
         return Match(RESOLVED, exact)
     if len(exact) > 1:
@@ -329,7 +325,7 @@ def match(contributor: Contributor, candidates: Candidates) -> Match:
     if contributor.literal or not has_initial(contributor.given):
         return Match(UNRESOLVED, compatible)
 
-    declared = exact | candidates.ids_for(match_key(match_form(contributor)))
+    declared = exact | candidates.ids_for(normalize_name(match_form(contributor)))
     fits = compatible | declared
     if len(fits) > 1:
         return Match(AMBIGUOUS, fits)
@@ -365,10 +361,8 @@ def _resolve(contributors: Sequence[Contributor], candidates: Candidates,
                 f"'{contributor.name}', fits more than one person and is left "
                 f"unresolved: {', '.join(found.ids)}")
             continue
-        suggested = set(found.ids)
-        fuzzy = fuzzy_match(full_form(contributor), index, fuzzy_threshold)
-        if fuzzy:
-            suggested.add(fuzzy)
+        suggested = set(found.ids) | set(
+            fuzzy_matches(full_form(contributor), index, fuzzy_threshold))
         if suggested:
             report.append(
                 f"{SUGGESTION} {where}: position {contributor.position}, "
