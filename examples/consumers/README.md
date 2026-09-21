@@ -59,11 +59,11 @@ that every one of them matches the document, and the passing
 `test_identity_fixtures_are_present` asserts that the works it is about are
 still in the demo, so nothing it leans on is checked only inside the marker.
 
-**One probe test is xfailed**, and it cites **#24** rather than #56, because
-the property it asks for is #24's — see the identity table under `graph.py`
-below. A strict xfail citing an issue is a promise that *that* issue makes it
-pass, so filing one against an issue that will not is as much a defect as a
-weak assertion.
+**No probe test is xfailed.** The last one cited **#24** rather than #56,
+because the property it asked for was #24's — see the identity table under
+`graph.py` below — and #24 made it pass. A strict xfail citing an issue is a
+promise that *that* issue makes it pass, so filing one against an issue that
+will not is as much a defect as a weak assertion.
 
 The tests match **per record**, rather than counting or searching the page
 for a substring. A count passes with two works' author lists swapped, and a
@@ -192,7 +192,7 @@ described as closed. Verified against the demo output.
 
   | Asked of the probe | Owner | Status |
   |---|---|---|
-  | One external co-author on three works, written `Patel, Priya` twice and `Patel, P.` once, is **one** contributor holding exactly those three works | **#24** | Still xfailed. #56 keys the grouping on the *normalised full name* and states that the policy is #24's and that this key over-splits. `priya patel` and `p patel` are two keys under it, by construction. Joining two spellings of one external person needs #24's grouping *plus* the aliases it gives external collaborators. Filing it against #56 would have left #56 unable to remove the marker |
+  | One external co-author on three works, written `Patel, Priya` twice and `Patel, P.` once, is **one** contributor holding exactly those three works | **#24** | Passes. #56 keys the grouping on the *normalised full name*, under which `priya patel` and `p patel` are two keys by construction. #24 adds `collaborators_file`, and the demo declares `P. Patel` as an alias of `Priya Patel`, so the three authorships are one `declared` grouping while `Pradeep Patel`, whom nothing declares, stays apart |
   | `Patel, Pradeep` on a fourth work is a **different** contributor, holding exactly that work and none of the other three | #56 | Passes. Under the normalised full-name key `pradeep patel` is a third key, where the abbreviated `p patel` merged all four authorships into one entry with one count |
   | The two `Lee, Lin` co-authors of `nolan2020stairs` stay **two authorships**, at the two positions that work's author list gives them | #56 | Passes. Not as two contributors: any grouping by name puts them together, and #56's key is a grouping by name. What survives the grouping is the occurrence, addressed by `(work.bib_id, author.position)` — which is what lets a consumer that distrusts the grouping work from occurrences instead |
 

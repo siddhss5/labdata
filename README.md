@@ -59,6 +59,7 @@ bib_files:
 pdf_base_url: "https://mylab.example.org/pdfs"
 people_file: "data/people.yaml"       # optional
 projects_file: "data/projects.yaml"   # optional
+collaborators_file: "data/collaborators.yaml"  # optional
 ```
 
 Each `bib_files` entry's `name` is a name under `bib_dir`, and must not be an
@@ -166,6 +167,22 @@ author names to people:
   current_position: "Research Scientist, Example Robotics Inc."
 ```
 
+### External co-authors (optional, `data/collaborators.yaml`)
+
+A list of co-authors outside the lab whose spellings you want grouped
+together. It only decides which authorships share one `collaborators`
+entry; it never makes anyone a lab member and never produces a `person_id`:
+
+```yaml
+- name: "Priya Patel"
+  aliases: ["P. Patel"]
+```
+
+`Patel, Priya` and `Patel, P.` are then one collaborator, with
+`grouped_by: declared`. A different `Patel, Pradeep` is not joined, because
+nothing declares him. A name or alias that a lab member already declares is
+reported under `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` and left to the member.
+
 ### Projects (optional, `data/projects.yaml`)
 
 ```yaml
@@ -178,24 +195,32 @@ author names to people:
 
 ## How author matching works
 
-labdata matches BibTeX author names to lab members in two passes:
+labdata matches the **structured parts** of each BibTeX author name — given,
+von, family, suffix — to lab members, in this order:
 
-1. **Exact alias match** against the `aliases` list in `people.yaml`, after
-   normalising both sides: lowercase, strip accents, remove periods, strip
-   `<sup>…</sup>` tags, collapse whitespace. Other punctuation — apostrophes,
-   hyphens — is kept, so `O'Neill` and `Zhang-Smith` must match on those
-   characters.
-2. **Fuzzy fallback** on string similarity, threshold 0.85, for minor spelling
-   variations. A name that is exactly one initial and one surname, such as
-   `S. Zhang`, is skipped entirely: there is not enough there to match on. The
-   guard is that narrow, so `S. Zhang-Smith` and `S. J. Zhang` remain eligible
-   for fuzzy matching — which is not the same as matching: they can still fall
-   below the threshold and resolve to nobody.
+1. **The full name**, against each person's `name` and any alias written in
+   full, after normalising both sides: lowercase, strip accents, remove
+   periods, strip `<sup>…</sup>` tags, collapse whitespace. Other
+   punctuation — apostrophes, hyphens, a `*` that is not an equal-contribution
+   marker — is kept, so `O'Neill` and `Zhang-Smith` must match on those
+   characters, and `Davis{*}` is not `Davis`. `Kim, Alan`
+   finds `Alan Kim` even when he declares no aliases.
+2. **A declared alias, only when the name is itself abbreviated** — when some
+   part of the given name is an initial, as in `Kim, A.` or `Brown, Bob A.`.
+   It links only when exactly one person declares that abbreviation *and* no
+   other member's name could be it too. A full name is never abbreviated to
+   find a match, so `Kim, Alan` does not resolve to another Kim who declared
+   `A. Kim`.
 
-Matching reads a private, abbreviated form of the name, never the `name` the
-document emits. The two are independent on purpose: what a consumer sees can
-change without changing who resolves to whom, and the matching policy can
-change without changing the schema.
+Nothing is guessed. A name that fits more than one person — `Kim, A.` when
+the lab has Alex Kim and Alan Kim — gets no `person_id`, has
+`resolution.status: ambiguous`, and is reported under
+`RESOLVE-AMBIGUOUS-NAME`. A near miss — `Davis, Dave M.` beside `Dave Davis`,
+or an initial nobody declared — is never linked, and is reported under
+`RESOLVE-SUGGESTION` with the ids it might be. Both name the file, the entry
+key and the author position, and both are warnings: `--validate` lists them
+and still exits `0`. To resolve one, add the spelling to that person's
+`aliases`.
 
 A name that matches nobody keeps `person_id: null` and its authorship
 references a `collaborators` entry instead, by `collaborator_key`.
@@ -210,11 +235,10 @@ write their names identically are one key. That is why each entry also lists
 the `authorships` it grouped, by `(work_id, position)`: a consumer that
 distrusts the grouping can ignore it and work from the occurrences. The
 grouping is keyed on the normalised full name, which over-splits — one person
-written `Priya Patel` on two papers and `P. Patel` on a third is two keys —
-and labdata reports both risks rather than leaving them silent: a key that
-spans more than one spelling, and an initials-only key that could be any of
-several fuller ones. Tuning the policy is
-[#24](https://github.com/siddhss5/labdata/issues/24).
+written `Priya Patel` on two papers and `P. Patel` on a third is two keys
+unless `collaborators_file` declares the alias — and labdata reports both
+risks rather than leaving them silent: a key that spans more than one
+spelling, and an initials-only key that could be any of several fuller ones.
 
 ## Reading the document
 

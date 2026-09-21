@@ -1,0 +1,9 @@
+# External co-authors whose spellings should be grouped together. Each entry
+# only joins unresolved authorships into one `collaborators` grouping; it is
+# never a lab member and never produces a `person_id`.
+#
+# Priya Patel is written `Patel, Priya` on two works and `Patel, P.` on a
+# third. Pradeep Patel, who shares her initial and family name, is not
+# declared, so his work stays a grouping of its own.
+- name: "Priya Patel"
+  aliases: ["P. Patel"]

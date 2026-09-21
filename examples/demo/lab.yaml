@@ -26,3 +26,4 @@ bib_files:
 pdf_base_url: "https://example.org/publications"
 people_file: "examples/demo/people.yaml"
 projects_file: "examples/demo/projects.yaml"
+collaborators_file: "examples/demo/collaborators.yaml"

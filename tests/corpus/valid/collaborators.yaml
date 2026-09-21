@@ -1,0 +1,14 @@
+# Fictional external co-authors for tests/COVERAGE.md. The valid corpus's
+# lab.yaml does not name this file, so its ordinary output is unchanged;
+# tests/conformance/test_config_cli.py compiles a variant that does.
+
+# One external name written `Quinn, Quentin` and `Quinn, Q.` in names.bib.
+# CASE config.collaborators_file.present
+# CASE identity.collaborator_alias
+- name: "Quentin Quinn"
+  aliases: ["Q. Quinn"]
+
+# An alias that a lab member (aadams) already declares.
+# CASE identity.collaborator_alias_is_member
+- name: "Amy Adams"
+  aliases: ["A. Adams"]

@@ -23,6 +23,7 @@ class TestLabDataConfig:
             "pdf_base_url": "https://example.com/pdfs",
             "people_file": "data/people.yaml",
             "projects_file": "data/projects.yaml",
+            "collaborators_file": "data/collaborators.yaml",
         }
         config_path = tmp_path / "lab.yaml"
         with open(config_path, 'w') as f:
@@ -36,6 +37,7 @@ class TestLabDataConfig:
         assert config.pdf_base_url == "https://example.com/pdfs"
         assert config.people_file == "data/people.yaml"
         assert config.projects_file == "data/projects.yaml"
+        assert config.collaborators_file == "data/collaborators.yaml"
 
     def test_minimal_config(self, tmp_path):
         config_data = {
@@ -53,6 +55,7 @@ class TestLabDataConfig:
         assert config.pdf_base_url is None
         assert config.people_file is None
         assert config.projects_file is None
+        assert config.collaborators_file is None
 
     def test_lab_metadata(self, tmp_path):
         config_data = {
