@@ -53,7 +53,14 @@ mechanism:
 - The links. `url` is one input field the compiler routes by looking at the
   host, so the two properties it can land in are both consulted -- and so is
   a map from link kind to links, which is where a document that has stopped
-  carrying `*_url` properties would keep it.
+  carrying `*_url` properties would keep it. **Only a link the document says
+  came from the input counts.** A link record states its origin, over
+  `input`, `sidecar`, `enrichment`, `inferred` and `derived`; a link the lab
+  added from somewhere else is not evidence that the entry's own `url` field
+  survived, and letting one stand in for it would make this probe hide a
+  loss, which is the one thing it must never do. A record that states no
+  origin is not counted either, for the same reason: the question is what the
+  document *says*, and silence is not an answer.
 
 Each of these is looked up in **every** place it could sit, not in one, and
 the first that answers wins. That is what a real consumer would have to do,
@@ -83,8 +90,10 @@ IDENTIFIER_SCHEME = {"doi": "doi", "eprint": "arxiv", "isbn": "isbn",
 ARXIV_SCHEME = "arxiv"
 ARXIV_PREFIX = "arXiv"
 
-# The link kinds the BibTeX `url` field could have become.
+# The link kinds the BibTeX `url` field could have become, and the one origin
+# that makes a link evidence that the input field reached the document.
 URL_KINDS = ("url", "video")
+FROM_INPUT = "input"
 
 # The field that names the container, per entry type. A structured venue's
 # name belongs in this one.
@@ -135,7 +144,12 @@ def scheme_map(publication):
 
 
 def identifier_value(publication, field):
-    """One identifier field, from the scheme map. A scheme may hold several."""
+    """One identifier field, from the scheme map. A scheme may hold several.
+
+    Unlike a link, an identifier carries no origin: the map is scheme to
+    identifiers and says nothing about where each came from. So there is no
+    provenance to check here, and none is invented.
+    """
     found = scheme_map(publication).get(IDENTIFIER_SCHEME.get(field))
     if isinstance(found, str):
         found = [found]
@@ -148,15 +162,21 @@ def name_list(people):
 
 
 def link_value(publication, kinds):
-    """The first link the document holds under any of ``kinds``, or None."""
+    """The first link under any of ``kinds`` that came from the input.
+
+    A link the document attributes to enrichment, a sidecar or its own
+    derivation says nothing about whether the entry's field survived, so it
+    is not read as though it did. Neither is a record that states no origin.
+    """
     links = publication.get("links")
     if not isinstance(links, dict):
         return None
     for kind in kinds:
         for record in links.get(kind) or []:
-            url = record.get("url") if isinstance(record, dict) else record
-            if url:
-                return url
+            if not isinstance(record, dict) or record.get("origin") != FROM_INPUT:
+                continue
+            if record.get("url"):
+                return record["url"]
     return None
 
 

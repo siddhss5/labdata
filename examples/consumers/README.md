@@ -39,7 +39,9 @@ python examples/consumers/bibtex_roundtrip.py lab.json > works.bib
 output in CI, the same way: as a subprocess handed a path.
 
 Each **failing** probe's obligations are split across two tests. The assertions
-naming the missing properties carry `xfail(strict=True, reason="#56")`, and
+naming the missing properties carry `xfail(strict=True)` against the issue that owns
+the missing property -- #56 for all but one, which is #24's, for the reason
+the identity paragraph under `graph.py` gives -- and
 everything the probe already does — schema validity, year grouping, edge
 endpoints, one entry per work — goes in a test that passes, so a regression in
 it turns the suite red instead of being absorbed by the expected `#56` xfail.
@@ -71,7 +73,7 @@ test matches a record *by* differs, because the artifacts differ:
 | `plain_html.py` | the `bib_id`, person id and project id the page carries as element ids — except collaborators, compared as a **multiset**, because the document gives them no id at all, which is the gap `graph.py` fails on showing up a second time |
 | `csl_json.py` | the record's `id`, against the fields `schema_version` 3 can supply |
 | `cv_tex.py` | the entry's **title**, because a LaTeX fragment carries no ids; a duplicate title fails loudly rather than matching the wrong entry |
-| `graph.py` | nothing — every `authored`, `part_of` and `member_of` edge is compared as a complete tuple. The identity tests match a contributor by **the exact set of works it authored**, and an authorship by its **position**, never by a node's label, so they survive #56 changing what the display form of a name is. Each work set is pinned in both directions: "these two contributors differ" would be satisfied by one that had taken the other's work as well, which is the merge being tested for |
+| `graph.py` | nothing — every `authored`, `part_of` and `member_of` edge is compared as a complete tuple. The identity tests match a contributor by **the exact set of works it authored**, and an authorship by the **position the document declares**, never by a node's label, so they survive #56 changing what the display form of a name is. Each work set is pinned in both directions: "these two contributors differ" would be satisfied by one that had taken the other's work as well, which is the merge being tested for. They also select contributors by the `collaborator:` **namespace**, so a co-author arriving under `person:` — the semantic widening #56 rejects — satisfies none of them |
 | `bibtex_roundtrip.py` | the entry's citation key. Field **names** are compared, never values: the LaTeX-to-Unicode conversion is deliberately one-way, so comparing values would assert something false |
 
 ## What a probe may read
@@ -162,9 +164,9 @@ including that one:
   input is passed through unchanged, so there is no prefix a consumer can
   reliably strip. The record therefore has no `container-title`, `volume`,
   `issue`, `page` or `DOI`.
-- **`graph.py`** — a `collaborators` entry carries no `id`, so there is
-  nothing to make a node out of; and no field of an authorship could point at
-  one if it did. `author.person_id` is not that field: the schema defines it
+- **`graph.py`** — a `collaborators` entry carries no key of its own, so
+  there is nothing to make a node out of; and no field of an authorship could
+  point at one if it did. `author.person_id` is not that field: the schema defines it
   at `/$defs/author/properties/person_id` as "the id of the matching person in
   `people.yaml`", which a collaborator by definition is not, and for these
   authors it is `null`. What is left is the display name, which SPEC.md §5
@@ -182,7 +184,9 @@ including that one:
   `key`, not an `id`, because a name-derived value is a lookup key and not a
   claim about a human. The two live in **separate namespaces**: a lab member
   is `person:<id>` and a group is `collaborator:<key>`, so an unresolved
-  string is never labelled a person. Both lookups come back empty today.
+  string is never labelled a person. The person side works today; it is the
+  collaborator side that is empty, since no entry carries a `key` and no
+  authorship carries a `collaborator_key`.
 
   An `authored` edge also carries a fourth column, the authorship's position
   in its work's author list, because a work lists authorships rather than
@@ -226,6 +230,20 @@ including that one:
   set of its test, named there on its own with its reason: it is labdata's own
   tag field rather than a bibliographic one, and it does reach the document,
   as `project_ids`.
+
+  Each field is looked for in **every** place it could sit — a flat property,
+  a structured `venue`, an `editors` list, an `identifiers` map from scheme
+  to identifiers, a `links` map from kind to link records — because a probe
+  that looked in one place could report a field lost that had simply moved.
+  One of those lookups carries a **provenance rule**: a link counts as
+  evidence that the entry's own `url` survived only when the document says
+  its `origin` is `input`. A link the lab added by enrichment, from a
+  sidecar, or derived for itself says nothing about the input field, and
+  letting one stand in for it would make this probe hide a loss — the one
+  thing it must never do. A record that states no origin does not count
+  either: the question is what the document *says*, and silence is not an
+  answer. Identifiers carry no origin, so there is nothing to check there and
+  nothing is invented.
 
 Note that CSL-JSON schema validation is not what fails in `csl_json.py`.
 Almost every CSL field is optional, so a record with no `page`, `volume`,

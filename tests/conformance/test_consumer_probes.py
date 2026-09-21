@@ -76,7 +76,8 @@ PROBE_TESTS = {
                  "test_graph_separates_co_authors_sharing_an_initial",
                  "test_graph_keeps_two_authorships_written_alike_apart"),
     "bibtex_roundtrip.py": ("test_bibtex_roundtrip_entry_is_well_formed",
-                            "test_bibtex_roundtrip_loses_no_field"),
+                            "test_bibtex_roundtrip_loses_no_field",
+                            "test_demo_field_is_in_the_input_and_in_no_property"),
 }
 
 # The demo record #56 is written against, and what a consumer must be able to
@@ -553,11 +554,20 @@ def test_graph_is_well_formed(probe_output, demo_document):
         kind, source, target = edge[:3]
         assert source in nodes and target in nodes, edge
     # Every `authored` edge names an authorship, not just a pair of nodes.
+    # The emptiness check comes first: the filter below is satisfied by a
+    # graph with no `authored` edge at all.
+    assert [e for e in edges if e[0] == "authored"] != []
     assert [e for e in edges if e[0] == "authored" and len(e) != 4] == []
     assert sorted(n for n in nodes if n.startswith("work:")) == sorted(
         "work:" + p["bib_id"] for p in doc["publications"])
     assert sorted(n for n in nodes if n.startswith("project:")) == sorted(
         "project:" + p["id"] for p in doc["projects"])
+    # Every `person:` node is a person the document declares. A co-author it
+    # could not resolve arriving under `person:` would be the namespace
+    # widening #56 rejects -- "an unresolved string is never labelled a
+    # person" -- and it would quietly satisfy the identity tests below.
+    assert sorted(n for n in nodes if n.startswith("person:")) == sorted(
+        "person:" + p["id"] for p in doc["people"])
     # All three kinds compared as complete tuples. Counting `authored` would
     # pass with two valid edges' endpoints swapped.
     assert sorted(edges) == sorted(expected_edges(doc))
@@ -785,14 +795,34 @@ NO_VENUE_RULE = {
 }
 
 
-def first_class_strings(pub):
-    """Every string value of a work, leaving out the re-serialized export.
+def first_class_values(pub):
+    """Every string anywhere in a work, except inside the re-serialized export.
 
-    That record is a copy of the entry and holds every field, read or not, so
-    a search for a value that includes it can never find one absent.
+    **Recursive on purpose.** The only record left out is the re-serialized
+    export, which is a copy of the entry and holds every field read or not,
+    so a search that included it could never find anything absent. Everything
+    else is walked to any depth, because that is where a field that has
+    stopped being lost would appear: `editors` is a list of name objects,
+    `identifiers` is a map from scheme to a list of strings, and a structured
+    `venue` is an object. A check that looked only at the work's own string
+    properties would call every one of those absent and would stay green
+    after the very loss it pins had been fixed.
     """
-    return {name: value for name, value in pub.items()
-            if name != "bibtex" and isinstance(value, str)}
+    found = []
+
+    def walk(value):
+        if isinstance(value, dict):
+            for name, inner in value.items():
+                if name != "bibtex":
+                    walk(inner)
+        elif isinstance(value, list):
+            for inner in value:
+                walk(inner)
+        elif isinstance(value, str):
+            found.append(value)
+
+    walk(pub)
+    return found
 
 
 @covers("types.incollection", "types.inbook", "types.book", "types.manual")
@@ -807,7 +837,7 @@ def test_entry_types_without_a_venue_rule_degrade_to_the_year(demo_document):
         # The claim the COVERAGE row makes: not merely absent under its own
         # name, but nowhere in the work at all.
         assert field not in pub, bib_id
-        assert [name for name, value in first_class_strings(pub).items()
+        assert [value for value in first_class_values(pub)
                 if container in value] == [], bib_id
         # The value is in the input, so the search above looked for something
         # that is really there.
@@ -826,30 +856,57 @@ def test_entry_types_without_a_venue_rule_degrade_to_the_year(demo_document):
 # fixtures would not turn anything red there. These give each field its own
 # grip: remove the fixture and the row's own test fails.
 
+# (case, entry, source field, the property names it could sit under, the text
+# to hunt for). The text is hunted for rather than compared, because a value
+# that reaches the document may arrive inside a larger string -- a container
+# name inside a composed venue -- and because an `editor` field arrives as
+# *people*, so what has to be absent is each editor's name rather than the
+# one combined string the entry wrote.
 UNREAD_FIELDS = [
-    case("fields.editor", "adams2022survey", "editor",
-         "Quinn, Quentin and Silva, Sofia"),
-    case("fields.month", "adams2022survey", "month", "March"),
-    case("fields.chapter", "hughes2021gaits", "chapter", "9"),
-    case("fields.isbn", "adams2023handbook", "isbn", "978-1-00-000002-8"),
+    case("fields.editor", "adams2022survey", "editor", ("editor", "editors"),
+         ("Quinn", "Quentin", "Silva", "Sofia")),
+    case("fields.month", "adams2022survey", "month", ("month",), ("March",)),
+    case("fields.chapter", "hughes2021gaits", "chapter", ("chapter",), ("9",)),
+    case("fields.isbn", "adams2023handbook", "isbn", ("isbn", "identifiers"),
+         ("978-1-00-000002-8",)),
     case("fields.organization", "ingram2019toolkit", "organization",
-         "Example University Personal Robotics Laboratory"),
-    case("fields.issn", "brown2025tidy", "issn", "2999-0001"),
+         ("organization",), ("Example University Personal Robotics Laboratory",)),
+    case("fields.issn", "brown2025tidy", "issn", ("issn", "identifiers"),
+         ("2999-0001",)),
     case("fields.howpublished", "fischer2025benchmark", "howpublished",
-         "Dataset and evaluation protocol on the project site"),
+         ("howpublished",), ("Dataset and evaluation protocol on the project site",)),
 ]
 
 
-@pytest.mark.parametrize("case_id,bib_id,field,value", UNREAD_FIELDS)
-def test_demo_field_is_in_the_input_and_in_no_property(demo_document, case_id,
-                                                       bib_id, field, value):
-    """The input entry carries the field, and the work carries it nowhere."""
+@pytest.mark.parametrize("case_id,bib_id,field,properties,needles", UNREAD_FIELDS)
+def test_demo_field_is_in_the_input_and_in_no_property(probe_output, demo_document,
+                                                       case_id, bib_id, field,
+                                                       properties, needles):
+    """The input entry carries the field, and the work carries it nowhere.
+
+    Asked three ways, because one is not enough to mean "in no property":
+
+    1. None of the property names the field could sit under is on the work.
+    2. Its text is in no value anywhere in the work, at any depth. A search
+       of the work's own string properties would miss a structured `editors`,
+       an `identifiers` map and an object `venue`, which are exactly where
+       the field goes when it stops being lost.
+    3. The round-trip probe, which looks in every one of those places, still
+       cannot emit the field. That is the consumer-visible statement, and it
+       is the one a reader of `tests/COVERAGE.md` is actually promised.
+    """
     _, doc = demo_document
-    assert source_entries()[bib_id][1][field] == value, bib_id
+    source_value = source_entries()[bib_id][1][field]
+    # The needles are really in the input, so the searches below looked for
+    # something that exists rather than for nothing.
+    assert [one for one in needles if one not in source_value] == [], bib_id
+
     pub = publication(doc, bib_id)
-    assert field not in pub, bib_id
-    assert [name for name, holds in first_class_strings(pub).items()
-            if value in holds] == [], bib_id
+    assert [name for name in properties if name in pub] == [], bib_id
+    assert [value for value in first_class_values(pub)
+            if any(one in value for one in needles)] == [], bib_id
+    emitted = read_entries(probe_output["bibtex_roundtrip.py"])[bib_id][1]
+    assert field not in emitted, bib_id
 
 
 # --- graph.py: who the co-authors are ----------------------------------------
@@ -941,27 +998,36 @@ def test_identity_fixtures_are_present(demo_document):
     # test below reads.
     assert [a for a in publication(doc, SAME_NAME_WORK)["authors"]
             if a["person_id"] is None] == alike
-    assert alike_positions(publication(doc, SAME_NAME_WORK)) == ["2", "3"]
+    assert alike_indexes(publication(doc, SAME_NAME_WORK)) == [2, 3]
 
 
-def alike_positions(pub):
-    """The 1-based positions of the two identically written authorships."""
-    return [str(i) for i, a in enumerate(pub["authors"], 1)
+def alike_indexes(pub):
+    """Where the two identically written authorships sit in the author list.
+
+    Read off the list, not off a `position` property: this says what the
+    *fixture* looks like, and it has to keep saying it against a document
+    that declares no position -- which is every document today. What the
+    document declares is the separate question
+    `test_graph_keeps_two_authorships_written_alike_apart` asks.
+    """
+    return [i for i, a in enumerate(pub["authors"], 1)
             if a["family"] == SAME_NAME_FAMILY and a["given"] == SAME_NAME_GIVEN]
 
 
-def external_contributors(doc, edges):
-    """{node: the works it authored} for every contributor that is not a lab
-    member.
+def external_contributors(edges):
+    """{node: the works it authored} for every contributor in the
+    `collaborator:` namespace.
 
-    A lab member is a `person:` node the document declares in `people`.
-    Anything else that reaches the graph came through `collaborators`, which
-    is the grouping the identity questions are about.
+    Selected by namespace, not by "is not in `people`". A co-author reaching
+    the graph under `person:` is the semantic widening #56 rejects, and these
+    tests must not be satisfied by it: a grouping over unresolved authorships
+    is not a person, whatever it is keyed on. That every `person:` node is a
+    declared person is asserted in `test_graph_is_well_formed`, which passes,
+    so this selection cannot quietly miss one either.
     """
-    members = {"person:" + person["id"] for person in doc["people"]}
     authored = {}
     for edge in edges:
-        if edge[0] == "authored" and edge[1] not in members:
+        if edge[0] == "authored" and edge[1].startswith("collaborator:"):
             authored.setdefault(edge[1], set()).add(edge[2].split(":", 1)[1])
     return authored
 
@@ -985,7 +1051,7 @@ def test_graph_joins_one_co_author_written_two_ways(probe_output, demo_document)
     """
     _, doc = demo_document
     _, edges = read_graph(probe_output["graph.py"])
-    authored = external_contributors(doc, edges)
+    authored = external_contributors(edges)
 
     joined = [node for node, works in authored.items()
               if works & set(ONE_PERSON_WORKS)]
@@ -1009,7 +1075,7 @@ def test_graph_separates_co_authors_sharing_an_initial(probe_output, demo_docume
     """
     _, doc = demo_document
     _, edges = read_graph(probe_output["graph.py"])
-    authored = external_contributors(doc, edges)
+    authored = external_contributors(edges)
 
     other = [node for node, works in authored.items() if OTHER_PERSON_WORK in works]
     assert len(other) == 1, sorted(authored.items())
@@ -1038,15 +1104,30 @@ def test_graph_keeps_two_authorships_written_alike_apart(probe_output, demo_docu
     """
     _, doc = demo_document
     _, edges = read_graph(probe_output["graph.py"])
-    members = {"person:" + person["id"] for person in doc["people"]}
+    pub = publication(doc, SAME_NAME_WORK)
+
+    # The document *declares* the position of each of the two authorships.
+    # Asserted against the document, not against the graph: the probe falls
+    # back to the list index when no position is declared -- faithfully, and
+    # that fallback stays -- so a position column in the output is no
+    # evidence the document said anything, and this marker names `position`
+    # as one of the two properties it is waiting for.
+    declared = [a.get("position") for a in authors_named(
+        pub, SAME_NAME_FAMILY, SAME_NAME_GIVEN)]
+    assert [p for p in declared if p is None] == [], declared
+    assert len(set(declared)) == len(declared) == 2, declared
 
     alike = [edge for edge in edges if edge[0] == "authored"
-             and edge[2] == "work:" + SAME_NAME_WORK and edge[1] not in members]
+             and edge[2] == "work:" + SAME_NAME_WORK
+             and edge[1].startswith("collaborator:")]
     assert len(alike) == 2, alike
-    # Two endpoints, not one record written twice, and the positions are the
-    # ones that work's author list actually gives those two names.
-    assert sorted(edge[3] for edge in alike) == alike_positions(
-        publication(doc, SAME_NAME_WORK))
+    # One grouping, two authorships: both edges leave the *same* contributor,
+    # because any grouping by name puts these two together. Two endpoints
+    # would be a different answer, and the wrong one.
+    assert len({edge[1] for edge in alike}) == 1, alike
+    # And the two records are told apart by the positions the document
+    # declared, not by the order the probe happened to read them in.
+    assert sorted(edge[3] for edge in alike) == sorted(str(p) for p in declared)
 
 
 # --- The probes themselves ---------------------------------------------------

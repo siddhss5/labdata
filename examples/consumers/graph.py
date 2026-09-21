@@ -24,20 +24,24 @@ distinction would be gone from the output whatever the document said.
 This is also where the identity questions are asked, because the node and
 edge sets below are already what those questions are about. A graph has to
 decide, for every co-author, whether two authorships are one contributor or
-two -- the same external person written two ways is one node with two edges,
-two different people who write their names alike are two authorships that
-must stay apart, and two people who merely share an initial and a surname are
-two nodes. The tests in tests/conformance/test_consumer_probes.py put those
-cases to this probe. It answers none of them today, and it does not guess:
-the only thing the document offers to key a co-author on is the display name,
-and keying on that is exactly the merge the document itself warns against.
+two -- the same external person written two ways is one node with an edge to
+each of their works, two different people who write their names alike are two
+authorships of one work that must stay apart, and two people who merely share
+an initial and a surname are two nodes. The tests in
+tests/conformance/test_consumer_probes.py put those cases to this probe. It
+answers none of them today, and it does not guess: the only thing the
+document offers to key a co-author on is the display name, and keying on that
+is exactly the merge the document itself warns against.
 
 Two namespaces, never one. `people` is a list of humans; `collaborators` is a
 *grouping over unresolved authorships*, which is not the same kind of thing
 and must not be labelled as if it were. So a lab member is `person:<id>` and
 a group is `collaborator:<key>`, and an unresolved string is never labelled a
-person. Both of those lookups come back empty against the document as it
-stands today.
+person. The person side works today: `people` carries ids and an authorship
+that resolved carries `person_id`. It is the collaborator side that comes
+back empty -- no entry carries a `key` and no authorship carries a
+`collaborator_key` -- which is why every co-author the demo cannot resolve is
+missing from the output below.
 """
 
 import json
