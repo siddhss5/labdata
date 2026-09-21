@@ -285,3 +285,40 @@
   journal = {Journal of Fictional Robots},
   year    = {2018}
 }
+
+% Four ways an initials-only external name can shadow a fuller one that a
+% key built by pattern-matching the normalised string does not see: a
+% surname particle, two initials, a hyphenated family name, and a name
+% outside ASCII. Each pair is two keys, and each initials-only key is
+% reported as one that could be the fuller one. None of them is a lab
+% member, so none resolves.
+% CASE identity.grouping_initials
+@article{id-grouping-parts,
+  title   = {Initials That Could Be Somebody Else},
+  author  = {Adams, Alice and
+             van der Meer, A. and van der Meer, Anna and
+             Smithson, A. J. and Smithson, Anna Jane and
+             Smith-Jones, B. and Smith-Jones, Bella and
+             Öztürk, Ç. A. and Öztürk, Çiğdem Ayşe},
+  journal = {Journal of Fictional Robots},
+  year    = {2017}
+}
+
+% The other side of the same check: names that must **not** be paired. Each
+% one differs from an initials-only key above in exactly one of the things
+% the check compares, so a check that stopped comparing that one thing would
+% report a pair that is not there.
+%
+%   Meer, Anna              no particle, where A. van der Meer has one
+%   van der Waals, Anna     the same particle, a different family name
+%   Smithson, Anna Beth     the same first initial, a different second
+%   Nolan, G.-A. / Gabriel  a hyphenated given name keeps both initials, so
+%                           `G.-A.` is not an abbreviation of `Gabriel`
+% CASE identity.grouping_distinct
+@article{id-grouping-distinct,
+  title   = {Initials That Could Not Be Somebody Else},
+  author  = {Adams, Alice and Meer, Anna and van der Waals, Anna and
+             Smithson, Anna Beth and Nolan, G.-A. and Nolan, Gabriel},
+  journal = {Journal of Fictional Robots},
+  year    = {2016}
+}

@@ -671,7 +671,7 @@ def test_collaborators_order(valid_output):
             for c in valid_output["collaborators"]]
     assert rows == sorted(rows)
     assert valid_output["collaborators"][0]["name"] == "Quentin Quinn"
-    assert valid_output["collaborators"][-1]["name"] == "Yolanda Young"
+    assert valid_output["collaborators"][-1]["key"] == "gabriel-nolan-45b44742"
 
 
 @covers("identity.alike_authorships")
@@ -698,6 +698,94 @@ def test_two_authorships_written_alike_stay_apart(valid_output):
                                     {"work_id": "id-alike", "position": 3}]
 
 
+# The two codes, restated rather than imported: a published code is a
+# permanent interface (SPEC.md, "Diagnostic codes"), and outside tests/unit
+# the suite uses only labdata's public names.
+SPANS_SPELLINGS = "ID-GROUPING-SPANS-SPELLINGS"
+INITIALS_AMBIGUOUS = "ID-GROUPING-INITIALS-AMBIGUOUS"
+
+# (label, the initials-only spelling, the fuller one it could be). Each row
+# is a shape that a check pattern-matching the normalised key cannot see:
+# only the last of them is one initial followed by one plain family name.
+INITIALS_SHADOWS = [
+    ("a surname particle", "A. van der Meer", "Anna van der Meer"),
+    ("two initials", "A. J. Smithson", "Anna Jane Smithson"),
+    ("a hyphenated family name", "B. Smith-Jones", "Bella Smith-Jones"),
+    ("a name outside ASCII", "\u00c7. A. \u00d6zt\u00fcrk",
+     "\u00c7i\u011fdem Ay\u015fe \u00d6zt\u00fcrk"),
+    ("one initial and one family name", "Q. Quinn", "Quentin Quinn"),
+]
+
+
+# The complete set of pairs the corpus produces, by readable name. Every
+# name the corpus writes in initials is here, with exactly the fuller names
+# it could be -- so a check that compared one thing less would add a pair and
+# a check that compared one thing more would drop one. The four names under
+# `id-grouping-distinct` appear in no list on purpose: each differs from an
+# initials-only key above in exactly one of the things the check compares.
+INITIALS_PAIRS = {
+    "A. van der Meer": ["Anna van der Meer"],
+    "A. J. Smithson": ["Anna Jane Smithson"],
+    "B. Smith-Jones": ["Bella Smith-Jones"],
+    "\u00c7. A. \u00d6zt\u00fcrk": ["\u00c7i\u011fdem Ay\u015fe \u00d6zt\u00fcrk"],
+    "Q. Quinn": ["Quentin Quinn"],
+}
+
+
+def reported_initials_keys(output):
+    """The collaborator key each initials-only warning is about."""
+    return {line.split("'")[1] for line in output.splitlines()
+            if INITIALS_AMBIGUOUS in line}
+
+
+def reported_initials_pairs(output, valid_output):
+    """{name: [fuller names]} for every initials-only warning, by readable name."""
+    by_key = {c["key"]: c["name"] for c in valid_output["collaborators"]}
+    pairs = {}
+    for line in output.splitlines():
+        if INITIALS_AMBIGUOUS not in line:
+            continue
+        quoted = [part for index, part in enumerate(line.split("'")) if index % 2]
+        pairs[by_key[quoted[0]]] = sorted(by_key[key] for key in quoted[1:])
+    return pairs
+
+
+@covers("identity.grouping_initials", "identity.grouping_distinct")
+def test_the_initials_warnings_are_exactly_these_pairs(valid_validate, valid_output):
+    """Both directions at once, over the whole corpus.
+
+    Comparing one thing less -- dropping the particles, the family name, the
+    second initial, or the second half of a hyphenated one -- adds a pair
+    that is not there. Comparing one thing more drops a pair that is. A test
+    that only asserted the pairs it wanted would catch the second and not the
+    first, which is the direction a warning gets wrong most easily.
+    """
+    assert reported_initials_pairs(valid_validate.output, valid_output) == INITIALS_PAIRS
+
+
+@pytest.mark.parametrize("label,initials,fuller",
+                         [pytest.param(*row, id=row[0]) for row in INITIALS_SHADOWS])
+@covers("identity.grouping_initials")
+def test_an_initials_only_key_that_could_be_a_fuller_one_is_reported(
+        valid_validate, valid_output, label, initials, fuller):
+    """Each shape a check over the normalised key would miss.
+
+    The test is on the structured parts -- the initials of the given name
+    against a fuller given name, with the family name and the particles equal
+    -- so a particle, a second initial, a hyphen in the family name and a
+    letter outside ASCII are all seen. Both keys are asserted to exist and to
+    differ, so each row is about a real pair rather than about a message.
+    """
+    short = item(valid_output, "collaborators", "name", initials)
+    fuller_entry = item(valid_output, "collaborators", "name", fuller)
+    assert short["key"] != fuller_entry["key"], label
+
+    named = [line for line in valid_validate.output.splitlines()
+             if INITIALS_AMBIGUOUS in line and short["key"] in line]
+    assert len(named) == 1, (label, valid_validate.output)
+    assert fuller_entry["key"] in named[0], (label, named[0])
+
+
 @covers("identity.grouping_spellings", "identity.grouping_initials")
 def test_grouping_risks_are_reported(valid_validate, valid_output):
     """The two ways the key can be wrong are said out loud, not left silent.
@@ -713,11 +801,19 @@ def test_grouping_risks_are_reported(valid_validate, valid_output):
     fuller = item(valid_output, "collaborators", "name", "Quentin Quinn")
 
     assert len(spanning["name_variants"]) == 2, spanning
-    assert f"ID-GROUPING-SPANS-SPELLINGS ./names.bib:id-external-2019:author" in output
+    assert f"{SPANS_SPELLINGS} ./names.bib:id-external-2019:author" in output
     assert spanning["key"] in output
 
-    assert f"ID-GROUPING-INITIALS-AMBIGUOUS ./names.bib:id-grouping:author" in output
+    assert f"{INITIALS_AMBIGUOUS} ./names.bib:id-grouping:author" in output
     assert initials["key"] in output and fuller["key"] in output
     # The two keys really are different, which is the instability being
     # recorded: a consumer must not build a URL on one and expect the other.
     assert initials["key"] != fuller["key"]
+
+    # The warning is about the pair, so the fuller key is not reported as
+    # though it were the ambiguous one, and a key with no fuller counterpart
+    # is not reported at all.
+    reported = reported_initials_keys(output)
+    assert fuller["key"] not in reported
+    alone = item(valid_output, "collaborators", "name", "Yolanda Young")
+    assert alone["key"] not in reported

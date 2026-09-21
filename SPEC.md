@@ -172,7 +172,7 @@ Codes in use:
 | `BIB-CROSSREF-UNSUPPORTED` | An entry carries a `crossref` field. Reported on the field's **presence**, whatever its value: an empty `crossref = {}` is a field the entry carries. The diagnostic names the file, the entry key and the parent key, or says the entry names no parent when the field is empty; the entry is not emitted and the run fails, in every mode. |
 | `BIB-YEAR-MISSING` | An entry has no `year` field. The work is emitted with `year: null` and sorts last. |
 | `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. |
-| `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key built from an initials-only name shares its initial and family name with at least one fuller key, so it could be any of them. Reported against the first authorship the key grouped. |
+| `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer — so a particle, a second initial, a hyphenated family name and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. |
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. |
 | `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. The configuration fails to load, because the name is emitted as `work.source.file`, which is promised never to be absolute. |
 
@@ -656,7 +656,10 @@ it. What that buys, and what it does not:
   the remaining risk is **reported** rather than silent:
   `ID-GROUPING-SPANS-SPELLINGS` when one key grouped more than one spelling,
   and `ID-GROUPING-INITIALS-AMBIGUOUS` when an initials-only key could be any
-  of several fuller ones.
+  of several fuller ones. Both read the **structured parts**, not the key, so
+  neither is limited to the shape a pattern over a normalised string happens
+  to match. Both are diagnostics and nothing else: they change no key, no
+  grouping and no emitted value.
 
 **`derived` is labdata's, and it is not an extension mechanism.** Every
 closed entity carries a `derived` object with `additionalProperties: true`.

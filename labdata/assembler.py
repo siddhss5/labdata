@@ -13,15 +13,14 @@ import hashlib
 import re
 import sys
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .config import LabDataConfig
 from .models import Author, Collaborator, LabData, Work
 from .parsers.bibtex import parse_all_works
 from .loaders import load_people, load_projects
 from .resolver import (
-    compute_backlinks, is_abbreviated, normalize_name, resolve_authors,
-    resolve_projects,
+    compute_backlinks, normalize_name, resolve_authors, resolve_projects,
 )
 
 
@@ -50,6 +49,36 @@ _NOT_SLUG = re.compile(r"-+")
 # (SPEC.md section 1), and the grouping policy itself is #24's.
 GROUPING_SPANS_SPELLINGS = "ID-GROUPING-SPANS-SPELLINGS"
 GROUPING_INITIALS_AMBIGUOUS = "ID-GROUPING-INITIALS-AMBIGUOUS"
+
+# One part of a given name that is an initial rather than a name: a letter,
+# its period optional, and a hyphenated run of them -- `A.`, `A`, `G.-A.`,
+# `J-P`. A Unicode letter, so `Ç.` is read as an initial and a name outside
+# ASCII is not silently exempt. A part that is anything else is read as a
+# name, which is the safe direction for a warning: it reports one grouping
+# key too few rather than one too many.
+_INITIAL = re.compile(r"^[^\W\d_]\.?(?:-[^\W\d_]\.?)*$", re.UNICODE)
+
+
+def _given_parts(given: Optional[str]) -> List[str]:
+    return [part for part in (given or "").split() if part]
+
+
+def initials_only(given: Optional[str]) -> bool:
+    """True when every part of a given name is an initial rather than a name."""
+    parts = _given_parts(given)
+    return bool(parts) and all(_INITIAL.match(part) for part in parts)
+
+
+def given_initials(given: Optional[str]) -> Tuple[str, ...]:
+    """The initial of each part of a given name, normalised.
+
+    ``Alice Jane`` and ``A. J.`` both give ``("a", "j")``; ``Grace-Ann`` and
+    ``G.-A.`` both give ``("g-a",)``, because both halves of a hyphenated
+    given name carry an initial.
+    """
+    return tuple("-".join(normalize_name(piece)[:1]
+                          for piece in part.split("-") if piece)
+                 for part in _given_parts(given))
 
 # A document needs a header, and a header with no name is one a renderer
 # cannot title a page from.
@@ -101,6 +130,14 @@ class _Grouping:
         self.normalized = normalized
         self.name_kind = LITERAL if author.literal else PERSONAL
         self.author = author            # the first spelling, in document order
+        # Read from the structured parts rather than from the key, so a
+        # particle, a second initial, a hyphenated family name and a name
+        # outside ASCII are all visible. Used by the diagnostics below and by
+        # nothing else: they decide nothing about grouping or matching.
+        self.family = normalize_name(author.family or "")
+        self.von = normalize_name(author.von or "")
+        self.initials = given_initials(author.given)
+        self.initials_only = initials_only(author.given)
         self.variants: List[str] = []
         self.authorships: List[Dict[str, object]] = []
         self.work_ids: List[str] = []
@@ -118,6 +155,28 @@ class _Grouping:
             self.work_ids.append(work.bib_id)
         if work.year is not None:
             self.last_year = max(self.last_year or work.year, work.year)
+
+    def could_be(self, other: "_Grouping") -> bool:
+        """True when this initials-only key could be that fuller one.
+
+        Same family and same particles, and one set of initials a prefix of
+        the other, in whichever direction is shorter: `A. Smith` could be
+        `Alice Smith` or `Alice Jane Smith`, and `A. J. Smith` could be
+        either as well. A name written as one brace-protected unit has no
+        parts to compare and takes part in neither side.
+        """
+        if other.key == self.key or not self.initials_only:
+            return False
+        if self.name_kind != PERSONAL or other.name_kind != PERSONAL:
+            return False
+        if other.initials_only or not other.initials:
+            return False
+        if not self.family or self.family != other.family:
+            return False
+        if self.von != other.von:
+            return False
+        shorter, longer = sorted((self.initials, other.initials), key=len)
+        return longer[:len(shorter)] == shorter
 
     def build(self) -> Collaborator:
         return Collaborator(
@@ -188,14 +247,8 @@ def _grouping_warnings(groups: Dict[str, "_Grouping"]) -> List[str]:
                 f"{GROUPING_SPANS_SPELLINGS} {group.where}: collaborator key "
                 f"'{group.key}' groups {len(group.variants)} spellings of one "
                 f"name: {spellings}")
-        if not is_abbreviated(group.normalized):
-            continue
-        initial, family = group.normalized.split(" ")
-        fuller = sorted(
-            other.key for other in groups.values()
-            if other.key != group.key and not is_abbreviated(other.normalized)
-            and other.normalized.split(" ")[-1] == family
-            and other.normalized.split(" ")[0].startswith(initial))
+        fuller = sorted(other.key for other in groups.values()
+                        if group.could_be(other))
         if fuller:
             reported.append(
                 f"{GROUPING_INITIALS_AMBIGUOUS} {group.where}: collaborator key "

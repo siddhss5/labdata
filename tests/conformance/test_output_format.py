@@ -8,6 +8,7 @@ To regenerate tests/corpus/expected/valid.yaml after an intended change, run
 and review the diff (git diff tests/corpus/expected/valid.yaml) before committing.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -119,12 +120,34 @@ def test_schema_rejects_an_authorship_with_two_references_or_none(validator,
         assert schema_errors(validator, data), change
 
 
+# The v3 schema as it stood at `78570e6`, the last commit before v4, digested
+# byte for byte. "Unchanged" is a claim about bytes, and only bytes can make
+# it: a check that v3 still parses and still says `3` stays green while its
+# title, its descriptions or any of its constraints are rewritten under a
+# consumer that pinned it.
+PREVIOUS_SCHEMA_SHA256 = (
+    "97f85113822cffb47d36b415716563b50bfe4bf2bc30e892e4cc45b9e377aa92")
+
+# The v4 `$id`, stated here as the literal a consumer would resolve. It is
+# served from a tag created when this version ships and never moved (SPEC.md
+# section 6), so changing this string is a contract change and has to be a
+# deliberate edit in two places.
+SCHEMA_ID = ("https://raw.githubusercontent.com/siddhss5/labdata/schema-v4"
+             "/schema/v4/output.schema.json")
+
+
 @covers("output.versioned_schema")
 def test_the_previous_schema_stays_reachable_unchanged(validator):
-    """v3 is still at its own path, still says 3, and is a schema in its own
-    right -- a consumer pinned to it keeps a stable target."""
-    with open(PREVIOUS_SCHEMA_PATH, encoding="utf-8") as f:
-        previous = json.load(f)
+    """v3 is still at its own path, byte for byte, and v4 is a second one.
+
+    A consumer pinned to v3 keeps a stable target only if nothing in the file
+    moves, so the assertion is on the digest rather than on any property of
+    the parsed document.
+    """
+    raw = PREVIOUS_SCHEMA_PATH.read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == PREVIOUS_SCHEMA_SHA256
+
+    previous = json.loads(raw.decode("utf-8"))
     jsonschema.Draft202012Validator.check_schema(previous)
     assert previous["properties"]["schema_version"]["const"] == 3
     assert validator.schema["properties"]["schema_version"]["const"] == 4
@@ -132,6 +155,20 @@ def test_the_previous_schema_stays_reachable_unchanged(validator):
     # twice.
     assert PREVIOUS_SCHEMA_PATH != SCHEMA_PATH
     assert previous["$id"] != validator.schema["$id"]
+
+
+@covers("output.versioned_schema")
+def test_the_published_id_is_the_string_consumers_resolve(validator):
+    """The `$id` is the contract's address, so it is pinned as a literal.
+
+    It names a dedicated tag rather than a branch: a branch URL moves under
+    the consumers that resolved it, and `blob/main` serves an HTML page
+    rather than the schema at all.
+    """
+    schema_id = validator.schema["$id"]
+    assert schema_id == SCHEMA_ID
+    assert "/schema-v4/" in schema_id, schema_id
+    assert "/main/" not in schema_id and "/blob/" not in schema_id, schema_id
 
 
 # --- The two properties the document must have as a whole -------------------

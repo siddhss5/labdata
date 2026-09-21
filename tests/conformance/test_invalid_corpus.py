@@ -9,7 +9,9 @@ wording or at parser-library messages.
 import pytest
 import yaml
 
-from .support import EXPECTED, INVALID, covers, export, run_labdata
+from .support import (
+    EXPECTED, EXPECTED_FAILURE, INVALID, covers, export, run_labdata,
+)
 
 with open(EXPECTED / "diagnostics.yaml", encoding="utf-8") as f:
     DIAGNOSTICS = yaml.safe_load(f)
@@ -23,7 +25,10 @@ def params(check):
         if check not in spec:
             continue
         issue = spec.get("xfail", {}).get(check)
-        marks = [pytest.mark.xfail(strict=True, reason=issue)] if issue else []
+        # `raises` is not decoration: it is what stops a marked row that
+        # breaks before its own assertion from being counted as expected.
+        marks = [pytest.mark.xfail(strict=True, reason=issue,
+                                   raises=EXPECTED_FAILURE)] if issue else []
         rows.append(pytest.param(case_id, spec, id=case_id, marks=marks))
     return rows
 
@@ -75,6 +80,23 @@ def test_duplicate_keys_warn_but_do_not_block_nonvalidation_modes(tmp_path, case
     assert run.code == 0 and run.crash is None, run.output
     assert "BIB-DUPLICATE-KEY" in run.stderr
     assert data is not None
+
+
+@covers("structure.crossref")
+def test_a_fatal_diagnostic_stops_a_normal_compile(tmp_path):
+    """A user cannot produce a document by skipping --validate.
+
+    The error is reachable from a normal compile as well, and nothing is
+    written: an exit code nobody reads and a file that exists anyway is the
+    silent path #65 removed, one step further along.
+    """
+    out = tmp_path / "lab.json"
+    run = run_labdata(["--config", "lab.yaml", "--format", "json", "--output", out],
+                      INVALID / DIAGNOSTICS["structure.crossref"]["dir"])
+    assert run.crash is None, run.crash
+    assert run.code != 0, run.output
+    assert "BIB-CROSSREF-UNSUPPORTED" in run.output
+    assert not out.exists(), "a document was written despite a fatal diagnostic"
 
 
 @pytest.mark.parametrize("case_id, spec", params("kept"))

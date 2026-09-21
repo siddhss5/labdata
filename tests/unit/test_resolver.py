@@ -87,7 +87,7 @@ class TestBuildAliasIndex:
         assert index["alex kim"] == "akim"
         assert index["alan kim"] == "alankim"
 
-    @pytest.mark.xfail(strict=True, reason="#24")
+    @pytest.mark.xfail(strict=True, reason="#24", raises=AssertionError)
     def test_same_initial_collision_without_alias(self):
         """An alias shared implicitly with another person's initials is ambiguous.
 
