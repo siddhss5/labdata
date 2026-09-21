@@ -212,38 +212,88 @@ def test_a_name_fitting_two_collaborator_entries_is_a_grouping_warning(tmp_path)
     assert exits == {0}
 
 
-def test_a_name_fitting_an_entry_and_one_member_is_a_grouping_warning(tmp_path):
+def boundary_runs(tmp_path):
+    """Every record, and every exit, of one boundary case.
+
+    ``records[(mode, strict)]`` is the ordered ``[(code, severity)]`` of the
+    JSON array; ``text[strict]`` the codes `--validate` lists as text, under
+    ``Warnings`` and under ``Bibliography errors``; ``exits`` the exit code of
+    every mode with ``--strict``, JSON and text.
+    """
+    records, text, exits = {}, {}, set()
+    for strict in ((), ("--strict",)):
+        for mode in ("--validate", "--unresolved"):
+            run = run_labdata(["--config", "lab.yaml", mode, "--format", "json",
+                               *strict], tmp_path)
+            records[(mode, bool(strict))] = [
+                (r["code"], r["severity"]) for r in json.loads(run.stdout)]
+            if strict:
+                exits.add(run.code)
+        run = run_labdata(["--config", "lab.yaml", "--validate", *strict], tmp_path)
+        sections = {}
+        for heading in ("Warnings", "Bibliography errors"):
+            part = run.stdout.split(f"\n{heading} (", 1)
+            listed = part[1].split("\n\n", 1)[0].splitlines()[1:] if len(part) > 1 else []
+            sections[heading] = [line.split()[1] for line in listed]
+        text[bool(strict)] = sections
+        if strict:
+            exits.add(run.code)
+    for mode in (["--unresolved"], ["--output", tmp_path / "o.yaml"]):
+        exits.add(run_labdata(["--config", "lab.yaml", "--strict", *mode],
+                              tmp_path).code)
+    return records, text, exits
+
+
+def test_a_name_fitting_an_entry_and_one_member_is_two_warnings(tmp_path):
     """`Patel, P.` fits the entry that declares `P. Patel` and member Paul
-    Patel, who declares no alias: one entry and one member."""
+    Patel, who declares no alias: one entry and one member.
+
+    The resolver reports its initials fitting the member as
+    RESOLVE-SUGGESTION, and grouping reports the entry and the member as
+    ID-GROUPING-AMBIGUOUS-DECLARED. Both are warnings under decision 10, so
+    --strict passes; RESOLVE-AMBIGUOUS-NAME is not reported.
+    """
     write_lab(tmp_path,
               "@article{a, title = {T}, journal = {J}, year = 2024, author = "
               "{Patel, P.}}\n",
               people=[{"id": "ppatel", "name": "Paul Patel", "role": "student"}],
               collaborators=[{"name": "Priya Patel", "aliases": ["P. Patel"]}])
-    records, exits = strict_codes(tmp_path)
-    codes = [r["code"] for r in records]
-    assert "ID-GROUPING-AMBIGUOUS-DECLARED" in codes
-    assert "RESOLVE-AMBIGUOUS-NAME" not in codes
-    assert {r["severity"] for r in records} == {"warning"}
+    records, text, exits = boundary_runs(tmp_path)
+    both = [("RESOLVE-SUGGESTION", "warning"),
+            ("ID-GROUPING-AMBIGUOUS-DECLARED", "warning")]
+    for strict in (False, True):
+        assert records[("--validate", strict)] == both
+        assert records[("--unresolved", strict)] == both + [
+            ("RESOLVE-UNRESOLVED-NAME", "warning")]
+        assert text[strict] == {
+            "Warnings": ["RESOLVE-SUGGESTION", "ID-GROUPING-AMBIGUOUS-DECLARED"],
+            "Bibliography errors": []}
     assert exits == {0}
 
 
 def test_a_name_fitting_an_entry_and_two_members_fails_strict(tmp_path):
     """One entry and two members: the members' ambiguity is
-    RESOLVE-AMBIGUOUS-NAME (decision 6), an error under --strict. The
-    grouping warning is reported as well, naming the entry too."""
+    RESOLVE-AMBIGUOUS-NAME (decision 6), an error under --strict, and the
+    grouping warning names the entry as well. No RESOLVE-SUGGESTION: a name
+    the resolver finds ambiguous is not also offered as a suggestion."""
     write_lab(tmp_path,
               "@article{a, title = {T}, journal = {J}, year = 2024, author = "
               "{Kim, A.}}\n",
               people=[{"id": "akim", "name": "Alex Kim", "role": "student"},
                       {"id": "alankim", "name": "Alan Kim", "role": "student"}],
               collaborators=[{"name": "Amy Kim"}])
-    records, exits = strict_codes(tmp_path)
-    by_code = {r["code"]: r for r in records}
-    assert set(by_code) == {"RESOLVE-AMBIGUOUS-NAME", "ID-GROUPING-AMBIGUOUS-DECLARED"}
-    assert by_code["RESOLVE-AMBIGUOUS-NAME"]["severity"] == "error"
-    assert by_code["ID-GROUPING-AMBIGUOUS-DECLARED"]["severity"] == "warning"
-    assert "collaborator:amy kim" in by_code["ID-GROUPING-AMBIGUOUS-DECLARED"]["message"]
+    records, text, exits = boundary_runs(tmp_path)
+    for strict, level in ((False, "warning"), (True, "error")):
+        both = [("RESOLVE-AMBIGUOUS-NAME", level),
+                ("ID-GROUPING-AMBIGUOUS-DECLARED", "warning")]
+        assert records[("--validate", strict)] == both
+        assert records[("--unresolved", strict)] == both + [
+            ("RESOLVE-UNRESOLVED-NAME", "warning")]
+    assert text[False] == {
+        "Warnings": ["RESOLVE-AMBIGUOUS-NAME", "ID-GROUPING-AMBIGUOUS-DECLARED"],
+        "Bibliography errors": []}
+    assert text[True] == {"Warnings": ["ID-GROUPING-AMBIGUOUS-DECLARED"],
+                          "Bibliography errors": ["RESOLVE-AMBIGUOUS-NAME"]}
     assert exits == {1}
 
 
