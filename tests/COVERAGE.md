@@ -48,8 +48,8 @@ Cases that fail today are not fixed here (that is the linked issue's job):
 (structured-name matching and collaborator aliases), #26 (precise
 diagnostics), #27 (explicit link and award fields), #28 (`keywords` project
 tags). #18 is still open for
-the template side — `| escape`, attribute-safe escaping and the checks on
-rendered output — but every LaTeX-to-text row below passes, and the one place
+renderers — escaping, attribute-safe escaping and the checks on rendered
+output — but every LaTeX-to-text row below passes, and the one place
 labdata generated Markdown of its own, the composed `venue`, is gone.
 
 ## `@string` macros and BibTeX structure
@@ -280,7 +280,7 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 | `config.lab.present` | A `lab:` section | Copied into the output as `lab` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
 | `config.lab.missing` | No `lab:` section | Accepted; `lab` is emitted as `{}`, so no header and an empty header are the same document | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_lab_missing` | pass |
 | `config.lab.wrong_type` | `lab: "Corpus Lab"`, a string | Error naming the file and the key | `tests/corpus/invalid/config_lab_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `config.site` | A `site:` section, read by the site config script | Accepted by labdata and not copied into the output | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
+| `config.site` | A `site:` section, read by downstream renderers | Accepted by labdata and not copied into the output | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
 | `config.bib_dir.present` | `bib_dir: "."` | The `.bib` files are read from that directory | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
 | `config.bib_dir.missing` | No `bib_dir` | Error naming the missing key | `tests/corpus/invalid/config_bib_dir_missing/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.bib_dir.wrong_type` | `bib_dir` as a list | Error naming the file and the key | `tests/corpus/invalid/config_bib_dir_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
@@ -312,7 +312,7 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 | `cli.config` | `labdata` with no `--config` | Usage error naming `--config` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_config_required` | pass |
 | `cli.config_not_found` | `--config` naming a file that is not there | Error naming the file; exits non-zero | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_config_not_found` | pass |
 | `cli.mode.required` | `--config` alone, with no mode flag | Usage error naming `--output`, `--validate` and `--unresolved` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_mode_required` | pass |
-| `cli.output` | `--output site/_data/lab.yml` | Writes the file, creating parent directories | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_output_creates_parent_dirs` | pass |
+| `cli.output` | `--output out/nested/lab.yml` | Writes the file, creating parent directories | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_output_creates_parent_dirs` | pass |
 | `cli.format.yaml` | `--format yaml`, and the default with no `--format` | YAML holding the same data as `--format json` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format` | pass |
 | `cli.format.json` | `--format json` | JSON holding the same data as the YAML export | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format` | pass |
 | `cli.format.invalid` | `--format xml` | Usage error naming the bad value; no file is written | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format_invalid` | pass |

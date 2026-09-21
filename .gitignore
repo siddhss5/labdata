@@ -12,18 +12,5 @@ data/pubs/
 .coverage
 .coverage.*
 
-# Generated site data (built by labdata CLI)
-site/_data/lab.yml
-
-# Jekyll build artifacts
-site/_site/
-site/.jekyll-cache/
-site/.jekyll-metadata
-# Generated Jekyll config (scripts/generate_site_config.py)
-site/_config.generated.yml
-
-# Site build output
-_site/
-
 # The conformance corpus ships a tiny fictional PDF fixture (tests/corpus).
 !tests/corpus/valid/pdfs/present.pdf

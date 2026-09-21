@@ -1,7 +1,6 @@
 # Example Lab: a fictional lab used as the labdata demo.
 # Its people, works and projects, and their example.org, DOI, arXiv
-# and video links, are invented. Only site.url and site.baseurl are real:
-# they are where this demo is deployed.
+# and video links, are invented.
 #
 # Paths are relative to the repository root, so run labdata from there:
 #   labdata --config examples/demo/lab.yaml --validate
@@ -12,13 +11,6 @@ lab:
   university: "Example University"
   department: "Department of Computer Science"
   website: "https://example.org"
-
-# Jekyll site settings (read by scripts/generate_site_config.py).
-# The site title and description come from lab.name and lab.description.
-# url and baseurl are the demo's real deployment address.
-site:
-  url: "https://siddhss5.github.io"
-  baseurl: "/labdata"
 
 bib_dir: "examples/demo/bib"
 bib_files:

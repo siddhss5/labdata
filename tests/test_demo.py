@@ -1,11 +1,8 @@
-"""Tests for the Example Lab demo in examples/demo/ and the site config it feeds."""
+"""Tests for the Example Lab demo in examples/demo/."""
 
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
-import yaml
 
 from labdata.assembler import assemble
 from labdata.cli import main
@@ -50,7 +47,8 @@ class TestDemoLab:
         for project in demo_result.data.projects:
             assert project.work_ids, project.id
 
-    def test_covers_template_roles(self, demo_result):
+    def test_covers_role_and_status_combinations(self, demo_result):
+        """The demo exercises each of these role and status pairs."""
         roles = {(p.role, p.status) for p in demo_result.data.people}
         assert ("professor", "current") in roles
         assert ("phd_student", "current") in roles
@@ -114,50 +112,3 @@ class TestDemoLab:
         assert demo_result.unresolved_authors == [
             "Lin Lee", "Olivia Ortiz", "P. Park", "P. Patel", "Pradeep Patel",
             "Priya Patel", "R. Reed", "Sybil Stone", "Trent Turner"]
-
-
-class TestGenerateSiteConfig:
-    def _run(self, lab_yaml, tmp_path):
-        out = tmp_path / "_config.generated.yml"
-        result = subprocess.run(
-            [sys.executable, "scripts/generate_site_config.py", str(lab_yaml), str(out)],
-            capture_output=True, text=True, cwd=REPO_ROOT,
-        )
-        assert result.returncode == 0, result.stderr
-        with open(out, 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f)
-
-    def test_demo(self, tmp_path):
-        with open(REPO_ROOT / DEMO_CONFIG, 'r', encoding='utf-8') as f:
-            lab_config = yaml.safe_load(f)
-        config = self._run(DEMO_CONFIG, tmp_path)
-        assert config["title"] == "Example Lab"
-        assert config["description"] == lab_config["lab"]["description"]
-        assert config["url"] == lab_config["site"]["url"]
-        assert config["baseurl"] == lab_config["site"]["baseurl"]
-
-    def test_values_follow_lab_yaml(self, tmp_path):
-        lab_yaml = tmp_path / "lab.yaml"
-        lab_yaml.write_text(yaml.safe_dump({
-            "lab": {"name": "Other Lab", "description": "Something else"},
-            "site": {"url": "https://other.example.org", "baseurl": "/other"},
-            "bib_dir": "bib",
-            "bib_files": [],
-        }))
-        config = self._run(lab_yaml, tmp_path)
-        assert config == {
-            "title": "Other Lab",
-            "description": "Something else",
-            "url": "https://other.example.org",
-            "baseurl": "/other",
-        }
-
-    def test_without_site_section(self, tmp_path):
-        lab_yaml = tmp_path / "lab.yaml"
-        lab_yaml.write_text(yaml.safe_dump({
-            "lab": {"name": "Root Lab"},
-            "bib_dir": "bib",
-            "bib_files": [],
-        }))
-        config = self._run(lab_yaml, tmp_path)
-        assert config == {"title": "Root Lab", "baseurl": ""}

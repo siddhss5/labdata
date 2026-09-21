@@ -21,8 +21,8 @@ def test_config_present(valid_output):
     categories = {w["category"] for w in valid_output["works"]}
     assert categories == {"Strings", "Names", "LaTeX", "Structure", "Encoding", "Links",
                           "Projects"}
-    # site is for scripts/generate_site_config.py; labdata accepts it and
-    # does not copy it into the output.
+    # site is for downstream renderers; labdata accepts it and does not
+    # copy it into the output.
     assert "site" not in valid_output
 
 
@@ -189,7 +189,7 @@ def test_cli_format_invalid(tmp_path):
 
 @covers("cli.output", "diag.wrote")
 def test_cli_output_creates_parent_dirs(tmp_path, valid_output):
-    out = tmp_path / "site" / "_data" / "lab.yml"
+    out = tmp_path / "out" / "nested" / "lab.yml"
     run = run_labdata(["--config", "lab.yaml", "--output", out], VALID)
     assert run.code == 0 and run.crash is None, run.output
     assert out.exists()
