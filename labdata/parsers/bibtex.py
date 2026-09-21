@@ -122,7 +122,6 @@ EQUAL_CONTRIBUTION = re.compile(rf"{_ANY_MARKER}\s*$")
 _MARKER_COMMAND = re.compile(r"(?<!\\)\\textsuperscript\s*$")
 _MARKER_ARGUMENT = re.compile(rf"\{{\*\}}(?:{_ANY_MARKER})*")
 
-_STRING_DEFINITION = re.compile(r'@string\s*[{(]\s*([^\s=,{}()"]+)\s*=', re.IGNORECASE)
 
 # The command name pybtex is about to read, when that name is `comment`.
 _COMMENT_COMMAND = re.compile(r'\s*comment\s*[{(]', re.IGNORECASE)
@@ -139,19 +138,24 @@ def _warn(message: str) -> None:
 
 # --- Reading the files -------------------------------------------------------
 
-def _redefined_macros(text: str) -> List[Tuple[str, int]]:
-    """Every redefinition of an ``@string`` macro in this text, as
-    ``(name, line)``, in source order: each definition after a macro's first.
+def _redefined_macros(text: str,
+                      definitions: List[Tuple[str, int]]) -> List[Tuple[str, int]]:
+    """Every redefinition of an ``@string`` macro, as ``(name, line)``, in
+    source order: each definition after a macro's first.
+
+    ``definitions`` are the ``(name, offset)`` of every ``@string`` the parser
+    actually read from ``text``, so a definition inside an ``@comment`` group
+    is not one. Names compare without case, as the parser's macros do.
 
     pybtex takes the last definition, as BibTeX does, and says nothing about
     it. labdata reports it instead of letting a redefinition pass unnoticed.
     """
     seen: set = set()
     repeated: List[Tuple[str, int]] = []
-    for match in _STRING_DEFINITION.finditer(text):
-        name = match.group(1).lower()
+    for name, offset in definitions:
+        name = name.lower()
         if name in seen:
-            repeated.append((name, text.count("\n", 0, match.start()) + 1))
+            repeated.append((name, text.count("\n", 0, offset) + 1))
         else:
             seen.add(name)
     return repeated
@@ -193,6 +197,16 @@ class _CommentSkippingParser(LowLevelParser):
     the file as it always would: at worst a commented-out entry stays visible,
     never a real entry disappears.
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # (macro name, offset of its `@`) for every `@string` read in full.
+        self.definitions: List[Tuple[str, int]] = []
+
+    def parse_string_body(self, body_end):
+        """Read one ``@string`` body, and remember the definition it made."""
+        super().parse_string_body(body_end)
+        self.definitions.append((self.current_field_name, self.command_start))
 
     def parse_command(self):
         # pybtex raises SkipEntry for a @comment, and also for an entry that
@@ -276,6 +290,7 @@ class _Parser(PybtexParser):
             filename=self.filename,
             macros=self.macros,
         )
+        self.string_definitions = commands.definitions
         for command, arguments in commands:
             kind = command.lower()
             if kind == "preamble":
@@ -354,7 +369,13 @@ def parse_bibtex_file(
     """
     text = Path(path).read_text(encoding="utf-8-sig")
 
-    found = [(path, name, line) for name, line in _redefined_macros(text)]
+    duplicate_keys: List[str] = []
+    with pybtex.errors.capture() as errors:
+        parser = _Parser(duplicate_keys=duplicate_keys)
+        data = parser.parse_string(text)
+
+    found = [(path, name, line) for name, line
+             in _redefined_macros(text, parser.string_definitions)]
     if redefinitions is not None:
         redefinitions.extend(found)
     elif found:
@@ -363,11 +384,6 @@ def parse_bibtex_file(
             _warn(summary)
         else:
             warnings.append(summary)
-
-    duplicate_keys: List[str] = []
-    with pybtex.errors.capture() as errors:
-        parser = _Parser(duplicate_keys=duplicate_keys)
-        data = parser.parse_string(text)
     for error, key, field_name, start in parser.syntax_errors:
         if key is None and _on_comment_line(text, start):
             continue

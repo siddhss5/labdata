@@ -727,3 +727,39 @@ class TestRedefinedStringSummary:
         assert [w.split(" ", 1)[0] for w in warnings] == [STRING_REDEFINED]
         parse_bibtex_file(str(path))
         assert f"Warning: {STRING_REDEFINED} {path}::: " in capsys.readouterr().err
+
+
+class TestRedefinitionsFollowTheParser:
+    """Only what the parser reads as an @string definition is counted."""
+
+    def parse(self, tmp_path, data: bytes):
+        path = tmp_path / "strings.bib"
+        path.write_bytes(data)
+        warnings = []
+        works = parse_all_works(bib_dir=str(tmp_path), warnings=warnings,
+                                bib_files=[{"name": "strings.bib", "category": "C"}])
+        return str(path), warnings, {work.bib_id: work for work in works}
+
+    def test_exact_lines_with_bom_crlf_comments_and_a_commented_definition(self, tmp_path):
+        lines = [
+            "% the @string definitions below give rss three values",
+            '@comment{ @string{rss = "Commented"} }',
+            '@string{rss = "One"}',
+            "",
+            '@string{RSS = "Two"}',
+            '@string{rss = "Three"}',
+            "@inproceedings{e, title = {T}, booktitle = rss, year = 2024}",
+        ]
+        data = b"\xef\xbb\xbf" + "\r\n".join(lines).encode("utf-8") + b"\r\n"
+        path, warnings, works = self.parse(tmp_path, data)
+        assert warnings == [
+            f"{STRING_REDEFINED} {path}::: 1 @string macro redefined (last "
+            f"definition used): rss [{path}:5, {path}:6]"]
+        assert works["e"].venue.name == "Three"
+
+    def test_a_commented_out_and_a_real_definition_say_nothing(self, tmp_path):
+        data = ('@comment{@string{x = "old"}}\n@string{x = "new"}\n'
+                "@article{e, title = {T}, journal = x, year = 2024}\n").encode()
+        _, warnings, works = self.parse(tmp_path, data)
+        assert warnings == []
+        assert works["e"].venue.name == "new"

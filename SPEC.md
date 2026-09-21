@@ -181,7 +181,11 @@ without depending on English wording. Codes obey three rules:
    The same code always carries the same class. What varies with the mode is
    how the run reacts to it, which is why the class is not in the code, and
    why a consumer reads the exit code and the stream rather than the
-   spelling. #26 adds a `--strict` mode that raises the last two further.
+   spelling. #26 adds a `--strict` mode that raises the last two further,
+   with one exception already decided on #26: `BIB-STRING-REDEFINED` is a
+   warning in every mode, **including under `--strict`**. BibTeX's own
+   last-wins rule settles a redefinition (§7), so it is reported and never
+   fails a run.
 3. A published code is permanent. It is never reused for a different
    condition, and retiring one is a breaking change.
 
@@ -200,7 +204,7 @@ Codes in use:
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. A warning. |
 | `BIB-YEAR-INVALID` | An entry's `year` is present but is not a number (`int()` rejects it), such as `in press`. The work is emitted with `year: null` and sorts last, as one with no year does. A warning. |
 | `BIB-STRING-UNDEFINED` | A field value names an `@string` macro that nothing defined earlier in the same file. Located at the entry and field that use it, and naming the macro. It is read as empty, as BibTeX reads it, and the entry and its neighbours are kept. A macro used inside another `@string` definition is located at the file alone. A warning. |
-| `BIB-STRING-REDEFINED` | One or more `@string` macros are defined more than once. One line per run, however many files and macros: the count, the macros and every redefinition as `file:line` (§7). The last definition is used, as in BibTeX. A warning. |
+| `BIB-STRING-REDEFINED` | One or more `@string` macros are defined more than once. One line per run, however many files and macros: the count, the macros and every redefinition as `file:line` (§7). Only definitions the parser reads count, so one inside an `@comment` group does not. The last definition is used, as in BibTeX. A warning in every mode, including under `--strict`. |
 | `BIB-SYNTAX-ERROR` | Text the BibTeX parser cannot read. Inside an entry, located at that entry and at the field the parser was reading or had just read, which is where an unclosed brace or quote leaves it, or with the field left empty when the error comes before any field; the entry is kept as far as it was read, so that value may hold text meant for later fields. Outside any entry — an `@` that begins no well-formed command — located at the file alone and skipped. A `%` comment line between entries is ignored, as `tests/COVERAGE.md` rows `structure.comment_lines` and `structure.comment_mentions_command` require: an `@` in its prose, which the parser library reads as the start of a command, is not reported (`labdata.parsers.bibtex._on_comment_line()`). The prose gives the line. A warning. |
 | `BIB-VENUE-MISSING` | An `@article` has no `journal`, or an `@inproceedings` has no `booktitle` (`labdata.parsers.bibtex.REQUIRED_CONTAINER`). No other entry type is checked. A field present but empty counts as missing. The entry is kept, and its venue is read by the usual rule from any other container field it carries, or is `null`. A warning. |
 | `BIB-ENTRY-TYPE-UNSUPPORTED` | An entry's type is not one labdata documents. Those are `@article`, `@inproceedings`, `@conference`, `@proceedings`, `@incollection`, `@inbook`, `@book`, `@phdthesis`, `@mastersthesis`, `@techreport`, `@manual` and `@misc` (`labdata.parsers.bibtex.SUPPORTED_TYPES`); `@unpublished` and `@booklet`, for two, are not. Located at `<file>:<key>:entry_type`. The entry is kept, and its venue is read by the field rules alone. A warning. |
@@ -973,7 +977,10 @@ same macro; `tests/corpus/valid/strings.bib` defines all three macros before
 any entry uses them, so the corpus does not distinguish the two readings.
 
 A redefinition is never silent. `labdata.parsers.bibtex._redefined_macros()`
-finds every definition of a macro after its first, and `parse_all_works()`
+finds every definition of a macro after its first — among the definitions
+the parser itself reads, so an `@string` inside an `@comment` group is not
+counted, and a line number counts lines as the parser does, after a byte
+order mark and with CRLF read as one line end — and `parse_all_works()`
 reports all of a run's in **one line**, under `BIB-STRING-REDEFINED`
 (`redefined_summary()`; `tests/COVERAGE.md` row `strings.redefined_report`):
 
