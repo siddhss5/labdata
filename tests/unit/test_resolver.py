@@ -32,7 +32,27 @@ class TestNormalizeName:
         assert normalize_name("H. Müller") == "h muller"
 
     def test_periods(self):
-        assert normalize_name("A.J. Adams") == "aj adams"
+        assert normalize_name("A.J. Adams") == "a j adams"
+
+    @pytest.mark.parametrize("written", ["S.S. Ivers", "S. S. Ivers",
+                                         "S S Ivers", "S.S Ivers"])
+    def test_run_together_initials_are_spaced(self, written):
+        assert normalize_name(written) == "s s ivers"
+
+    def test_three_run_together_initials(self):
+        assert normalize_name("T.A.K. Moss") == normalize_name("T. A. K. Moss") \
+            == "t a k moss"
+
+    @pytest.mark.parametrize("written, normalized", [
+        ("SS Ivers", "ss ivers"),        # no period inside: a name, not initials
+        ("Jo Nash", "jo nash"),
+        ("Al. Nash", "al nash"),
+        ("Ng Nash", "ng nash"),
+        ("J.-P. Wren", "j-p wren"),      # hyphenated initials stay as written
+        ("J.P.-A. Wren", "jp-a wren"),
+    ])
+    def test_other_parts_are_not_split(self, written, normalized):
+        assert normalize_name(written) == normalized
 
     def test_whitespace(self):
         assert normalize_name("  A.  Adams  ") == "a adams"
@@ -143,6 +163,10 @@ class TestMatchForm:
     def test_given_names_are_abbreviated(self):
         assert match_form(Author(name="Alice Jane Adams", given="Alice Jane",
                                  family="Adams")) == "A. J. Adams"
+
+    def test_run_together_initials_are_one_initial_each(self):
+        assert match_form(Author(name="S.S. Ivers", given="S.S.",
+                                 family="Ivers")) == "S. S. Ivers"
 
     def test_a_hyphenated_given_name_keeps_both_initials(self):
         assert match_form(Author(name="Grace-Ann Green", given="Grace-Ann",
@@ -616,6 +640,17 @@ class TestDeclaredCollaboratorGrouping:
         assert grouped == {"Priya Patel": ("declared", ["w0", "w1"]),
                            "Pradeep Patel": ("normalized_name", ["w2"])}
         assert [a.person_id for w in works for a in w.authors] == [None] * 3
+        assert warnings == []
+
+    def test_run_together_initials_match_a_spaced_declared_alias(self):
+        from labdata.loaders import DeclaredCollaborator
+        _, collaborators, warnings = self.assemble(
+            [], [DeclaredCollaborator("Priya Sun Patel", ["P. S. Patel"])],
+            [Author(name="Priya Sun Patel", position=1, given="Priya Sun",
+                    family="Patel")],
+            [Author(name="P.S. Patel", position=1, given="P.S.", family="Patel")])
+        assert [(c.name, c.grouped_by, c.work_ids) for c in collaborators] == [
+            ("Priya Sun Patel", "declared", ["w0", "w1"])]
         assert warnings == []
 
     def test_a_name_fitting_two_declared_collaborators_is_reported(self):

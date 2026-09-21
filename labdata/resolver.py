@@ -60,6 +60,20 @@ PROJECT_UNKNOWN = "RESOLVE-PROJECT-UNKNOWN"
 # key too few rather than one too many.
 _INITIAL = re.compile(r"^[^\W\d_]\.?(?:-[^\W\d_]\.?)*$", re.UNICODE)
 
+# Initials written without a space between them: two or more letters, each
+# but the last followed by a period, the last period optional -- `S.S.`,
+# `S.S`, `T.A.K.`. Read as one initial per letter, so `S.S.` matches as
+# `S. S.` does. A part with no period inside it (`SS`, `Al.`) is a name, and
+# a hyphenated one (`J.-P.`) is left as written.
+_RUN_TOGETHER = re.compile(r"(?<!\S)[^\W\d_](?:\.[^\W\d_])+\.?(?!\S)",
+                           re.UNICODE)
+
+
+def _spaced_initials(text: str) -> str:
+    """``S.S. Adams`` → ``S. S. Adams``: run-together initials, one per part."""
+    return _RUN_TOGETHER.sub(
+        lambda m: " ".join(f"{c}." for c in m.group(0) if c != "."), text)
+
 
 def normalize_name(name: str) -> str:
     """Normalize a name for matching.
@@ -74,6 +88,8 @@ def normalize_name(name: str) -> str:
         c for c in unicodedata.normalize('NFD', name)
         if unicodedata.category(c) != 'Mn'
     )
+    # Space run-together initials: S.S. → S. S.
+    name = _spaced_initials(name)
     # Remove periods
     name = name.replace('.', '')
     # Remove superscript HTML tags
@@ -84,7 +100,7 @@ def normalize_name(name: str) -> str:
 
 
 def _given_parts(given: Optional[str]) -> List[str]:
-    return [part for part in (given or "").split() if part]
+    return [part for part in _spaced_initials(given or "").split() if part]
 
 
 def initials_only(given: Optional[str]) -> bool:
@@ -149,7 +165,7 @@ def match_form(contributor: Contributor) -> str:
     if contributor.literal:
         return contributor.literal
     given = contributor.given or ""
-    initials = " ".join(_initials(part) for part in given.split())
+    initials = " ".join(_initials(part) for part in _given_parts(given))
     return _joined(initials, contributor)
 
 

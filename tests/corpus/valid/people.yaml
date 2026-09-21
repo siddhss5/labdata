@@ -106,3 +106,46 @@
   name: "Alan Kim"
   role: "phd_student"
   status: "current"
+
+# Run-together initials (#81). Stella declares her initials spaced and is
+# written run-together; Tobin declares them run-together and is written
+# spaced; Uma has three. Each form is equal to the other once each initial
+# is a part of its own.
+# CASE names.initials_run_together
+# CASE names.initials_run_together_unmatched
+- id: "sivers"
+  name: "Stella Sky Ivers"
+  aliases: ["S. S. Ivers"]
+  role: "phd_student"
+  status: "current"
+
+# CASE names.initials_run_together_alias
+# CASE names.initials_multiletter_whole
+- id: "tlark"
+  name: "Tobin Rue Lark"
+  aliases: ["T.R. Lark"]
+  role: "phd_student"
+  status: "current"
+
+# CASE names.initials_run_together_three
+- id: "umoss"
+  name: "Uma Ann Kaye Moss"
+  aliases: ["U. A. K. Moss"]
+  role: "postdoc"
+  status: "current"
+
+# A multi-letter given name that could be read as two initials.
+# CASE names.initials_multiletter_whole
+- id: "jnash"
+  name: "Jonas Otto Nash"
+  aliases: ["J. O. Nash"]
+  role: "ms_student"
+  status: "current"
+
+# Hyphenated initials, which are left as written.
+# CASE names.initials_hyphenated
+- id: "jwren"
+  name: "Jana-Pia Wren"
+  aliases: ["J.-P. Wren"]
+  role: "phd_student"
+  status: "current"

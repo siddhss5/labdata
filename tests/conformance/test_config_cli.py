@@ -33,7 +33,7 @@ def test_config_pdf_base_url_present(valid_output):
 
 @covers("config.people_file.present")
 def test_config_people_file_present(valid_output):
-    assert len(valid_output["people"]) == 12
+    assert len(valid_output["people"]) == 17
     assert work(valid_output, "name-last-first")["authors"][0]["person_id"] == "aadams"
 
 

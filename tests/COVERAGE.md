@@ -181,6 +181,12 @@ field of the output.
 | `names.same_initial_alex` | `Kim, Alex`, who declares the alias `A. Kim` | Resolves to `akim` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.same_initial_alan` | `Kim, Alan`, who declares no alias | Resolves to `alankim`, not to the other Kim | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.initials_ambiguous` | `Kim, A.`, which fits both Kims | Not resolved to either; listed for a human to resolve | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.initials_run_together` | `Ivers, S.S.`, whose person declares the alias `S. S. Ivers` | Resolves to `sivers`: initials written together are one initial per letter, so `S.S.`, `S.S`, `S S` and `S. S.` match alike. The readable name and the given part stay `S.S.` as written | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.initials_run_together_alias` | `Lark, T. R.`, whose person declares the alias `T.R. Lark` | Resolves to `tlark`: the declared side is read the same way | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.initials_run_together_three` | `Moss, U.A.K.`, whose person declares the alias `U. A. K. Moss` | Resolves to `umoss` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.initials_run_together_unmatched` | `Ivers, S.T.`, which no one declares | Not resolved: `S. T. Ivers` is not `S. S. Ivers`, and not `Stella Sky Ivers` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.initials_multiletter_whole` | `Nash, Jo` beside the alias `J. O. Nash`, and `Lark, TR` beside the alias `T.R. Lark` | Neither resolves: a part with no period inside it is a name and is never split into initials | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.initials_hyphenated` | `Wren, J.-P.` and `Wren, J.P.`, whose person declares the alias `J.-P. Wren` | `J.-P.` resolves to `jwren`; `J.P.` does not. Hyphenated initials are left as written and are equal only to themselves | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 
 ## Identity resolution
 Every way an author name can be matched to a person, and what happens when it
