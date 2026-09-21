@@ -7,6 +7,7 @@ MIT License - see LICENSE file for details.
 """
 
 import yaml
+from dataclasses import dataclass, field
 from typing import List
 from pathlib import Path
 
@@ -87,3 +88,35 @@ def load_projects(path: str) -> List[Project]:
         projects.append(project)
 
     return projects
+
+
+@dataclass
+class DeclaredCollaborator:
+    """One external co-author declared in `collaborators_file`.
+
+    It only groups authorships into `collaborators`; it is never a person
+    and never produces a `person_id`.
+    """
+    name: str
+    aliases: List[str] = field(default_factory=list)
+
+
+def load_collaborators(path: str) -> List[DeclaredCollaborator]:
+    """Load declared external co-authors from a YAML file.
+
+    Expected format (list of dicts):
+        - name: "Priya Patel"
+          aliases: ["P. Patel"]
+    """
+    if not Path(path).exists():
+        return []
+
+    with open(path, 'r', encoding='utf-8') as f:
+        data = yaml.safe_load(f)
+
+    if not data or not isinstance(data, list):
+        return []
+
+    return [DeclaredCollaborator(name=entry['name'],
+                                 aliases=entry.get('aliases', []))
+            for entry in data]

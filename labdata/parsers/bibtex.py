@@ -386,8 +386,8 @@ def readable_name(parts: Dict[str, Optional[str]]) -> str:
     This is *a readable form of the input name, not a citation form*. It does
     not abbreviate, expand or normalise anything, so an entry writing
     ``Brown, B.`` yields ``B. Brown`` and one writing ``Brown, Bob`` yields
-    ``Bob Brown``. The form the resolver matches on is a separate, private
-    one (`labdata.resolver`), which is what lets #24 change matching without
+    ``Bob Brown``. The resolver matches on the structured parts rather than
+    on this string (`labdata.resolver`), so matching can change without
     changing what the document displays.
 
     A name written as one brace-protected unit keeps its full form, because
@@ -426,7 +426,7 @@ def parse_author_list(entry: Entry, where: str) -> List[Author]:
     Each authorship carries the parts BibTeX split its name into, a readable
     form built from them, its 1-based position, and whether the entry marked
     it as an equal contribution. Matching those parts to a person is the
-    resolver's, and #24's.
+    resolver's.
     """
     return [Author(name=found["name"],
                    position=found["position"],

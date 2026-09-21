@@ -104,7 +104,8 @@ class TestDemoLab:
         identity fixture #69 added shows up as three Patels rather than one:
         `Priya Patel` on two works, `P. Patel` on a third and `Pradeep Patel`
         on a fourth. Two of those three are the same person, which no key
-        built from a name can tell, and joining them is #24's. `Lin Lee` is
+        built from a name can tell; the demo's `collaborators_file` joins them
+        into one collaborator, and neither becomes a person. `Lin Lee` is
         one name written twice on `nolan2020stairs` by two different people,
         which is why the authorship rather than the grouping is the record a
         consumer falls back to.

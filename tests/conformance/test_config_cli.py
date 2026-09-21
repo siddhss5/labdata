@@ -42,6 +42,49 @@ def test_config_projects_file_present(valid_output):
     assert [p["id"] for p in valid_output["projects"]] == ["homebot", "sharedarm"]
 
 
+QUINN_WORKS = ["id-external-2023", "id-external-2019", "id-grouping"]
+
+
+def person_ids(data):
+    return [(w["bib_id"], a["position"], a["person_id"])
+            for w in data["works"] for a in w["authors"] + w["editors"]]
+
+
+@covers("config.collaborators_file.present", "identity.collaborator_alias")
+def test_config_collaborators_file_present(tmp_path, valid_output):
+    """A declared alias joins `Quinn, Quentin` and `Quinn, Q.` into one
+    grouping, and changes no `person_id` anywhere."""
+    run, data = export(VALID, tmp_path,
+                       write_variant(tmp_path, collaborators_file="collaborators.yaml"))
+    assert run.code == 0 and run.crash is None, run.output
+    quinn = [c for c in data["collaborators"] if c["family"] == "Quinn"]
+    assert len(quinn) == 1, quinn
+    assert quinn[0]["grouped_by"] == "declared"
+    assert quinn[0]["work_ids"] == QUINN_WORKS
+    assert quinn[0]["name_variants"] == ["Q. Quinn", "Quentin Quinn"]
+    # Only this key moved: without the file, the two spellings are two keys.
+    assert len([c for c in valid_output["collaborators"]
+                if c["family"] == "Quinn"]) == 2
+    assert {c["grouped_by"] for c in valid_output["collaborators"]} == {"normalized_name"}
+    assert person_ids(data) == person_ids(valid_output)
+
+
+@covers("identity.collaborator_alias_is_member")
+def test_collaborator_alias_that_is_a_member_is_reported(tmp_path, valid_output):
+    """`A. Adams` is also a member's alias: reported, and the member keeps it."""
+    run = run_labdata(["--config", write_variant(
+        tmp_path, collaborators_file="collaborators.yaml"), "--validate"], VALID)
+    assert run.code == 0 and run.crash is None, run.output
+    [line] = [line for line in run.stdout.splitlines()
+              if "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER" in line]
+    assert "collaborators.yaml:Amy Adams:aliases" in line
+    assert "A. Adams" in line and "aadams" in line
+    _, data = export(VALID, tmp_path,
+                     write_variant(tmp_path, collaborators_file="collaborators.yaml"))
+    assert [c for c in data["collaborators"] if c["name"] == "Amy Adams"] == []
+    assert person_ids(data) == person_ids(valid_output)
+
+
 # --- Config keys: missing (optional keys) ------------------------------------
 
 @covers("config.lab.missing")

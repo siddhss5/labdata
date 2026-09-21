@@ -122,10 +122,9 @@ def _xfail_marker_calls(tree):
 
 
 # Every place in the suite that builds a strict xfail marker: the two
-# generators and the one literal. Stated here so that a fourth cannot be
-# added without this row moving, and so the search below cannot pass by
-# finding nothing.
-XFAIL_MARKER_SITES = 3
+# generators. Stated here so that a third cannot be added without this row
+# moving, and so the search below cannot pass by finding nothing.
+XFAIL_MARKER_SITES = 2
 
 
 def test_every_strict_xfail_in_the_source_declares_the_exception_it_expects():

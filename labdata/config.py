@@ -100,6 +100,7 @@ class LabDataConfig:
         pdf_base_url: "https://lab.edu/pdfs"
         people_file: "data/people.yaml"
         projects_file: "data/projects.yaml"
+        collaborators_file: "data/collaborators.yaml"
     """
     bib_dir: str
     bib_files: List[BibFile]
@@ -111,6 +112,10 @@ class LabDataConfig:
     # Where this configuration was read from, so a diagnostic about it can
     # name the file the user would edit. Never emitted.
     path: Optional[str] = None
+
+    # External co-authors whose spellings should be grouped together. Last,
+    # so the positional order of the fields above is unchanged.
+    collaborators_file: Optional[str] = None
 
     @classmethod
     def from_yaml(cls, path: str) -> 'LabDataConfig':
@@ -136,4 +141,5 @@ class LabDataConfig:
             projects_file=data.get('projects_file'),
             lab=data.get('lab'),
             path=str(path),
+            collaborators_file=data.get('collaborators_file'),
         )

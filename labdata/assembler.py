@@ -16,17 +16,24 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from .config import LabDataConfig, reject_absolute_name
-from .models import Author, Collaborator, LabData, Work
+from .models import Author, Collaborator, LabData, Person, Work
 from .parsers.bibtex import parse_all_works
-from .loaders import load_people, load_projects
+from .loaders import (
+    DeclaredCollaborator, load_collaborators, load_people, load_projects,
+)
 from .resolver import (
-    compute_backlinks, normalize_name, resolve_authors, resolve_projects,
+    AMBIGUOUS, AMBIGUOUS_NAME, RESOLVED, Candidates, compute_backlinks, given_initials,
+    initials_only, match, match_key, normalize_name, person_candidates,
+    resolve_authors, resolve_projects,
 )
 
 
 # The policy that built a collaborator key. It is a declared, open string, so
 # #25 can emit `explicit` or `orcid` without a schema version bump.
+# `declared` is a grouping `collaborators_file` asked for: its name and
+# aliases joined the spellings, and it is still a grouping, never a person.
 GROUPED_BY_NORMALIZED_NAME = "normalized_name"
+GROUPED_BY_DECLARED = "declared"
 
 # Whether the name was written as one brace-protected unit. Not
 # `person`/`organization`: braces in BibTeX mean "do not parse this", which
@@ -46,39 +53,15 @@ _NOT_SLUG = re.compile(r"-+")
 
 # Two ways a grouping key can be wrong that the document would otherwise keep
 # to itself. Neither is an error: an external co-author is never an error
-# (SPEC.md section 1), and the grouping policy itself is #24's.
+# (SPEC.md section 1).
 GROUPING_SPANS_SPELLINGS = "ID-GROUPING-SPANS-SPELLINGS"
 GROUPING_INITIALS_AMBIGUOUS = "ID-GROUPING-INITIALS-AMBIGUOUS"
 
-# One part of a given name that is an initial rather than a name: a letter,
-# its period optional, and a hyphenated run of them -- `A.`, `A`, `G.-A.`,
-# `J-P`. A Unicode letter, so `Ç.` is read as an initial and a name outside
-# ASCII is not silently exempt. A part that is anything else is read as a
-# name, which is the safe direction for a warning: it reports one grouping
-# key too few rather than one too many.
-_INITIAL = re.compile(r"^[^\W\d_]\.?(?:-[^\W\d_]\.?)*$", re.UNICODE)
-
-
-def _given_parts(given: Optional[str]) -> List[str]:
-    return [part for part in (given or "").split() if part]
-
-
-def initials_only(given: Optional[str]) -> bool:
-    """True when every part of a given name is an initial rather than a name."""
-    parts = _given_parts(given)
-    return bool(parts) and all(_INITIAL.match(part) for part in parts)
-
-
-def given_initials(given: Optional[str]) -> Tuple[str, ...]:
-    """The initial of each part of a given name, normalised.
-
-    ``Alice Jane`` and ``A. J.`` both give ``("a", "j")``; ``Grace-Ann`` and
-    ``G.-A.`` both give ``("g-a",)``, because both halves of a hyphenated
-    given name carry an initial.
-    """
-    return tuple("-".join(normalize_name(piece)[:1]
-                          for piece in part.split("-") if piece)
-                 for part in _given_parts(given))
+# A `collaborators_file` name or alias that a lab member already declares.
+# Resolving to the member wins, because the collaborator file never produces
+# a `person_id`, and the collaborator entry is not used for that spelling;
+# saying so is what keeps the choice from being silent.
+COLLABORATOR_ALIAS_IS_MEMBER = "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER"
 
 # A document needs a header, and a header with no name is one a renderer
 # cannot title a page from.
@@ -125,8 +108,10 @@ def collaborator_key(name_kind: str, normalized: str) -> str:
 class _Grouping:
     """One collaborator under construction, in the order the works are read."""
 
-    def __init__(self, key: str, author: Author, normalized: str):
+    def __init__(self, key: str, author: Author, normalized: str,
+                 grouped_by: str = GROUPED_BY_NORMALIZED_NAME):
         self.key = key
+        self.grouped_by = grouped_by
         self.normalized = normalized
         self.name_kind = LITERAL if author.literal else PERSONAL
         self.author = author            # the first spelling, in document order
@@ -191,7 +176,7 @@ class _Grouping:
         return Collaborator(
             key=self.key,
             name=self.author.name,
-            grouped_by=GROUPED_BY_NORMALIZED_NAME,
+            grouped_by=self.grouped_by,
             name_kind=self.name_kind,
             given=self.author.given,
             von=self.author.von,
@@ -207,32 +192,86 @@ class _Grouping:
         )
 
 
+def declared_collaborators(declared: List[DeclaredCollaborator],
+                           people: List[Person], source: str,
+                           warnings: List[str]) -> List[Tuple[str, List[str]]]:
+    """The `collaborators_file` entries as ``(normalised name, spellings)``,
+    minus any spelling a lab member already declares.
+
+    The normalised name is what the entry's collaborator key is built from. A
+    name or alias equal to a member's name or alias is reported under
+    `COLLABORATOR_ALIAS_IS_MEMBER` and left out, so the member is never
+    shadowed and the collaborator never silently chosen.
+    """
+    members = person_candidates(people)
+    entries = []
+    for collaborator in declared:
+        kept = []
+        for field_name, name in [("name", collaborator.name)] + [
+                ("aliases", alias) for alias in collaborator.aliases]:
+            owners = members.ids_for(match_key(name))
+            if owners:
+                warnings.append(
+                    f"{COLLABORATOR_ALIAS_IS_MEMBER} {source}:"
+                    f"{collaborator.name}:{field_name}: '{name}' is also "
+                    f"declared by {', '.join(sorted(owners))}; the member keeps "
+                    "it and the collaborator entry is not used for it")
+            else:
+                kept.append(name)
+        entries.append((normalize_name(collaborator.name), kept))
+    return entries
+
+
 def group_collaborators(works: List[Work], bib_dir: str,
-                        warnings: List[str]) -> List[Collaborator]:
+                        warnings: List[str],
+                        declared: Optional[List[Tuple[str, List[str]]]] = None,
+                        people: Optional[List[Person]] = None) -> List[Collaborator]:
     """Group every unresolved authorship, and say where the grouping is risky.
 
-    The grouping is keyed on the normalised full name, which is today's
-    policy against the new key rather than a new policy: tuning it -- joining
-    two spellings of one person, splitting two people who write alike -- is
-    #24's. What this does add is the two diagnostics that make the remaining
-    merge risk visible instead of silent.
+    The grouping is keyed on the normalised full name. An authorship that
+    matches exactly one `collaborators_file` entry -- by the same rules a
+    person is matched by, with the lab members competing -- is grouped under
+    that entry's key instead, which is what joins `Patel, Priya` and
+    `Patel, P.` once `P. Patel` is declared. A name that fits a declared
+    collaborator and anyone else is reported and grouped by name.
 
     Mutates ``author.collaborator_key`` in place, so every authorship
     references exactly one contributor.
     """
+    rivals = None
+    if declared:
+        rivals = Candidates(
+            [(f"collaborator:{name}", spellings) for name, spellings in declared]
+            + [(f"person:{p.id}", [p.name] + list(p.aliases))
+               for p in (people or [])])
     groups: Dict[str, _Grouping] = {}
     for work in works:
+        where = f"{bib_dir}/{work.source_file}:{work.bib_id}:author"
         for author in work.authors:
             if author.person_id:
                 continue
             normalized = normalize_name(author.name)
             kind = LITERAL if author.literal else PERSONAL
+            grouped_by = GROUPED_BY_NORMALIZED_NAME
+            if rivals is not None:
+                found = match(author, rivals)
+                ids = found.ids
+                if found.status == RESOLVED and ids[0].startswith("collaborator:"):
+                    normalized = ids[0].split(":", 1)[1]
+                    kind, grouped_by = PERSONAL, GROUPED_BY_DECLARED
+                elif found.status == AMBIGUOUS and any(
+                        i.startswith("collaborator:") for i in ids):
+                    warnings.append(
+                        f"{AMBIGUOUS_NAME} {where}: position {author.position}, "
+                        f"'{author.name}', fits more than one declared "
+                        f"collaborator or member and is grouped by its own "
+                        f"name: {', '.join(ids)}")
             key = collaborator_key(kind, normalized)
             author.collaborator_key = key
             group = groups.get(key)
             if group is None:
-                group = groups[key] = _Grouping(key, author, normalized)
-            group.add(work, author, f"{bib_dir}/{work.source_file}:{work.bib_id}:author")
+                group = groups[key] = _Grouping(key, author, normalized, grouped_by)
+            group.add(work, author, where)
 
     warnings.extend(_grouping_warnings(groups))
 
@@ -250,10 +289,14 @@ def _grouping_warnings(groups: Dict[str, "_Grouping"]) -> List[str]:
     """The two ways a key over- or under-groups, reported against a work.
 
     Both are located at the first authorship the key grouped, which is where
-    a human goes to fix the spelling.
+    a human goes to fix the spelling. A grouping `collaborators_file`
+    declared spans its spellings because a human said it should, so neither
+    is reported against it.
     """
     reported = []
     for group in sorted(groups.values(), key=lambda g: g.key):
+        if group.grouped_by == GROUPED_BY_DECLARED:
+            continue
         if len(group.variants) > 1:
             spellings = ", ".join(repr(v) for v in sorted(group.variants))
             reported.append(
@@ -314,11 +357,19 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     projects = load_projects(config.projects_file) if config.projects_file else []
 
     # Resolve
-    unresolved_authors = resolve_authors(works, people)
+    unresolved_authors = resolve_authors(works, people, warnings=warnings,
+                                         bib_dir=config.bib_dir)
     unknown_projects = resolve_projects(works, projects)
 
-    # Group the authorships that resolved to nobody
-    collaborators = group_collaborators(works, config.bib_dir, warnings)
+    # Group the authorships that resolved to nobody, joining the spellings
+    # `collaborators_file` declares
+    declared = None
+    if config.collaborators_file:
+        declared = declared_collaborators(
+            load_collaborators(config.collaborators_file), people,
+            config.collaborators_file, warnings)
+    collaborators = group_collaborators(works, config.bib_dir, warnings,
+                                        declared, people)
 
     # A header a renderer cannot title a page from. A `lab` that is not a
     # mapping at all is a different condition -- the header is malformed

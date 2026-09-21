@@ -24,10 +24,10 @@ per claim rather than one blanket marker per probe. Keeping them together
 would neuter the first group: a regression in schema validity would surface
 as an already-expected xfail and CI would stay green.
 
-`schema_version` 4 (#56) closed every gap but one. The assertions these
-probes make about the document now pass as written; the one marker left is
-`#24`'s, and it asks for two spellings of one external co-author to be
-joined, which a grouping keyed on a name cannot do by construction.
+`schema_version` 4 (#56) closed every gap but one, and #24 closed that one:
+two spellings of one external co-author are joined once `collaborators_file`
+declares the alias, which a grouping keyed on a name cannot do by
+construction.
 
 What the static checks catch, and where they stop.
 
@@ -1196,12 +1196,12 @@ def test_field_presence_reads_the_value_not_the_container(demo_document, label,
 #     and #56's key is a grouping by name. What #56 promises is that the
 #     authorship is the primary contributor record, addressed by
 #     `(work.bib_id, author.position)`, so the two occurrences survive.
-#   - Joining `Patel, Priya` and `Patel, P.` is **not** #56's, and asserting
-#     it against #56 would be a marker #56 could not remove. A normalised
-#     full-name key splits those two spellings by construction. #24 is the
-#     issue that groups collaborators by full name *and* gives external
-#     collaborators aliases, which is the mechanism that joins two spellings
-#     of one person; #25 layers explicit overrides and ORCID on top of it.
+#   - Joining `Patel, Priya` and `Patel, P.` is **not** #56's: a normalised
+#     full-name key splits those two spellings by construction. #24 gives
+#     external collaborators aliases, and the demo's `collaborators_file`
+#     declares `P. Patel` for her, which is the mechanism that joins two
+#     spellings of one person; #25 layers explicit overrides and ORCID on top
+#     of it.
 #
 # The scenarios are asserted over the node and edge sets `graph.py` already
 # builds, per #69's own recommendation, rather than in a fifth probe. Nothing
@@ -1296,14 +1296,7 @@ def external_contributors(edges):
     return authored
 
 
-@covers("probe.identity_one_person", xfail="#24", owns=(), because=(
-    "one external co-author written `Patel, Priya` on two works and "
-    "`Patel, P.` on a third is not one contributor under any key the "
-    "document has or #56 gives it -- today's abbreviated key merges her with "
-    "a different person, and #56's normalised full-name key splits her in "
-    "two spellings by construction. Joining the spellings of one external "
-    "person needs the full-name grouping *plus* the collaborator aliases "
-    "this issue adds"))
+@covers("probe.identity_one_person")
 def test_graph_joins_one_co_author_written_two_ways(probe_output, demo_document):
     """One external person on three works is one contributor, holding exactly
     those three works.

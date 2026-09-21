@@ -59,19 +59,20 @@ and a BibTeX re-emission — each reading the document and nothing else, and
 demo output. Under `schema_version` 3 four of them could not produce correct
 output; `schema_version` 4 closed every one of those gaps but one. Their
 failing assertions are marked `xfail(strict=True)` against **the issue that
-owns the missing property**, and the one marker left is #24's: it asks for
-two spellings of one external co-author to be joined, which a grouping keyed
-on a name cannot do by construction. A strict `xfail` swallows every failure
+owns the missing property**. The last of them was #24's, which asked for two
+spellings of one external co-author to be joined — something a grouping keyed
+on a name cannot do by construction — and it passes now that
+`collaborators_file` can declare the alias (§5). A strict `xfail` swallows every failure
 in its test, including one in something the probe already does correctly, so
 such a test is kept to the assertions that name the missing property — and,
 for the prerequisites it cannot avoid relying on, the rule is: **every
 prerequisite an xfailed test already satisfies is independently enforced by a
-test that passes.** The xfailed identity test reads the graph's `authored`
-edges; the passing `test_graph_is_well_formed` asserts that every one of them
-matches the document, and the passing `test_identity_fixtures_are_present`
-asserts that the works it is about are still there, so neither prerequisite
-is checked only inside a marker. `examples/consumers/README.md` lists what is
-left.
+test that passes.** The identity test that was xfailed reads the graph's
+`authored` edges; the passing `test_graph_is_well_formed` asserts that every
+one of them matches the document, and the passing
+`test_identity_fixtures_are_present` asserts that the works it is about are
+still there, so neither prerequisite was checked only inside a marker.
+`examples/consumers/README.md` lists what each probe asserts.
 
 **The CLI is the reference compiler.** Its flags, its exit codes and the
 stream each kind of message goes to are public API.
@@ -84,7 +85,7 @@ Flags, as `labdata.cli.main()` defines them:
 | `--format {yaml,json}` | Output format. Default `yaml`. |
 | `--output PATH` | Write the document to `PATH`. |
 | `--validate` | Report counts and problems, then exit without writing. |
-| `--unresolved` | List author names that matched no person, then exit. |
+| `--unresolved` | List author names that matched no person, then exit. A name left ambiguous is one of them. |
 
 **At least one** of `--output`, `--validate` or `--unresolved` is required —
 not exactly one. `labdata.cli.main()` rejects only the case where all three
@@ -167,7 +168,7 @@ without depending on English wording. Codes obey three rules:
    | **Fatal at load** | `Error loading configuration: <CODE> …` on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE` |
    | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY` |
-   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `CONFIG-LAB-NAME-MISSING` |
+   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `CONFIG-LAB-NAME-MISSING` |
 
    The same code always carries the same class. What varies with the mode is
    how the run reacts to it, which is why the class is not in the code, and
@@ -185,6 +186,9 @@ Codes in use:
 | `BIB-YEAR-MISSING` | An entry has no `year` field. The work is emitted with `year: null` and sorts last. A warning. |
 | `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. A warning: an external co-author is never an error. |
 | `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer, and two lineage suffixes that disagree ruling the pair out — so a particle, a second initial, a hyphenated family name, a suffix and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. A warning, for the same reason. |
+| `RESOLVE-AMBIGUOUS-NAME` | An author or editor name fits more than one person, so it is given no `person_id` and `resolution.status` is `ambiguous`; or an unresolved authorship fits a declared collaborator and someone else as well, so it is grouped by its own name. Located at the work — `<bib_dir>/<file>:<key>:author` or `:editor` — with the position and every id it fits in the prose. A warning in every mode: an author who resolves to nobody is never an error (#26's `--strict` may promote it). |
+| `RESOLVE-SUGGESTION` | An author or editor name matched no person but is close to one: its initials fit a person's name that declares no such alias, or it is a near miss on string similarity. Nothing is linked. Located as above, naming the position and the suggested ids. A warning, for the same reason. |
+| `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` | A `collaborators_file` `name` or alias equal to a lab member's name or alias. The member keeps the spelling and the collaborator entry is not used for it. Located at `<collaborators_file>:<collaborator name>:name` or `:aliases`. A warning. |
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. A warning. |
 | `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute. Raised as a `labdata.config.ConfigurationError` — its own type, so that a crash still reaches the user as a crash — by `LabDataConfig.from_yaml()`, by `BibFile` itself, by `assemble()` on every name it is about to compile, and by `Work.to_dict()`. **The last is the one that holds**, because it is the boundary every emitted document passes through: `BibFile` is a plain, mutable dataclass, so a name can be set after it was checked, and a `Work` can be built without a configuration at all. The three earlier checks stay because they fail sooner and say more — `from_yaml()` names the file the user would edit. |
 
@@ -360,8 +364,9 @@ rule does not apply to the input itself — only to whatever it produces.
 | `crossref` | **Rejected, on presence rather than on value.** An entry carrying the field is an error under `BIB-CROSSREF-UNSUPPORTED`, whatever is inside it: an empty `crossref = {}` is a field the entry carries, and letting it through would put the silent path back under a different spelling. The entry is not emitted and the run fails in every mode (`parse_all_works()`). No field of any entry is filled in from any other entry. |
 | `journal`, `booktitle`, `school`, `institution` | Converted under heading 1, then consumed by `build_venue()` into `venue.name`, with the `venue.kind` each implies. |
 | The citation key and the entry type | Become `bib_id` (and `source.key`) and `entry_type` (`entry_fields()`); see heading 4. |
-| `person.aliases` | Read for matching by `labdata.resolver.build_alias_index()`, never emitted — `Person.to_dict()` has no `aliases` key. |
-| `bib_dir`, `people_file`, `projects_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed PDF link. `bib_files[].name` **is** emitted, as `work.source.file`, and is therefore checked: an absolute one is rejected (`labdata.config.is_absolute_path()`), at load and again when the document is built. |
+| `person.aliases` | Read for matching by `labdata.resolver.match()`, never emitted — `Person.to_dict()` has no `aliases` key. |
+| `collaborators_file` entries | A list of `{name, aliases}` read by `labdata.loaders.load_collaborators()`. Read only to decide which unresolved authorships share one `collaborators` grouping (§5); never emitted as such and never a source of `person_id`. |
+| `bib_dir`, `people_file`, `projects_file`, `collaborators_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed PDF link. `bib_files[].name` **is** emitted, as `work.source.file`, and is therefore checked: an absolute one is rejected (`labdata.config.is_absolute_path()`), at load and again when the document is built. |
 | Any BibTeX field named nowhere in this table or heading 1 — `keywords`, `annote`, `language` and the rest | Not interpreted by labdata outside the `bibtex` record. `entry_fields()` copies it and `format_bibtex()` serializes it, but nothing reads its value, so it affects no other property (§5). |
 
 The fields named in that table and in heading 1 are the complete set labdata
@@ -595,9 +600,9 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 | `author.given`, `von`, `family`, `suffix`, `literal` | Input — the parts BibTeX split the name into, converted from LaTeX, with an equal-contribution marker removed (`person_name_parts()`). An entry writing `Brown, B.` yields `given: "B."`, and that is correct, not a gap. |
 | `author.name` | **Derived** — the parts joined in reading order (`readable_name()`). *A readable form of the input name, not a citation form*: it does not abbreviate, expand or normalise. |
 | `author.position` | **Derived** — where the authorship sits in its work's list, 1-based, counting only the names that reach the document. |
-| `author.person_id` | **Derived** — the resolver's match against `people_file` (`labdata.resolver.resolve_authors()`). |
+| `author.person_id` | **Derived** — the resolver's match against `people_file` (`labdata.resolver.resolve_authors()`): on the structured full name, then — only for a name that is itself abbreviated — on a declared alias, and never when the name fits more than one person or only nearly matches. See *How a name is matched* below. |
 | `author.collaborator_key` | **Derived** — the key of the grouping an unresolved authorship fell into (`labdata.assembler.group_collaborators()`). Exactly one of it and `person_id` is non-null. |
-| `author.resolution` | **Derived** — `status` over `resolved` and `unresolved`, and `method` over `exact` and `fuzzy`, or `null` when nothing matched (`resolve_authors()`). Both are open strings. |
+| `author.resolution` | **Derived** — `status` over `resolved`, `unresolved` and `ambiguous`, and `method` `exact`, or `null` when nothing matched (`resolve_authors()`). Both are open strings; `fuzzy` is no longer emitted (Version note under §6). |
 | `author.equal_contribution` | **Derived** — whether the entry wrote a `*` marker on any part of the name (`labdata.parsers.bibtex.marks_equal_contribution()`). |
 | `work.editors[*]` | The same, minus `collaborator_key` and `equal_contribution`. An editor that matched nobody is simply `person_id: null` (`parse_editor_list()`). |
 | `person.*` except the two below | Input — the fields of `people_file` (`labdata.loaders.load_people()`). `aliases` is read for matching and is **not** emitted. |
@@ -606,6 +611,31 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 | `project.work_ids`, `people_ids` | **Derived** — back-links, and the people reached through them (`compute_backlinks()`). |
 | `collaborators` | **Derived, entirely** — see below (`labdata.assembler.group_collaborators()`). |
 | `derived` | Reserved for labdata; empty today. See below. |
+
+### How a name is matched
+
+`labdata.resolver.match()` compares a name's structured parts against every
+person's `name` and `aliases`, all read through one normalisation — case,
+accents, periods and stray `*` characters ignored — and decides in this
+order:
+
+1. **The full name.** The parts joined as `given von family, suffix`, equal to
+   exactly one person's name or alias: resolved, `method: exact`. Equal to two
+   people's: `ambiguous`.
+2. **A declared alias, only where the input is abbreviated** — where some part
+   of the given name is an initial. The name abbreviated to initials, equal
+   to a name or alias exactly one person declares, resolves only if no other
+   person's name or alias *could be* it: same family, particles and suffix,
+   and the given names agreeing part by part, an initial agreeing with any
+   name it abbreviates. `Kim, A.` is `ambiguous` when Alex Kim declares
+   `A. Kim` and Alan Kim declares nothing. A full name is never abbreviated
+   to find a match, so `Kim, Alan` cannot reach the alias `A. Kim`.
+3. **Otherwise nothing is linked.** Everyone the name could be, and the best
+   string-similarity match at or above 0.85, are reported as a suggestion.
+
+A name that is ambiguous or unresolved is reported (`RESOLVE-AMBIGUOUS-NAME`,
+`RESOLVE-SUGGESTION`) and, for an authorship, grouped into a collaborator
+like any other unresolved one.
 
 ### Six derived regions that need more than a row
 
@@ -683,8 +713,9 @@ it. What that buys, and what it does not:
 - **People and collaborators occupy separate namespaces.** A graph writes
   `person:aadams` and `collaborator:rachel-ross-0797b357`, never both under
   `person:`. An unresolved string is never labelled a person.
-- **`grouped_by` names the policy.** It is `normalized_name` in v4, and an
-  open string, so #25 can emit `explicit` or `orcid` without a bump.
+- **`grouped_by` names the policy.** It is `normalized_name`, or `declared`
+  for a grouping `collaborators_file` asked for, and an open string, so #25
+  can emit `explicit` or `orcid` without a bump.
 - **`name_kind` is `personal` or `literal`, not `person`/`organization`.**
   Brace protection in BibTeX means "do not parse this", which covers
   organisations but also mononyms, so the document must not assert
@@ -692,17 +723,26 @@ it. What that buys, and what it does not:
 - **`work_count` is deduplicated per work; `authorship_count` counts
   occurrences.** One work listing two authorships under one key contributes
   `1` and `2` respectively.
-- **The policy is #24's.** v4 ships today's policy against the new full-name
-  key, which removes most of the merge risk for free but also over-splits:
-  one person written `Priya Patel` on two works and `P. Patel` on a third is
-  two keys. Both rates are policy, and #24 tunes them. What v4 adds is that
-  the remaining risk is **reported** rather than silent:
+- **The policy.** An unresolved authorship is keyed on its normalised full
+  name, which removes most of the merge risk but over-splits: one person
+  written `Priya Patel` on two works and `P. Patel` on a third is two keys.
+  **`collaborators_file` joins them when a human says so**: a list of
+  `{name, aliases}`, each entry matched by the same rules as a person (§5,
+  *How a name is matched*), with the lab members competing. An authorship
+  that matches exactly one entry is grouped under the key of that entry's
+  normalised name, `grouped_by: declared`; one that fits an entry and anyone
+  else is reported under `RESOLVE-AMBIGUOUS-NAME` and grouped by its own
+  name. A `name` or alias a member already declares is reported under
+  `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` and not used. The file never
+  produces a `person_id`. The remaining risk is **reported** rather than
+  silent:
   `ID-GROUPING-SPANS-SPELLINGS` when one key grouped more than one spelling,
   and `ID-GROUPING-INITIALS-AMBIGUOUS` when an initials-only key could be any
   of several fuller ones. Both read the **structured parts**, not the key, so
   neither is limited to the shape a pattern over a normalised string happens
   to match. Both are diagnostics and nothing else: they change no key, no
-  grouping and no emitted value.
+  grouping and no emitted value, and neither is reported against a
+  `declared` grouping, whose spellings a human joined on purpose.
 
 **`derived` is labdata's, and it is not an extension mechanism.** Every
 closed entity carries a `derived` object with `additionalProperties: true`.
@@ -796,6 +836,28 @@ What that does **not** license: changing `person_id` to point at a
 collaborator, making it a list, allowing it to carry something other than a
 person's id, or reordering a list §3 promises. Those are shape, namespace,
 meaning and guarantees, and each of them is a bump.
+
+> **Version note (#24).** Through commit `eec03e6`, every author was
+> abbreviated to initials before matching (`match_form()`), so a full name
+> could resolve to whoever declared the abbreviation, and a near miss on
+> string similarity was linked with `method: fuzzy`. Since #24, matching
+> reads the structured full name first and the abbreviated form only where
+> the input itself is abbreviated (§5, *How a name is matched*); a name that
+> fits more than one person gets `resolution.status: ambiguous` and no
+> `person_id`, a near miss is reported under `RESOLVE-SUGGESTION` and never
+> linked, and `collaborators_file` can join the spellings of one external
+> co-author, as `grouped_by: declared`. `schema_version` stays 4: the shape,
+> namespace and meaning of `person_id` are unchanged, and `ambiguous` and
+> `declared` are new members of open strings. In the valid corpus four
+> `person_id` values move — `name-kim-alan` from `akim` to `alankim`,
+> `name-kim-initial` from `akim` to null, `id-full-name` from null to
+> `ffischer`, and `id-fuzzy` from `ddavis` to null — which moves works from
+> `akim` to `alankim`, removes the `Frank Fischer` collaborator and adds
+> `A. Kim` and `Dave M. Davis` ones; two more authorships keep `ddavis` with
+> `method: exact` rather than `fuzzy`. In the demo no `person_id` moves; it now
+> declares `P. Patel` as an alias of `Priya Patel` in
+> `examples/demo/collaborators.yaml`, so `P. Patel` joins her grouping and the
+> `P. Patel` collaborator is gone. Exit codes are unchanged.
 
 **Published schemas are immutable and live at versioned paths.** A schema that
 has been published is never edited. Version `N`'s schema stays reachable, byte

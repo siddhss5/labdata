@@ -82,14 +82,12 @@ NAMES = [
     case("names.others", "name-others", "authors.*.person_id", Contains("aadams", "bbrown")),
     case("names.others", "name-others", "authors.*.name", Excludes("others")),
     case("names.same_initial_alex", "name-kim-alex", "authors.0.person_id", "akim"),
-    case("names.same_initial_alan", "name-kim-alan", "authors.0.person_id", "alankim",
-         xfail="#24"),
-    case("names.initials_ambiguous", "name-kim-initial", "authors.0.person_id", None,
-         xfail="#24"),
+    case("names.same_initial_alan", "name-kim-alan", "authors.0.person_id", "alankim"),
+    case("names.initials_ambiguous", "name-kim-initial", "authors.0.person_id", None),
     case("identity.alias", "name-last-first", "authors.0.person_id", "aadams"),
-    case("identity.full_name", "id-full-name", "authors.0.person_id", "ffischer", xfail="#24"),
+    case("identity.full_name", "id-full-name", "authors.0.person_id", "ffischer"),
     case("identity.normalized", "id-normalized", "authors.0.person_id", "ddavis"),
-    case("identity.fuzzy", "id-fuzzy", "authors.0.person_id", None, xfail="#24"),
+    case("identity.fuzzy", "id-fuzzy", "authors.0.person_id", None),
     case("identity.external", "id-external-2023", "authors.1.person_id", None),
 ]
 
@@ -160,10 +158,9 @@ EQUAL_CONTRIBUTION = [
          "authors.*.equal_contribution", [False, False, False, False, False]),
     # Two of these resolve to nobody because the escaped marker stayed in
     # the family name, which is no person's. The third of them --
-    # `Green\$^{*}$` -- is one of the three corpus authorships whose
-    # `person_id` would move if matching read the emitted name instead of
-    # the private form (#56 section 7), so it is pinned here as well as in
-    # `test_matching_never_reads_the_emitted_name`.
+    # `Green\$^{*}$` -- is a near miss on Grace-Ann Green, which is reported
+    # as a suggestion and never linked, so it is pinned here as well as in
+    # `test_resolver.py`'s `MATCHED_ON_THE_FULL_NAME`.
     case("names.equal_contribution_escaped", "name-equal-escaped",
          "authors.*.person_id",
          ["bbrown", "ddavis", None, None, "aadams"]),
@@ -184,7 +181,7 @@ def test_equal_contribution(valid_output, case_id, bib_key, path, expected):
 
 
 # The parts BibTeX split each name into, carried through to the output rather
-# than collapsed into the display string. Matching on them is #24.
+# than collapsed into the display string. The resolver matches on them.
 
 NAME_PARTS = [
     case("names.structured", "name-suffix", "authors.0.given", "John"),
@@ -277,10 +274,37 @@ def test_only_marked_authors_are_equal_contributors(valid_output):
     assert [name for _, name in marked if "*" in name] == []
 
 
-@covers("names.initials_ambiguous", xfail="#24", owns=("name-kim-initial",))
+@covers("names.initials_ambiguous")
 def test_ambiguous_initials_listed(valid_unresolved):
     """An initials-only name that fits two members is listed for a human to resolve."""
     assert "A. Kim" in valid_unresolved.stdout
+
+
+@covers("identity.ambiguous_reported")
+def test_ambiguous_name_reported_as_a_located_warning(valid_validate, valid_unresolved):
+    """The author that fits both Kims is reported with its file, key and
+    position, as a warning: neither mode's exit code moves."""
+    for run in (valid_validate, valid_unresolved):
+        assert run.code == 0 and run.crash is None, run.output
+        [line] = [line for line in run.output.splitlines()
+                  if "RESOLVE-AMBIGUOUS-NAME" in line]
+        assert "names.bib:name-kim-initial:author" in line
+        assert all(token in line for token in ("position 1", "akim", "alankim"))
+    report = valid_validate.stdout
+    assert report.index("RESOLVE-AMBIGUOUS-NAME") > report.index("Warnings (")
+    assert "Bibliography errors" not in report
+
+
+@covers("identity.suggestion_reported")
+def test_near_miss_reported_as_a_suggestion(valid_validate, valid_unresolved, valid_output):
+    """`Davis, Dave M.` is suggested as ddavis, located, and linked to nobody."""
+    for run in (valid_validate, valid_unresolved):
+        assert run.code == 0 and run.crash is None, run.output
+        [line] = [line for line in run.output.splitlines()
+                  if "RESOLVE-SUGGESTION" in line and "id-fuzzy" in line]
+        assert "names.bib:id-fuzzy:author" in line
+        assert "position 1" in line and "ddavis" in line
+    assert work(valid_output, "id-fuzzy")["authors"][0]["collaborator_key"]
 
 
 @covers("identity.external")

@@ -1,9 +1,10 @@
 """
 Entity resolution: link works to people and projects.
 
-Matches contributor names in works to people in people.yaml using
-explicit aliases (exact match) with fuzzy fallback (difflib).
-Resolves project tags and computes back-links.
+Matches contributor names in works to people in people.yaml on the
+structured full name, then on declared aliases. A name that fits more than
+one person is left unresolved and reported, and a near miss is reported as a
+suggestion rather than linked. Resolves project tags and computes back-links.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
 Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
@@ -14,12 +15,13 @@ import re
 import sys
 import unicodedata
 from difflib import SequenceMatcher
-from typing import Dict, List, Optional, Sequence, Set
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from .models import Contributor, Work, Person, Project, LabData
 
 
-# Default fuzzy match threshold (0.0 to 1.0)
+# Default fuzzy match threshold (0.0 to 1.0). A fuzzy match is only ever a
+# suggestion reported to a human; it never links anything.
 FUZZY_THRESHOLD = 0.85
 
 # Pattern for abbreviated names: single initial + surname (e.g., "A. Kim")
@@ -27,10 +29,25 @@ FUZZY_THRESHOLD = 0.85
 _ABBREVIATED_NAME_RE = re.compile(r'^[a-z] [a-z]+$')
 
 # How a contributor's `resolution.status` reads, and how it resolved. Both are
-# open strings: #24 adds `ambiguous` to the first and #25 fills the second
-# with an explicit override or an ORCID, and neither is a breaking change.
-RESOLVED, UNRESOLVED = "resolved", "unresolved"
-BY_NAME, BY_FUZZY = "exact", "fuzzy"
+# open strings: `ambiguous` is a name that fits more than one person, and #25
+# fills the method with an explicit override or an ORCID, and neither is a
+# breaking change.
+RESOLVED, UNRESOLVED, AMBIGUOUS = "resolved", "unresolved", "ambiguous"
+BY_NAME = "exact"
+
+# Two things the resolver declines to decide, reported rather than guessed.
+# Both are warnings: an author who resolves to nobody is never an error
+# (SPEC.md section 1), and promoting them is #26's `--strict`.
+AMBIGUOUS_NAME = "RESOLVE-AMBIGUOUS-NAME"
+SUGGESTION = "RESOLVE-SUGGESTION"
+
+# One part of a given name that is an initial rather than a name: a letter,
+# its period optional, and a hyphenated run of them -- `A.`, `A`, `G.-A.`,
+# `J-P`. A Unicode letter, so `Ç.` is read as an initial and a name outside
+# ASCII is not silently exempt. A part that is anything else is read as a
+# name, which is the safe direction for a warning: it reports one grouping
+# key too few rather than one too many.
+_INITIAL = re.compile(r"^[^\W\d_]\.?(?:-[^\W\d_]\.?)*$", re.UNICODE)
 
 
 def normalize_name(name: str) -> str:
@@ -55,20 +72,76 @@ def normalize_name(name: str) -> str:
     return name
 
 
+def match_key(name: str) -> str:
+    """`normalize_name()`, also ignoring a star, which no name is spelled with.
+
+    A star left on a name is an equal-contribution marker the parser did not
+    take off, such as `Davis{*}`; the name still names the same person. Only
+    matching reads this form: the emitted name and the collaborator key keep
+    the star.
+    """
+    return re.sub(r'\s+', ' ', normalize_name(name).replace('*', '')).strip()
+
+
+def _given_parts(given: Optional[str]) -> List[str]:
+    return [part for part in (given or "").split() if part]
+
+
+def initials_only(given: Optional[str]) -> bool:
+    """True when every part of a given name is an initial rather than a name."""
+    parts = _given_parts(given)
+    return bool(parts) and all(_INITIAL.match(part) for part in parts)
+
+
+def has_initial(given: Optional[str]) -> bool:
+    """True when any part of a given name is an initial: ``Dave M.``, ``A.``"""
+    return any(_INITIAL.match(part) for part in _given_parts(given))
+
+
+def given_initials(given: Optional[str]) -> Tuple[str, ...]:
+    """The initial of each part of a given name, normalised.
+
+    ``Alice Jane`` and ``A. J.`` both give ``("a", "j")``; ``Grace-Ann`` and
+    ``G.-A.`` both give ``("g-a",)``, because both halves of a hyphenated
+    given name carry an initial.
+    """
+    return tuple("-".join(normalize_name(piece)[:1]
+                          for piece in part.split("-") if piece)
+                 for part in _given_parts(given))
+
+
 def _initials(given: str) -> str:
     """Abbreviate one given name: ``Alice`` → ``A.``, ``Grace-Ann`` → ``G.-A.``"""
     parts = [part for part in given.split("-") if part]
     return "-".join(f"{part[0]}." for part in parts)
 
 
-def match_form(contributor: Contributor) -> str:
-    """The private form a contributor's name is matched on: ``A. J. van Last, Jr.``
+def _joined(given: str, contributor: Contributor) -> str:
+    name = " ".join(part for part in (given, contributor.von,
+                                      contributor.family) if part)
+    suffix = contributor.suffix
+    return f"{name}, {suffix}" if suffix and name else (name or suffix or "")
 
-    This is the form `format_name()` used to produce and the document used to
-    display, before #56 separated the two. It stays the matching form so that
-    making `contributor.name` the full name changes nothing about who resolves
-    to whom: the emitted name and the matched name are now independent, which
-    is what lets #24 change matching later without touching the schema.
+
+def full_form(contributor: Contributor) -> str:
+    """The form a full name is matched on: ``Alice Jane van Last, Jr.``
+
+    The structured parts in reading order, with the suffix after a comma as
+    `people.yaml` writes it. Nothing is abbreviated. A name written as one
+    brace-protected unit is matched as written.
+    """
+    if contributor.literal:
+        return contributor.literal
+    return _joined(contributor.given or "", contributor)
+
+
+def match_form(contributor: Contributor) -> str:
+    """The abbreviated form of a name: ``A. J. van Last, Jr.``
+
+    Matched only where the input is itself abbreviated -- where some part of
+    the given name is an initial -- and then only against a declared name or
+    alias. A full name is never abbreviated to find a match: that is how
+    `Alan Kim` used to resolve to another Kim who declared `A. Kim`.
 
     A name written as one brace-protected unit has nothing to abbreviate and
     is matched as written.
@@ -77,10 +150,7 @@ def match_form(contributor: Contributor) -> str:
         return contributor.literal
     given = contributor.given or ""
     initials = " ".join(_initials(part) for part in given.split())
-    name = " ".join(part for part in (initials, contributor.von,
-                                      contributor.family) if part)
-    suffix = contributor.suffix
-    return f"{name}, {suffix}" if suffix and name else (name or suffix or "")
+    return _joined(initials, contributor)
 
 
 def is_abbreviated(name: str) -> bool:
@@ -134,6 +204,7 @@ def fuzzy_match(name: str, index: Dict[str, str], threshold: float = FUZZY_THRES
     since they lack enough information for reliable fuzzy matching.
 
     Returns the person_id of the best match above the threshold, or None.
+    The resolver reads the answer as a suggestion only.
     """
     normalized = normalize_name(name)
 
@@ -155,30 +226,155 @@ def fuzzy_match(name: str, index: Dict[str, str], threshold: float = FUZZY_THRES
     return None
 
 
-def _resolve(contributors: Sequence[Contributor], index: Dict[str, str],
-             fuzzy_threshold: float) -> List[str]:
+def _is_initial_token(token: str) -> bool:
+    pieces = [piece for piece in token.split("-") if piece]
+    return bool(pieces) and all(len(piece) == 1 for piece in pieces)
+
+
+def _tokens_agree(written: str, declared: str) -> bool:
+    """One given-name part against another: equal, or the same initials
+    where either side is only an initial."""
+    if _is_initial_token(written) or _is_initial_token(declared):
+        return (tuple(p[0] for p in written.split("-") if p)
+                == tuple(p[0] for p in declared.split("-") if p))
+    return written == declared
+
+
+class Candidates:
+    """The names a matcher compares against: ``(id, [name, *aliases])`` each.
+
+    Every form is read through `match_key()`, so case, accents, periods and
+    stray stars do not matter.
+    """
+
+    def __init__(self, entries: Sequence[Tuple[str, Sequence[str]]]):
+        self.forms: List[Tuple[str, str]] = []
+        self.exact: Dict[str, Set[str]] = {}
+        for entity_id, names in entries:
+            for name in names:
+                key = match_key(name)
+                if not key:
+                    continue
+                self.forms.append((entity_id, key))
+                self.exact.setdefault(key, set()).add(entity_id)
+
+    def ids_for(self, key: str) -> Set[str]:
+        return set(self.exact.get(key, ()))
+
+    def compatible(self, contributor: Contributor) -> Set[str]:
+        """Every entity one of whose forms this name could be.
+
+        Same family, particles and suffix, and the given names agreeing part
+        by part over the shorter of the two -- an initial agreeing with any
+        name it abbreviates. `A. Kim` could be `Alex Kim` or `Alan Kim`;
+        `Alan Kim` could not be `Alex Kim`. Used to find everyone a name
+        could be, never on its own to link one.
+        """
+        if contributor.literal or not contributor.family:
+            return set()
+        tail = match_key(" ".join(part for part in (contributor.von,
+                                                     contributor.family) if part))
+        if contributor.suffix:
+            tail = f"{tail}, {match_key(contributor.suffix)}"
+        written = [match_key(part) for part in _given_parts(contributor.given)]
+        written = [part for part in written if part]
+        found = set()
+        for entity_id, key in self.forms:
+            if not key.endswith(" " + tail):
+                continue
+            declared = key[:-len(tail) - 1].split()
+            if written and declared and all(
+                    _tokens_agree(w, d) for w, d in zip(written, declared)):
+                found.add(entity_id)
+        return found
+
+
+class Match:
+    """What matching one name found.
+
+    ``status`` is `RESOLVED` with the one id in ``ids``, `AMBIGUOUS` with
+    every id the name fits, or `UNRESOLVED` with ``ids`` holding the
+    suggestions a human might check, which may be empty.
+    """
+
+    def __init__(self, status: str, ids: Set[str]):
+        self.status = status
+        self.ids = sorted(ids)
+
+    @property
+    def id(self) -> Optional[str]:
+        return self.ids[0] if self.status == RESOLVED else None
+
+
+def match(contributor: Contributor, candidates: Candidates) -> Match:
+    """Match one name, on its full form first.
+
+    1. The full name, or a declared alias written in full, equal to exactly
+       one entity's: resolved. Equal to two: ambiguous.
+    2. Only when the name is itself abbreviated -- some part of the given
+       name an initial -- its abbreviated form against the declared names and
+       aliases. It resolves only when exactly one entity declares it *and*
+       no other entity's name could be it too: `A. Kim` is ambiguous when
+       one Kim declares the alias and another Kim is `Alan`.
+    3. Otherwise nothing is linked, and every entity the name could be is a
+       suggestion.
+    """
+    exact = candidates.ids_for(match_key(full_form(contributor)))
+    if len(exact) == 1 and not (contributor.given and has_initial(contributor.given)):
+        return Match(RESOLVED, exact)
+    if len(exact) > 1:
+        return Match(AMBIGUOUS, exact)
+
+    compatible = candidates.compatible(contributor)
+    if contributor.literal or not has_initial(contributor.given):
+        return Match(UNRESOLVED, compatible)
+
+    declared = exact | candidates.ids_for(match_key(match_form(contributor)))
+    fits = compatible | declared
+    if len(fits) > 1:
+        return Match(AMBIGUOUS, fits)
+    if declared:
+        return Match(RESOLVED, declared)
+    return Match(UNRESOLVED, fits)
+
+
+def person_candidates(people: Sequence[Person]) -> Candidates:
+    return Candidates([(p.id, [p.name] + list(p.aliases)) for p in people])
+
+
+def _resolve(contributors: Sequence[Contributor], candidates: Candidates,
+             index: Dict[str, str], fuzzy_threshold: float,
+             where: str, report: Optional[List[str]]) -> List[str]:
     """Resolve one list of contributors in place; return the names left over."""
     unresolved: List[str] = []
     for contributor in contributors:
-        matched = match_form(contributor)
-        normalized = normalize_name(matched)
-
-        # Try exact match first
-        if normalized in index:
-            contributor.person_id = index[normalized]
+        found = match(contributor, candidates)
+        if found.status == RESOLVED:
+            contributor.person_id = found.id
             contributor.resolution_status = RESOLVED
             contributor.resolution_method = BY_NAME
             continue
 
-        # Try fuzzy match
-        person_id = fuzzy_match(matched, index, fuzzy_threshold)
-        if person_id:
-            contributor.person_id = person_id
-            contributor.resolution_status = RESOLVED
-            contributor.resolution_method = BY_FUZZY
-            continue
-
+        contributor.resolution_status = found.status
         unresolved.append(contributor.name)
+        if report is None:
+            continue
+        if found.status == AMBIGUOUS:
+            report.append(
+                f"{AMBIGUOUS_NAME} {where}: position {contributor.position}, "
+                f"'{contributor.name}', fits more than one person and is left "
+                f"unresolved: {', '.join(found.ids)}")
+            continue
+        suggested = set(found.ids)
+        fuzzy = fuzzy_match(full_form(contributor), index, fuzzy_threshold)
+        if fuzzy:
+            suggested.add(fuzzy)
+        if suggested:
+            report.append(
+                f"{SUGGESTION} {where}: position {contributor.position}, "
+                f"'{contributor.name}', matched no person but may be "
+                f"{', '.join(sorted(suggested))}; not linked, declare an "
+                "alias if it is")
     return unresolved
 
 
@@ -186,20 +382,19 @@ def resolve_authors(
     works: List[Work],
     people: List[Person],
     fuzzy_threshold: float = FUZZY_THRESHOLD,
+    warnings: Optional[List[str]] = None,
+    bib_dir: str = ".",
 ) -> List[str]:
     """Resolve contributor names in works to person IDs.
 
-    Strategy:
-    1. Exact match against aliases (fast, reliable)
-    2. Fuzzy match with threshold (fallback)
-
-    Matching reads the private form of `match_form()`, never the name the
-    document emits, so what a consumer sees and what the resolver compares
-    are independent.
+    Strategy, in `match()`: the structured full name, then -- only for a
+    name that is itself abbreviated -- a declared alias. A name that fits
+    more than one person is left unresolved, and a near miss is never
+    linked. Both are reported under `AMBIGUOUS_NAME` and `SUGGESTION` into
+    ``warnings``, located at the work, when a list is given.
 
     Editors are resolved by the same machinery. They are not authorships, so
-    an editor that matches nobody is simply left unresolved and is not
-    reported as an unresolved author.
+    an editor that matches nobody is not reported as an unresolved author.
 
     Mutates ``person_id`` and ``resolution`` in place.
 
@@ -209,12 +404,16 @@ def resolve_authors(
     if not people:
         return []
 
+    candidates = person_candidates(people)
     index = build_alias_index(people)
     unresolved: Set[str] = set()
 
     for work in works:
-        unresolved |= set(_resolve(work.authors, index, fuzzy_threshold))
-        _resolve(work.editors, index, fuzzy_threshold)
+        where = f"{bib_dir}/{work.source_file}:{work.bib_id}"
+        unresolved |= set(_resolve(work.authors, candidates, index,
+                                   fuzzy_threshold, f"{where}:author", warnings))
+        _resolve(work.editors, candidates, index, fuzzy_threshold,
+                 f"{where}:editor", warnings)
 
     return sorted(unresolved)
 
