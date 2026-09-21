@@ -56,8 +56,11 @@ as `venue` apart. `examples/consumers/` holds five such probes — a plain HTML
 page, a LaTeX CV fragment, a CSL-JSON export, a person/project/work edge list
 and a BibTeX re-emission — each reading the document and nothing else, and
 `tests/conformance/test_consumer_probes.py` runs every one of them against the
-demo output. Four cannot produce correct output against `schema_version` 3,
-and are marked `xfail(strict=True)` against #56. A strict `xfail` swallows every failure in its test, including one in
+demo output. Four cannot produce correct output against `schema_version` 3.
+Their failing assertions are marked `xfail(strict=True)` against **the issue
+that owns the missing property** — #56 for all but one, which asks for two
+spellings of one external co-author to be joined and is #24's, because #56's
+grouping key splits them by construction and could not remove the marker. A strict `xfail` swallows every failure in its test, including one in
 something the probe already does correctly, so each of those tests is kept to
 the assertions that name the missing properties — and, for the prerequisites
 it cannot avoid relying on, the rule is: **every prerequisite an xfailed test

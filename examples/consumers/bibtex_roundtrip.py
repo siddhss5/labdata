@@ -38,11 +38,27 @@ mechanism:
   built from them, and those links are not invertible: a `doi` written as a
   URL in the input is passed through unchanged, so there is no prefix a
   consumer can reliably strip, and the arXiv link drops the prefix field that
-  said which repository the id belongs to. So `doi` and `eprint` are looked
-  up as properties, like everything else, and are not reconstructed from a
-  link. `url` is different and is not a judgement call: it is one input field
-  the compiler routes to one of two properties by looking at the host, so
-  both are consulted and exactly one of them holds it.
+  said which repository the id belongs to. So `doi`, `eprint`, `isbn` and
+  `issn` are looked up as identifiers and never reconstructed from a link.
+  An identifier can also sit in a map from scheme to identifiers rather than
+  in a property of its own, which is where a repeatable one has to live --
+  print and electronic ISSNs are two values of one field -- so both places
+  are consulted. `archivePrefix` is not an identifier at all: it names the
+  repository `eprint` belongs to, which is exactly what the scheme of an
+  arXiv identifier says, so it is recovered from the scheme.
+- The editors. They are people, not a string, so the document may carry them
+  either as a parsed list beside the authors or as the raw field. Both are
+  consulted, and a parsed list is written back out in BibTeX's own name order
+  by the same function that writes the authors.
+- The links. `url` is one input field the compiler routes by looking at the
+  host, so the two properties it can land in are both consulted -- and so is
+  a map from link kind to links, which is where a document that has stopped
+  carrying `*_url` properties would keep it.
+
+Each of these is looked up in **every** place it could sit, not in one, and
+the first that answers wins. That is what a real consumer would have to do,
+and it is what keeps this probe honest in both directions: it cannot report
+a field lost because it looked in only one of the places the field might be.
 """
 
 import json
@@ -59,6 +75,16 @@ FIELDS = (
     "doi", "eprint", "archiveprefix", "isbn", "issn", "language", "keywords",
     "annote", "note", "abstract", "url",
 )
+
+# The scheme under which each identifier field would sit in a map from
+# scheme to identifiers, and the prefix an arXiv identifier's scheme implies.
+IDENTIFIER_SCHEME = {"doi": "doi", "eprint": "arxiv", "isbn": "isbn",
+                     "issn": "issn"}
+ARXIV_SCHEME = "arxiv"
+ARXIV_PREFIX = "arXiv"
+
+# The link kinds the BibTeX `url` field could have become.
+URL_KINDS = ("url", "video")
 
 # The field that names the container, per entry type. A structured venue's
 # name belongs in this one.
@@ -102,17 +128,59 @@ def venue_parts(publication):
     return venue if isinstance(venue, dict) else None
 
 
+def scheme_map(publication):
+    """The document's map from identifier scheme to identifiers, or empty."""
+    found = publication.get("identifiers")
+    return found if isinstance(found, dict) else {}
+
+
+def identifier_value(publication, field):
+    """One identifier field, from the scheme map. A scheme may hold several."""
+    found = scheme_map(publication).get(IDENTIFIER_SCHEME.get(field))
+    if isinstance(found, str):
+        found = [found]
+    return ", ".join(str(one) for one in found) if found else None
+
+
+def name_list(people):
+    """A list of parsed names joined the way a BibTeX name field joins them."""
+    return " and ".join(author_name(person) for person in people) or None
+
+
+def link_value(publication, kinds):
+    """The first link the document holds under any of ``kinds``, or None."""
+    links = publication.get("links")
+    if not isinstance(links, dict):
+        return None
+    for kind in kinds:
+        for record in links.get(kind) or []:
+            url = record.get("url") if isinstance(record, dict) else record
+            if url:
+                return url
+    return None
+
+
 def field_value(publication, field):
-    """What the document can put in one field of the entry, or None."""
+    """What the document can put in one field of the entry, or None.
+
+    Every place the field could sit is consulted, first answer wins.
+    """
     if field == "author":
-        return " and ".join(author_name(a) for a in publication["authors"]) or None
+        return name_list(publication["authors"])
+    if field == "editor" and publication.get("editors"):
+        return name_list(publication["editors"])
     if field == "url":
-        return publication.get("url") or publication.get("video_url")
+        return (publication.get("url") or publication.get("video_url")
+                or link_value(publication, URL_KINDS))
+    if field == "archiveprefix" and scheme_map(publication).get(ARXIV_SCHEME):
+        return ARXIV_PREFIX
     if field == CONTAINER_FIELD.get(publication["entry_type"]):
         name = (venue_parts(publication) or {}).get("name")
         if name:
             return name
     value = publication.get(field)
+    if value is None:
+        value = identifier_value(publication, field)
     if value is None:
         value = (venue_parts(publication) or {}).get(field)
     return value

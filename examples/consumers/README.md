@@ -52,8 +52,13 @@ The rule that covers those is: **every prerequisite an xfailed test already
 satisfies is independently enforced by a test that passes.** Here the passing
 CV test calls the same `tex_entry()` for every publication, and the passing
 HTML and graph tests both fail on a duplicated id, so nothing the xfailed test
-leans on is checked only inside the marker. The three xfails turn into passes
-in #56 and lose their markers there.
+leans on is checked only inside the marker.
+
+Seven probe tests are xfailed. Six cite #56 and turn into passes there; the
+seventh cites **#24**, because the property it asks for is #24's and not
+#56's — see the identity paragraph under `graph.py` below. A strict xfail
+citing an issue is a promise that *that* issue makes it pass, so filing one
+against an issue that will not is as much a defect as a weak assertion.
 
 The passing tests match **per record**, rather than counting or searching the
 page for a substring. A count passes with two works' author lists swapped, and
@@ -66,7 +71,7 @@ test matches a record *by* differs, because the artifacts differ:
 | `plain_html.py` | the `bib_id`, person id and project id the page carries as element ids — except collaborators, compared as a **multiset**, because the document gives them no id at all, which is the gap `graph.py` fails on showing up a second time |
 | `csl_json.py` | the record's `id`, against the fields `schema_version` 3 can supply |
 | `cv_tex.py` | the entry's **title**, because a LaTeX fragment carries no ids; a duplicate title fails loudly rather than matching the wrong entry |
-| `graph.py` | nothing — every `authored`, `part_of` and `member_of` edge is compared as a complete tuple. The identity tests match a contributor by **the set of works it authored**, never by a node's label, so they survive #56 changing what the display form of a name is |
+| `graph.py` | nothing — every `authored`, `part_of` and `member_of` edge is compared as a complete tuple. The identity tests match a contributor by **the exact set of works it authored**, and an authorship by its **position**, never by a node's label, so they survive #56 changing what the display form of a name is. Each work set is pinned in both directions: "these two contributors differ" would be satisfied by one that had taken the other's work as well, which is the merge being tested for |
 | `bibtex_roundtrip.py` | the entry's citation key. Field **names** are compared, never values: the LaTeX-to-Unicode conversion is deliberately one-way, so comparing values would assert something false |
 
 ## What a probe may read
@@ -97,9 +102,10 @@ Reading an author's name from the parts *is* allowed and the probes do it.
 **unconditionally** (`Brown, Bob` → `B. Brown`), so it is lossy as a source.
 `given`, `von`, `family`, `suffix` and `literal` are on every author and
 preserve whatever the input supplied — which is a full given name for most of
-the demo, and an initial in nine of its authorships, across seven distinct
-authors, whose entry wrote `Brown, B.` rather than `Brown, Bob`
-(`brown2024blend`, `ingram2021affordances`, `jones2021timing`).
+the demo, and an initial in ten of its authorships, across eight distinct
+abbreviated names, whose entry wrote `Brown, B.` rather than `Brown, Bob`
+(`brown2024blend`, `ingram2019toolkit`, `ingram2021affordances`,
+`jones2021timing`).
 
 So the parts are not a promise of a full name; they are a promise of the
 input's name. That is the right guarantee and no property is missing: where
@@ -108,7 +114,7 @@ carrying `given: "P."` is correct CSL. The probes therefore reproduce the
 parts as they find them — neither abbreviating a full name nor inventing one
 from an initial — and the tests assert that over every authorship rather than
 spot-checking one. (The published schema describes `given` as
-"unabbreviated", which those seven authors contradict; that wording is #68,
+"unabbreviated", which those eight names contradict; that wording is #68,
 and it is a description to correct, not data to change.)
 
 ### Escaping
@@ -142,8 +148,9 @@ that differ only by an escape (`x&y` and `x&amp;y`) staying distinct.
 ## What blocks the four failing probes
 
 Verified against the demo output. The first two are shown by the record
-`brown2025tidy`; the third and fourth by the co-authors the demo cannot
-resolve, none of whom is on that record:
+`brown2025tidy`; the third by the eleven authorships the demo cannot resolve,
+none of which is on that record; the fourth by every entry in the demo,
+including that one:
 
 - **`cv_tex.py`** — `pages`, `volume` and `number` are not emitted as
   first-class properties, and `venue` is a composed Markdown string rather
@@ -163,23 +170,35 @@ resolve, none of whom is on that record:
   authors it is `null`. What is left is the display name, which SPEC.md §5
   states is *not* an identity — three different people who all write as
   `J. Smith` are one entry — so keying a node on it would merge people the
-  document itself warns are distinct. The five co-authors of the demo who are
-  not lab members are therefore neither nodes nor edge endpoints.
+  document itself warns are distinct. The demo's eleven unresolved
+  authorships, grouped today into seven entries, are therefore neither nodes
+  nor edge endpoints.
 
-  That is the gap as it stands. How #56 closes it — an `id` on the entry plus
-  some authorship reference, a demotion of `collaborators` to an explicitly
-  derived index, or something else — is #56's to decide, and this probe names
-  no field for it to adopt.
+  The probe consumes the reference #56 settles on. An authorship references
+  exactly one contributor: `person_id`, the id of a person in `people.yaml`,
+  or `collaborator_key`, the grouping key for an authorship that matched
+  nobody. `person_id` is never widened to reach a collaborator — that is the
+  semantic widening #56 rejects — and a `collaborators` entry is read for a
+  `key`, not an `id`, because a name-derived value is a lookup key and not a
+  claim about a human. The two live in **separate namespaces**: a lab member
+  is `person:<id>` and a group is `collaborator:<key>`, so an unresolved
+  string is never labelled a person. Both lookups come back empty today.
 
-  Three further tests ask what the grouping would have to promise, against
-  fixtures added for them: one external co-author on three works written
-  `Patel, Priya` twice and `Patel, P.` once is **one** node; `Patel, Pradeep`
-  on a fourth work is a **different** node, though the two share a first
-  initial and a family name and today share one `collaborators` entry; and
-  the two `Lee, Lin` co-authors of `nolan2020stairs`, two different people
-  written identically on one work, are **two** nodes rather than one entry
-  counted twice. None of the three can be satisfied today, for the same
-  reason: the only thing the document offers to key on is the display name.
+  An `authored` edge also carries a fourth column, the authorship's position
+  in its work's author list, because a work lists authorships rather than
+  contributors. Without it two people written alike on one work are one line
+  of output whatever the document says.
+
+  ### The three identity questions, and the two issues that own them
+
+  | Asked of the probe | Owner | Why |
+  |---|---|---|
+  | One external co-author on three works, written `Patel, Priya` twice and `Patel, P.` once, is **one** contributor holding exactly those three works | **#24** | #56 keys the grouping on the *normalised full name* and states that the policy is #24's and that this key over-splits — "24% of demo names appear as both `A. Adams` and `Alice Adams`". `priya patel` and `p patel` are two keys under it, by construction. Joining two spellings of one external person needs #24's full-name grouping *plus* the aliases it gives external collaborators. Filing this against #56 would leave #56 unable to remove the marker |
+  | `Patel, Pradeep` on a fourth work is a **different** contributor, holding exactly that work and none of the other three | #56 | Under the same normalised full-name key `pradeep patel` is a third key, where today's abbreviated `p patel` merges all four authorships into one entry with one count |
+  | The two `Lee, Lin` co-authors of `nolan2020stairs` stay **two authorships**, at the two positions that work's author list gives them | #56 | Not two contributors: any grouping by name puts them together, and #56's key is a grouping by name. What #56 promises is that the authorship is the primary contributor record, addressed by `(work.bib_id, author.position)`, so the occurrence survives the grouping — which is what lets a consumer that distrusts the grouping work from occurrences instead |
+
+  None of the three can be satisfied today, for the same reason: the only
+  thing the document offers to key a co-author on is the display name.
 
 - **`bibtex_roundtrip.py`** — nothing structural blocks the *entry*; what is
   missing is most of what goes in it. Re-emitting from first-class properties

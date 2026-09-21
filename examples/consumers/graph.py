@@ -10,18 +10,34 @@ to test, and for why this probe cannot produce a complete graph today.
 Output is tab separated, one record per line:
 
     node	person:aadams	Alice Adams
-    edge	authored	person:aadams	work:brown2025tidy
+    node	collaborator:t-turner-9d9cc45d	Trent Turner
+    edge	authored	person:aadams	work:brown2025tidy	3
+    edge	part_of	work:brown2025tidy	project:homebot
+    edge	member_of	person:aadams	project:homebot
+
+An `authored` edge carries a fourth column, the authorship's position in its
+work's author list. It is there because a work lists *authorships*, not
+contributors: two different people written alike are two authorships of one
+work, and without the position the two records would be one line and the
+distinction would be gone from the output whatever the document said.
 
 This is also where the identity questions are asked, because the node and
 edge sets below are already what those questions are about. A graph has to
 decide, for every co-author, whether two authorships are one contributor or
 two -- the same external person written two ways is one node with two edges,
-and two different people who write their names alike are two nodes. The tests
-in tests/conformance/test_consumer_probes.py put those cases to this probe.
-It answers none of them, and it does not try: without an identifier on a
-collaborator and a field on an authorship that references one, the only thing
-left to key on is the display name, and keying on that is exactly the merge
-the document itself warns against.
+two different people who write their names alike are two authorships that
+must stay apart, and two people who merely share an initial and a surname are
+two nodes. The tests in tests/conformance/test_consumer_probes.py put those
+cases to this probe. It answers none of them today, and it does not guess:
+the only thing the document offers to key a co-author on is the display name,
+and keying on that is exactly the merge the document itself warns against.
+
+Two namespaces, never one. `people` is a list of humans; `collaborators` is a
+*grouping over unresolved authorships*, which is not the same kind of thing
+and must not be labelled as if it were. So a lab member is `person:<id>` and
+a group is `collaborator:<key>`, and an unresolved string is never labelled a
+person. Both of those lookups come back empty against the document as it
+stands today.
 """
 
 import json
@@ -33,50 +49,69 @@ def clean(text):
     return " ".join(str(text).split())
 
 
-def person_nodes(doc):
-    """{node id: label} for every co-author the document gives an identity to.
+def contributor_nodes(doc):
+    """{node id: label} for everyone an authorship could point at.
 
-    A graph node needs an identifier, not a display string. The document
-    gives every lab member an `id`. It gives a co-author who is not a lab
-    member no identifier at all: they appear in `collaborators` keyed by
-    their display name, which SPEC.md section 5 states is not an identity --
-    three different people who all write as `J. Smith` are one entry. So
-    keying a node on that name would merge people the document itself warns
-    are distinct, and this probe does not do it.
-
-    `collaborators[].id` is read here because that is where an identifier
-    would naturally sit; it is absent today, so those entries yield no node.
+    A lab member has an `id` in `people`. A co-author who is not one reaches
+    the graph only through `collaborators`, whose entries are read here for
+    a `key` -- the lookup key a grouping offers, as against an `id`, which
+    would be a claim about a human that a name-derived value cannot support.
+    It is absent today, so those entries yield no node.
     """
     nodes = {}
     for person in doc["people"]:
         nodes["person:" + person["id"]] = clean(person["name"])
     for collaborator in doc["collaborators"]:
-        if collaborator.get("id"):
-            nodes["person:" + collaborator["id"]] = clean(collaborator["name"])
+        key = collaborator.get("key")
+        if key:
+            nodes["collaborator:" + key] = clean(collaborator["name"])
     return nodes
 
 
+def contributor_of(author):
+    """The node one authorship points at, or None if it points at nothing.
+
+    An authorship references exactly one contributor. `person_id` is defined
+    by the schema as the id of the matching person in people.yaml and means
+    nothing else, so it is never widened to reach a collaborator;
+    `collaborator_key` is the reference an authorship that matched nobody
+    would carry. Neither is inferred from a name.
+    """
+    if author.get("person_id"):
+        return "person:" + author["person_id"]
+    if author.get("collaborator_key"):
+        return "collaborator:" + author["collaborator_key"]
+    return None
+
+
+def position_of(author, index):
+    """Where in its work's author list one authorship sits, 1-based.
+
+    `position` is read when the document declares it. Otherwise the index is
+    used, and that is faithful rather than a guess: the document states that
+    `publication.authors` is in the order the entry wrote them (SPEC.md
+    section 3), so the index is that order and nothing is being invented.
+    """
+    return str(author.get("position") or index)
+
+
 def render(doc):
-    people = person_nodes(doc)
+    contributors = contributor_nodes(doc)
     works = {"work:" + p["bib_id"]: clean(p["title"]) for p in doc["publications"]}
     projects = {"project:" + p["id"]: clean(p["title"]) for p in doc["projects"]}
 
     nodes = {}
-    nodes.update(people)
+    nodes.update(contributors)
     nodes.update(works)
     nodes.update(projects)
 
     edges = []
     for pub in doc["publications"]:
         work = "work:" + pub["bib_id"]
-        for author in pub["authors"]:
-            # `person_id` is the only field of an authorship that points at a
-            # person. The schema defines it as the id of a matching person in
-            # people.yaml, so for a co-author who is not a lab member it is
-            # null and there is nothing else here to follow.
-            node = "person:" + author["person_id"] if author.get("person_id") else None
-            if node in people:
-                edges.append(("authored", node, work))
+        for index, author in enumerate(pub["authors"], 1):
+            node = contributor_of(author)
+            if node in contributors:
+                edges.append(("authored", node, work, position_of(author, index)))
         for project_id in pub["project_ids"]:
             project = "project:" + project_id
             if project in projects:
@@ -84,7 +119,7 @@ def render(doc):
     for project in doc["projects"]:
         for person_id in project["people_ids"]:
             node = "person:" + person_id
-            if node in people:
+            if node in contributors:
                 edges.append(("member_of", node, "project:" + project["id"]))
 
     lines = ["\t".join(["node", node, label]) for node, label in nodes.items()]

@@ -35,7 +35,7 @@ document does not emit. They see `import` and `from ... import` statements,
 string literals the code evaluates, and calls to the bare builtin `open`.
 They do not see `__import__`, `importlib`, `Path.read_text()`, a literal
 assembled at run time, or a subprocess. A probe written to get past them
-would get past them. The four probes comply by direct inspection, which is
+would get past them. All five probes comply by direct inspection, which is
 what matters; this is a guard against drift, not a sandbox.
 """
 
@@ -53,7 +53,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-from .support import REPO_ROOT, covers, export, publication
+from .support import REPO_ROOT, case, covers, export, publication
 
 
 PROBES = REPO_ROOT / "examples" / "consumers"
@@ -74,7 +74,7 @@ PROBE_TESTS = {
                  "test_graph_covers_every_co_author",
                  "test_graph_joins_one_co_author_written_two_ways",
                  "test_graph_separates_co_authors_sharing_an_initial",
-                 "test_graph_separates_two_people_written_alike"),
+                 "test_graph_keeps_two_authorships_written_alike_apart"),
     "bibtex_roundtrip.py": ("test_bibtex_roundtrip_entry_is_well_formed",
                             "test_bibtex_roundtrip_loses_no_field"),
 }
@@ -492,7 +492,12 @@ def test_csl_json_records_are_citable(probe_output, demo_document):
 # --- graph.py ----------------------------------------------------------------
 
 def read_graph(text):
-    """(nodes, edges) from the probe's tab-separated records."""
+    """(nodes, edges) from the probe's tab-separated records.
+
+    An `authored` edge is a 4-tuple -- it carries the authorship's position
+    after its two endpoints -- and the other two kinds are 3-tuples, so an
+    edge is read by its first three fields and its arity is asserted below.
+    """
     nodes, edges = {}, []
     for line in text.splitlines():
         record = line.split("\t")
@@ -503,15 +508,32 @@ def read_graph(text):
     return nodes, edges
 
 
+def expected_contributor(author):
+    """The node one authorship implies, or None.
+
+    Both references, because the probe follows both: `person_id` for a lab
+    member, `collaborator_key` for an authorship that matched nobody. Only
+    the first exists today, and this stays a statement about the document
+    rather than about `schema_version` 3.
+    """
+    if author.get("person_id"):
+        return "person:" + author["person_id"]
+    if author.get("collaborator_key"):
+        return "collaborator:" + author["collaborator_key"]
+    return None
+
+
 def expected_edges(doc):
-    """Every edge the document implies, given the ids it carries today."""
+    """Every edge the document implies, given the references it carries."""
     projects = {p["id"] for p in doc["projects"]}
     edges = []
     for pub in doc["publications"]:
         work = "work:" + pub["bib_id"]
-        for author in pub["authors"]:
-            if author["person_id"]:
-                edges.append(("authored", "person:" + author["person_id"], work))
+        for index, author in enumerate(pub["authors"], 1):
+            node = expected_contributor(author)
+            if node:
+                edges.append(("authored", node, work,
+                              str(author.get("position") or index)))
         edges += [("part_of", work, "project:" + i) for i in pub["project_ids"]
                   if i in projects]
     for project in doc["projects"]:
@@ -527,8 +549,11 @@ def test_graph_is_well_formed(probe_output, demo_document):
     nodes, edges = read_graph(probe_output["graph.py"])
 
     assert edges != []
-    for kind, source, target in edges:
-        assert source in nodes and target in nodes, (kind, source, target)
+    for edge in edges:
+        kind, source, target = edge[:3]
+        assert source in nodes and target in nodes, edge
+    # Every `authored` edge names an authorship, not just a pair of nodes.
+    assert [e for e in edges if e[0] == "authored" and len(e) != 4] == []
     assert sorted(n for n in nodes if n.startswith("work:")) == sorted(
         "work:" + p["bib_id"] for p in doc["publications"])
     assert sorted(n for n in nodes if n.startswith("project:")) == sorted(
@@ -539,11 +564,12 @@ def test_graph_is_well_formed(probe_output, demo_document):
 
 
 @pytest.mark.xfail(strict=True, reason=(
-    "#56: a `collaborators` entry carries no `id`, and no field of an "
-    "authorship could reference one if it did -- `author.person_id` is "
+    "#56: a `collaborators` entry carries no key of its own, and no field of "
+    "an authorship could reference one if it did -- `author.person_id` is "
     "defined by the schema as the id of a matching person in people.yaml, "
-    "which a collaborator is not -- so the five co-authors of the demo who "
-    "are not lab members are neither nodes nor endpoints"))
+    "which a collaborator is not -- so the eleven authorships the demo cannot "
+    "resolve, grouped today into seven entries, are neither nodes nor "
+    "endpoints"))
 def test_graph_covers_every_co_author(probe_output, demo_document):
     """A node for every co-author and an edge for every authorship."""
     _, doc = demo_document
@@ -746,26 +772,84 @@ def test_bibtex_roundtrip_loses_no_field(probe_output, demo_document):
 # organization reach no property at all. It is recorded here because it is the
 # same loss the probe above reports, seen from the compiler's side.
 
+# {bib_id: (entry type, the field naming its container, that field's value)}.
+# The value is taken from examples/demo/bib/books.bib, which no probe reads,
+# so the absence below is checked against the text the input actually wrote.
 NO_VENUE_RULE = {
-    "adams2022survey": "incollection",
-    "hughes2021gaits": "inbook",
-    "adams2023handbook": "book",
-    "ingram2019toolkit": "manual",
+    "adams2022survey": ("incollection", "booktitle",
+                        "Handbook of Robots in the Home"),
+    "hughes2021gaits": ("inbook", "publisher", "Example Technical Publishing"),
+    "adams2023handbook": ("book", "publisher", "Example Academic Press"),
+    "ingram2019toolkit": ("manual", "organization",
+                          "Example University Personal Robotics Laboratory"),
 }
+
+
+def first_class_strings(pub):
+    """Every string value of a work, leaving out the re-serialized export.
+
+    That record is a copy of the entry and holds every field, read or not, so
+    a search for a value that includes it can never find one absent.
+    """
+    return {name: value for name, value in pub.items()
+            if name != "bibtex" and isinstance(value, str)}
 
 
 @covers("types.incollection", "types.inbook", "types.book", "types.manual")
 def test_entry_types_without_a_venue_rule_degrade_to_the_year(demo_document):
-    """Each of the four is emitted, and its venue is the year and nothing else."""
+    """Each of the four is emitted, its venue is the year and nothing else,
+    and the field naming its container reaches no property at all."""
     _, doc = demo_document
-    for bib_id, entry_type in sorted(NO_VENUE_RULE.items()):
+    for bib_id, (entry_type, field, container) in sorted(NO_VENUE_RULE.items()):
         pub = publication(doc, bib_id)
         assert pub["entry_type"] == entry_type, bib_id
         assert pub["venue"] == str(pub["year"]), bib_id
+        # The claim the COVERAGE row makes: not merely absent under its own
+        # name, but nowhere in the work at all.
+        assert field not in pub, bib_id
+        assert [name for name, value in first_class_strings(pub).items()
+                if container in value] == [], bib_id
+        # The value is in the input, so the search above looked for something
+        # that is really there.
+        assert source_entries()[bib_id][1][field] == container, bib_id
     # A type that does have a rule still composes one, so the check above is
     # about these four rather than about every venue in the demo.
     article = publication(doc, ARTICLE)
     assert article["venue"] != str(article["year"])
+
+
+# --- Fields the demo carries that reach no property --------------------------
+#
+# One row per field, each bound to an assertion that **passes**: the field is
+# in the input and is nowhere in the work. The field-loss probe reports all
+# of them together, but that test is xfailed, so deleting one of these
+# fixtures would not turn anything red there. These give each field its own
+# grip: remove the fixture and the row's own test fails.
+
+UNREAD_FIELDS = [
+    case("fields.editor", "adams2022survey", "editor",
+         "Quinn, Quentin and Silva, Sofia"),
+    case("fields.month", "adams2022survey", "month", "March"),
+    case("fields.chapter", "hughes2021gaits", "chapter", "9"),
+    case("fields.isbn", "adams2023handbook", "isbn", "978-1-00-000002-8"),
+    case("fields.organization", "ingram2019toolkit", "organization",
+         "Example University Personal Robotics Laboratory"),
+    case("fields.issn", "brown2025tidy", "issn", "2999-0001"),
+    case("fields.howpublished", "fischer2025benchmark", "howpublished",
+         "Dataset and evaluation protocol on the project site"),
+]
+
+
+@pytest.mark.parametrize("case_id,bib_id,field,value", UNREAD_FIELDS)
+def test_demo_field_is_in_the_input_and_in_no_property(demo_document, case_id,
+                                                       bib_id, field, value):
+    """The input entry carries the field, and the work carries it nowhere."""
+    _, doc = demo_document
+    assert source_entries()[bib_id][1][field] == value, bib_id
+    pub = publication(doc, bib_id)
+    assert field not in pub, bib_id
+    assert [name for name, holds in first_class_strings(pub).items()
+            if value in holds] == [], bib_id
 
 
 # --- graph.py: who the co-authors are ----------------------------------------
@@ -779,6 +863,26 @@ def test_entry_types_without_a_venue_rule_degrade_to_the_year(demo_document):
 # person on a fourth work, sharing her first initial and her family name. The
 # two `Lee, Lin` co-authors of `nolan2020stairs` are two different people
 # written identically on one work.
+#
+# **The three scenarios are filed against two different issues, because they
+# are promised by two different issues.** #56 settles a grouping over
+# unresolved authorships keyed on the *normalised full name*, and says in as
+# many words that the policy is #24's and that this key over-splits. So:
+#
+#   - Separating `Pradeep Patel` from `Priya Patel` is #56's. Under a
+#     normalised full-name key `pradeep patel` and `priya patel` are two
+#     keys, where today's abbreviated `p patel` is one.
+#   - Keeping the two `Lee, Lin` authorships apart is #56's, but not by
+#     making them two contributors: any grouping by name puts them together,
+#     and #56's key is a grouping by name. What #56 promises is that the
+#     authorship is the primary contributor record, addressed by
+#     `(work.bib_id, author.position)`, so the two occurrences survive.
+#   - Joining `Patel, Priya` and `Patel, P.` is **not** #56's, and asserting
+#     it against #56 would be a marker #56 could not remove. A normalised
+#     full-name key splits those two spellings by construction. #24 is the
+#     issue that groups collaborators by full name *and* gives external
+#     collaborators aliases, which is the mechanism that joins two spellings
+#     of one person; #25 layers explicit overrides and ORCID on top of it.
 #
 # The scenarios are asserted over the node and edge sets `graph.py` already
 # builds, per #69's own recommendation, rather than in a fifth probe. Nothing
@@ -821,87 +925,128 @@ def test_identity_fixtures_are_present(demo_document):
         "P.": ["ingram2019toolkit"],
         "Pradeep": ["hughes2021gaits"],
     }
+    # Every one of them writes the same display name today, which is what
+    # makes the grouping question a real one rather than a hypothetical.
+    assert {a["name"] for bib_id in ONE_PERSON_WORKS + (OTHER_PERSON_WORK,)
+            for a in authors_named(publication(doc, bib_id), SHARED_FAMILY)} == {
+        "P. Patel"}
 
     # Two different people under one written name, on one work.
     alike = authors_named(publication(doc, SAME_NAME_WORK),
                           SAME_NAME_FAMILY, SAME_NAME_GIVEN)
     assert len(alike) == 2
     assert [a["person_id"] for a in alike] == [None, None]
-    # They are the only external co-authors of that work, which is what lets
-    # the test below count nodes rather than read a label off one.
+    # They are the only external co-authors of that work, and they sit at
+    # adjacent positions in its author list, which is what the authorship
+    # test below reads.
     assert [a for a in publication(doc, SAME_NAME_WORK)["authors"]
             if a["person_id"] is None] == alike
+    assert alike_positions(publication(doc, SAME_NAME_WORK)) == ["2", "3"]
 
 
-def external_authorship(doc, edges):
-    """{node: the works it authored} for every node that is not a lab member.
+def alike_positions(pub):
+    """The 1-based positions of the two identically written authorships."""
+    return [str(i) for i, a in enumerate(pub["authors"], 1)
+            if a["family"] == SAME_NAME_FAMILY and a["given"] == SAME_NAME_GIVEN]
 
-    A lab member has an `id` in `people`; anyone else reaches the graph only
-    if the document gave the authorship something to follow.
+
+def external_contributors(doc, edges):
+    """{node: the works it authored} for every contributor that is not a lab
+    member.
+
+    A lab member is a `person:` node the document declares in `people`.
+    Anything else that reaches the graph came through `collaborators`, which
+    is the grouping the identity questions are about.
     """
     members = {"person:" + person["id"] for person in doc["people"]}
     authored = {}
-    for kind, source, target in edges:
-        if kind == "authored" and source not in members:
-            authored.setdefault(source, set()).add(target.split(":", 1)[1])
+    for edge in edges:
+        if edge[0] == "authored" and edge[1] not in members:
+            authored.setdefault(edge[1], set()).add(edge[2].split(":", 1)[1])
     return authored
 
 
-@covers("probe.identity_one_person", xfail="#56", owns=(), because=(
-    "a `collaborators` entry carries no identifier, and an authorship carries "
-    "no field that could reference one, so the three works of one external "
-    "co-author written `Patel, Priya` twice and `Patel, P.` once produce no "
-    "node and no `authored` edge at all"))
+@covers("probe.identity_one_person", xfail="#24", owns=(), because=(
+    "one external co-author written `Patel, Priya` on two works and "
+    "`Patel, P.` on a third is not one contributor under any key the "
+    "document has or #56 gives it -- today's abbreviated key merges her with "
+    "a different person, and #56's normalised full-name key splits her in "
+    "two spellings by construction. Joining the spellings of one external "
+    "person needs the full-name grouping *plus* the collaborator aliases "
+    "this issue adds"))
 def test_graph_joins_one_co_author_written_two_ways(probe_output, demo_document):
-    """One external person on three works is one node with three edges."""
+    """One external person on three works is one contributor, holding exactly
+    those three works.
+
+    Stated in both directions on purpose: exactly one external contributor
+    touches any of the three, and its work set is exactly those three. A
+    weaker form -- one contributor holding all three -- would pass with a
+    second contributor holding one of them as well.
+    """
     _, doc = demo_document
     _, edges = read_graph(probe_output["graph.py"])
-    authored = external_authorship(doc, edges)
+    authored = external_contributors(doc, edges)
 
     joined = [node for node, works in authored.items()
-              if works == set(ONE_PERSON_WORKS)]
+              if works & set(ONE_PERSON_WORKS)]
     assert len(joined) == 1, sorted(authored.items())
+    assert authored[joined[0]] == set(ONE_PERSON_WORKS)
 
 
 @covers("probe.identity_distinct_people", xfail="#56", owns=(), because=(
     "`collaborators` is keyed on the abbreviated display name, so `P. Patel` "
     "the author of three works and `P. Patel` the author of a fourth are one "
-    "entry with one count; the document keeps their given names apart on the "
-    "authorships but offers no key that does, so a consumer cannot build two "
-    "nodes from it"))
+    "entry with one count and one `last_year`; the authorships keep their "
+    "given names apart but the entry offers no key that does, and carries "
+    "none of its own, so a consumer cannot make two contributors of them"))
 def test_graph_separates_co_authors_sharing_an_initial(probe_output, demo_document):
-    """Two external people who share a first initial and family name are two
-    nodes, and neither borrows the other's works."""
+    """Two external people who share a first initial and a family name are
+    separate contributors, and neither holds any of the other's works.
+
+    Both work sets are pinned exactly, in both directions: requiring only
+    that the two differ would be satisfied by a contributor that had taken
+    one of the other's works as well, which is the merge this is about.
+    """
     _, doc = demo_document
     _, edges = read_graph(probe_output["graph.py"])
-    authored = external_authorship(doc, edges)
+    authored = external_contributors(doc, edges)
 
-    joined = {node for node, works in authored.items()
-              if works == set(ONE_PERSON_WORKS)}
-    other = {node for node, works in authored.items()
-             if OTHER_PERSON_WORK in works}
-    assert len(joined) == 1, sorted(authored.items())
+    other = [node for node, works in authored.items() if OTHER_PERSON_WORK in works]
     assert len(other) == 1, sorted(authored.items())
-    assert joined & other == set()
+    assert authored[other[0]] == {OTHER_PERSON_WORK}
+    shared = [node for node, works in authored.items()
+              if works & set(ONE_PERSON_WORKS)]
+    assert shared != [], sorted(authored.items())
+    assert set(shared) & set(other) == set()
 
 
-@covers("probe.identity_same_written_name", xfail="#56", owns=(), because=(
+@covers("probe.identity_authorship", xfail="#56", owns=(), because=(
     "two different people listed on one work under one written name are "
-    "counted twice into a single `collaborators` entry -- the grouping is by "
-    "display name and there is nothing else to group by -- so the two "
-    "authorships cannot be told apart, let alone made into two nodes"))
-def test_graph_separates_two_people_written_alike(probe_output, demo_document):
-    """Two different people written identically on one work are two nodes,
-    with one edge each to that work."""
+    "counted twice into a single `collaborators` entry, and neither "
+    "occurrence is addressable: an authorship carries no `position` and no "
+    "reference to the contributor it was grouped into, so the two reach a "
+    "consumer as one indistinguishable pair"))
+def test_graph_keeps_two_authorships_written_alike_apart(probe_output, demo_document):
+    """Two different people written identically on one work stay two
+    authorships of it, told apart by their positions.
+
+    Not two contributors: any grouping by name puts them together, and #56's
+    normalised full-name key is a grouping by name. What has to survive is
+    the occurrence -- the authorship addressed by its work and its position
+    -- because that is the record a consumer that distrusts the grouping
+    falls back to.
+    """
     _, doc = demo_document
     _, edges = read_graph(probe_output["graph.py"])
-    authored = external_authorship(doc, edges)
+    members = {"person:" + person["id"] for person in doc["people"]}
 
-    on_work = {node for node, works in authored.items() if SAME_NAME_WORK in works}
-    assert len(on_work) == 2, sorted(authored.items())
-    assert sorted(source for kind, source, target in edges
-                  if kind == "authored" and target == "work:" + SAME_NAME_WORK
-                  and source in on_work) == sorted(on_work)
+    alike = [edge for edge in edges if edge[0] == "authored"
+             and edge[2] == "work:" + SAME_NAME_WORK and edge[1] not in members]
+    assert len(alike) == 2, alike
+    # Two endpoints, not one record written twice, and the positions are the
+    # ones that work's author list actually gives those two names.
+    assert sorted(edge[3] for edge in alike) == alike_positions(
+        publication(doc, SAME_NAME_WORK))
 
 
 # --- The probes themselves ---------------------------------------------------
@@ -912,13 +1057,27 @@ def test_probe_runs_on_the_demo_document(probe_output, name):
     assert probe_output[name].strip() != ""
 
 
+def reads_probe_output(source, name):
+    """True when ``source`` subscripts the `probe_output` fixture with ``name``.
+
+    An expression, not a mention: a probe's name in a comment or a docstring
+    is prose, and prose is not a test reading what the probe wrote.
+    """
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) \
+                and node.value.id == "probe_output" \
+                and isinstance(node.slice, ast.Constant) and node.slice.value == name:
+            return True
+    return False
+
+
 def test_every_probe_is_exercised():
     """No probe can be added to the directory and silently never run, and
     none can be wired to tests that never look at what it wrote.
 
     The second half is what `PROBE_TESTS` alone cannot promise: its keys are
-    how `probe_output` is keyed, so a probe whose named tests never mention
-    it is a probe that ran and was never read.
+    how `probe_output` is keyed, so a probe none of whose named tests reads
+    `probe_output[<its name>]` is a probe that ran and was never read.
     """
     on_disk = sorted(p.name for p in PROBES.glob("*.py"))
     assert on_disk == sorted(PROBE_TESTS)
@@ -930,8 +1089,14 @@ def test_every_probe_is_exercised():
             found = getattr(module, test, None)
             assert callable(found), "%s: no %s" % (name, test)
             sources.append(inspect.getsource(found))
-        assert [s for s in sources if name in s], \
+        assert [s for s in sources if reads_probe_output(s, name)], \
             "%s: none of %s reads its output" % (name, ", ".join(tests))
+    # A mention that is not a read has to fail the check above, or it
+    # establishes nothing: this is the shape it must reject.
+    assert not reads_probe_output('def t():\n    """graph.py"""\n    pass\n',
+                                  "graph.py")
+    assert reads_probe_output('def t(probe_output):\n'
+                              '    return probe_output["graph.py"]\n', "graph.py")
 
 
 def imported_modules(tree):
