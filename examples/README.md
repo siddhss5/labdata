@@ -2,7 +2,7 @@
 
 Minimal examples showing how to use labdata from the command line and from Python.
 
-All examples use the fictional **Example Lab** in [`demo/`](demo/): three BibTeX files,
+All examples use the fictional **Example Lab** in [`demo/`](demo/): four BibTeX files,
 `people.yaml` and `projects.yaml`. Its people, publications and projects, and their
 example.org, DOI, arXiv and video links, are invented. Only `site.url` and `site.baseurl`
 in `demo/lab.yaml` are real: they are where the demo is deployed.
@@ -44,11 +44,11 @@ relative to the repository root, plus the `site` settings used to build the demo
 
 ## Consumer Probes
 
-[`consumers/`](consumers/) holds four small programs that read the emitted
+[`consumers/`](consumers/) holds five small programs that read the emitted
 document and nothing else — an HTML page, a LaTeX CV fragment, a CSL-JSON
-export and an edge list. They are falsification tests rather than examples to
-copy: three of them cannot be written against the current schema, and that is
-the point. See [`consumers/README.md`](consumers/README.md).
+export, an edge list and a BibTeX re-emission. They are falsification tests
+rather than examples to copy: four of them cannot be written against the
+current schema, and that is the point. See [`consumers/README.md`](consumers/README.md).
 
 ## Jekyll Site
 

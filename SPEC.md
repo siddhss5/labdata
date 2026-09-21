@@ -52,12 +52,15 @@ the document; the fix belongs in the schema, not in the consumer. Recovering
 the property from `publication.bibtex` does not close the gap, because that
 record is an opaque re-serialization of the entry rather than a set of
 first-class properties (§5), and neither does taking a composed string such
-as `venue` apart. `examples/consumers/` holds four such probes — a plain HTML page, a LaTeX CV
-fragment, a CSL-JSON export and a person/project/work edge list — each reading
-the document and nothing else, and `tests/conformance/test_consumer_probes.py`
-runs every one of them against the demo output. Three cannot produce correct
-output against `schema_version` 3, and are marked `xfail(strict=True)` against
-#56. A strict `xfail` swallows every failure in its test, including one in
+as `venue` apart. `examples/consumers/` holds five such probes — a plain HTML
+page, a LaTeX CV fragment, a CSL-JSON export, a person/project/work edge list
+and a BibTeX re-emission — each reading the document and nothing else, and
+`tests/conformance/test_consumer_probes.py` runs every one of them against the
+demo output. Four cannot produce correct output against `schema_version` 3.
+Their failing assertions are marked `xfail(strict=True)` against **the issue
+that owns the missing property** — #56 for all but one, which asks for two
+spellings of one external co-author to be joined and is #24's, because #56's
+grouping key splits them by construction and could not remove the marker. A strict `xfail` swallows every failure in its test, including one in
 something the probe already does correctly, so each of those tests is kept to
 the assertions that name the missing properties — and, for the prerequisites
 it cannot avoid relying on, the rule is: **every prerequisite an xfailed test
@@ -66,7 +69,7 @@ xfailed CV test looks up one publication by id, then that publication's one
 `\item` by title, and both lookups assert. The passing CV test calls the same `\item`
 lookup for every publication, and the passing HTML and graph tests both fail
 on a duplicated id, so neither prerequisite is checked only inside a marker.
-`examples/consumers/README.md` lists the three gaps.
+`examples/consumers/README.md` lists the gaps.
 
 **The CLI is the reference compiler.** Its flags, its exit codes and the
 stream each kind of message goes to are public API.
@@ -234,8 +237,10 @@ name parts are converted the same way, in `person_name_parts()`.
 Being converted is not the same as being emitted. Of these fields, `title`,
 `abstract` and `note` are emitted under their own names; `journal`,
 `booktitle`, `school`, `institution` and `type` are consumed by
-`format_venue()` (§5) and reach the document only through `venue`; and
-`series`, `publisher`, `address` and `organization` are converted and then
+`format_venue()` (§5) and reach the document only through `venue`, and only
+for the entry types it has a rule for — for any other type it reads none of
+them and the venue is the bare year, so they reach the document not at all;
+and `series`, `publisher`, `address` and `organization` are converted and then
 used by nothing, so they also appear under heading 3.
 
 **2. Emitted without conversion — the rule is a requirement on the input.**
@@ -283,11 +288,11 @@ rule does not apply to the input itself — only to whatever it produces.
 | `volume`, `number` | Outside `TEXT_FIELDS`, so unconverted; consumed by `format_venue()` and not emitted separately. |
 | `crossref` | Resolved by `resolve_crossref()`, which fills the child's missing fields from the parent and turns the parent's `title` into the child's `booktitle`. **`author` is not inherited**: `parse_author_list()` reads the raw entry rather than the resolved fields, so a child with no `author` of its own has an empty `authors` list. Verified directly. Not emitted as a property. |
 | The citation key and the entry type | Become `bib_id` and `entry_type` (`entry_fields()`); see heading 4. |
-| `journal`, `booktitle`, `school`, `institution`, `type` | Converted under heading 1, then consumed by `format_venue()`. |
+| `journal`, `booktitle`, `school`, `institution`, `type` | Converted under heading 1, then consumed by `format_venue()` — for the entry types it has a rule for. For any other type it reads none of them and the venue is the bare year (§5). |
 | `series`, `publisher`, `address`, `organization` | Converted under heading 1, then used by nothing. |
 | `person.aliases` | Read for matching by `labdata.resolver.build_alias_index()`, never emitted — `Person.to_dict()` has no `aliases` key. |
 | `bib_dir`, `bib_files[].name`, `people_file`, `projects_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed `pdf_url`. |
-| Any BibTeX field not named anywhere in this table or heading 1 — `pages`, `editor`, `month`, `isbn` and the rest | Not interpreted by labdata outside the `bibtex` record. `entry_fields()` copies it and `format_bibtex()` serializes it, but nothing reads its value, so it affects no other property (§5). Emitting more of them as first-class properties is #56. |
+| Any BibTeX field not named anywhere in this table or heading 1 — `pages`, `editor`, `month`, `chapter`, `edition`, `isbn`, `issn`, `howpublished` and the rest | Not interpreted by labdata outside the `bibtex` record. `entry_fields()` copies it and `format_bibtex()` serializes it, but nothing reads its value, so it affects no other property (§5). Emitting more of them as first-class properties is #56. |
 
 The fields named in that table and in heading 1 are the complete set labdata
 *interprets* from a `.bib` entry; everything else falls in the last row.
@@ -474,7 +479,7 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 | `publication.title`, `abstract`, `note` | Input — BibTeX fields, converted from LaTeX to text (§2). `note` additionally has trailing `.` and whitespace trimmed (`labdata.parsers.bibtex.extract_note()`). |
 | `publication.year` | Input — the BibTeX `year`, as an integer; `0` when absent (`entry_to_publication()`). |
 | `publication.category` | Input — the `category` of the `bib_files` entry the file was listed under, not anything in the `.bib` file (`labdata.config.BibFile`, read by `parse_all_publications()`). |
-| `publication.venue` | **Derived** — composed from `journal`, `booktitle`, `school`, `institution`, `type`, `number`, `volume`, `eprint` and `year` according to the entry type (`labdata.parsers.bibtex.format_venue()`). |
+| `publication.venue` | **Derived** — composed from `journal`, `booktitle`, `school`, `institution`, `type`, `number`, `volume`, `eprint` and `year` according to the entry type, and the bare `year` for an entry type there is no rule for (`labdata.parsers.bibtex.format_venue()`). See below. |
 | `publication.url` | Input — the BibTeX `url`, but only when it is not a video URL (`entry_to_publication()`). |
 | `publication.video_url` | **Derived** — the BibTeX `url`, when it names youtube.com, youtu.be or vimeo.com (`labdata.parsers.bibtex.extract_video_url()`). |
 | `publication.doi_url` | **Derived** — `https://doi.org/` plus the `doi` field, unless `doi` is already a URL (`construct_doi_url()`). |
@@ -492,7 +497,20 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 | `project.publication_ids`, `people_ids` | **Derived** — back-links, and the people reached through them (`compute_backlinks()`). |
 | `collaborators` | **Derived, entirely** — see below (`labdata.assembler.assemble()`). |
 
-### Four derived fields that need more than a row
+### Five derived fields that need more than a row
+
+**`publication.venue` is the bare year for an entry type with no rule.**
+`format_venue()` branches on the entry type and has a rule for `article`,
+`inproceedings`, `phdthesis`, `mastersthesis`, `techreport` and `misc`. For
+anything else it falls through to `str(year)`: it does not fail, and it does
+not warn. What that costs is the whole container — an `@incollection` loses
+its `booktitle`, an `@inbook` and a `@book` their `publisher`, a `@manual`
+its `organization` — because those fields reach the document through `venue`
+or not at all (§2, heading 1). The demo carries one entry of each of those
+four types so the loss is exercised rather than described; `tests/COVERAGE.md`
+rows `types.incollection`, `types.inbook`, `types.book` and `types.manual`
+record it, and the missing diagnostic is the `types.unsupported` row, which is
+#26. Structured venues are #56.
 
 **`publication.bibtex` is re-serialized, not verbatim.** It is produced by
 `format_bibtex()`, which calls pybtex's `Entry.to_string("bibtex")` on the

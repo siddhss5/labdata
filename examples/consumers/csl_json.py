@@ -25,6 +25,10 @@ CSL_TYPES = {
     "phdthesis": "thesis",
     "mastersthesis": "thesis",
     "techreport": "report",
+    # A manual is an issued document with a version, which is what CSL's
+    # "report" is for; CSL has no manual type and "document" would throw away
+    # what the entry type said.
+    "manual": "report",
     "unpublished": "manuscript",
     "misc": "document",
 }

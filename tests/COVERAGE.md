@@ -97,6 +97,10 @@ Every type labdata has a venue rule for, plus one it does not.
 | `types.misc_arxiv` | `@misc` with `eprint` | Venue: the arXiv identifier and year | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `types.misc` | `@misc` with no venue fields | Venue: the year alone | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `types.unsupported` | `@book`, a type labdata has no venue rule for | Warning naming the file, key and type; the entry is kept | `tests/corpus/invalid/unsupported_entry_type/book.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `types.incollection` | `@incollection` with `booktitle`, `editor`, `chapter`, `pages`, `publisher`, `series`, `isbn` and `month` | No venue rule: the venue is the bare year, and the `booktitle` naming the collection is in no property of the work. The missing warning is `types.unsupported` | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_entry_types_without_a_venue_rule_degrade_to_the_year` | pass |
+| `types.inbook` | `@inbook` with `chapter`, `pages`, `publisher`, `address`, `edition` and `isbn` | No venue rule: the venue is the bare year, and the `publisher` of the book is in no property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_entry_types_without_a_venue_rule_degrade_to_the_year` | pass |
+| `types.book` | `@book` with `publisher`, `address`, `series`, `edition` and `isbn` | No venue rule: the venue is the bare year, and the `publisher` is in no property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_entry_types_without_a_venue_rule_degrade_to_the_year` | pass |
+| `types.manual` | `@manual` with `organization`, `address`, `edition` and `month` | No venue rule: the venue is the bare year, and the issuing `organization` is in no property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_entry_types_without_a_venue_rule_degrade_to_the_year` | pass |
 
 ## Fields read
 Every BibTeX field labdata reads. Fields it does not read (`pages`,
@@ -117,6 +121,32 @@ Every BibTeX field labdata reads. Fields it does not read (`pages`,
 | `fields.url` | `url` | Becomes `video_url` for a known video host, otherwise `url` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.project` | `project = {homebot}` | Becomes `project_ids` | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.unread` | `pages` and `publisher`, which labdata does not read | Not dropped: they stay in the `bibtex` field | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+
+## Fields the demo carries that reach no property
+The fields #69 required a fixture for. One row each, and each bound to an
+assertion that **passes**: the field is in the input entry, and its value is
+at no path in the work. The field-loss probe reports all of them together,
+but that test is xfailed and so cannot turn red when a fixture goes missing;
+these rows are what gives each field its own grip. Every value here is also
+preserved in the `bibtex` record, as `fields.unread` says.
+
+Each row reacts to its own field's **value**, wherever in the work it lands --
+a flat property, `identifiers[scheme]`, a parsed `editors` entry, a
+structured `venue` -- and to nothing else. Not to a container that merely
+exists, since `identifiers: {}` and a null flat property are what a work with
+no such field looks like; and not by substring, since `chapter = {9}` and the
+ISBN `978-1-00-000003-5` are on the same work.
+`test_field_absence_reads_the_value_not_the_container` pins both directions.
+
+| Case | Input | Expected | Fixture | Test | Status |
+|---|---|---|---|---|---|
+| `fields.editor` | `editor = {Quinn, Quentin and Silva, Sofia}` on an `@incollection` | Read by nothing: no editor's name is a value anywhere in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.month` | `month = {March}` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.chapter` | `chapter = {9}` on an `@inbook` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.isbn` | `isbn` on a `@book` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.organization` | `organization` on a `@manual` | Converted from LaTeX, then read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.issn` | `issn` on an `@article` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/journal.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.howpublished` | `howpublished` on a `@misc` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/other.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
 
 ## Name forms
 Author names as they appear in `.bib` files. `name` below is the `authors[].name`
@@ -347,3 +377,32 @@ as a whole. The structure is defined by
 | `output.demo_schema` | The Example Lab demo output | Validates against the same schema, in both formats | `examples/demo/lab.yaml` | `test_output_format.py::test_demo_matches_schema` | pass |
 | `output.yaml_json_same` | The same run exported twice | The YAML and JSON exports hold the same data | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_yaml_and_json_hold_the_same_data` | pass |
 | `output.full` | The valid corpus entries no open issue owns | Match `tests/corpus/expected/valid.yaml`, compared as parsed data | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_full_output` | pass |
+
+## Consumer probes
+The probes in `examples/consumers/` read the emitted document and nothing
+else, and run against the demo in CI. The rows here are the two of #69: the
+field-loss probe, which re-emits a BibTeX entry from first-class properties
+and reports every field name that did not reach one, and the identity
+scenarios asserted over the node and edge sets `graph.py` builds.
+
+The field-loss probe is a **field-loss detector, not a value round trip**:
+LaTeX-to-Unicode conversion is one-way, so comparing values would assert
+something false. Its one ignore set member, `project`, is named on its own in
+the test with the reason it is not a loss.
+
+The identity rows are filed against **two** issues, because two issues
+promise them. #56 settles a grouping keyed on the normalised full name and
+says the policy itself is #24's; under that key `priya patel`, `p patel` and
+`pradeep patel` are three keys, so #56 delivers the separation but by
+construction does not join two spellings of one person. Joining them needs
+the collaborator aliases of #24.
+
+| Case | Input | Expected | Fixture | Test | Status |
+|---|---|---|---|---|---|
+| `probe.roundtrip_shape` | The demo document | One BibTeX entry per work, keyed and typed from the document, carrying exactly the fields the document can still supply | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_entry_is_well_formed` | pass |
+| `probe.link_origin` | A work whose only link states an `origin` of `input`, `enrichment`, `sidecar`, `derived`, `inferred`, or none at all | The round-trip probe reads the link as the entry's `url` only when the document says it came from the input | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_reads_only_a_link_the_input_supplied` | pass |
+| `probe.field_loss` | Every entry of the demo, across its four `.bib` files | Every field name in a source entry reaches a first-class property, except `project`; the failure names every field lost, by entry and overall | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_loses_no_field` | xfail #56 |
+| `probe.identity_fixtures` | The demo document: one external co-author on three works in two spellings, a second with the same first initial and family name on a fourth, and two different people under one written name on a fifth | All four scenarios are present, with the given names kept apart on the authorships and one display name across all of them | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_identity_fixtures_are_present` | pass |
+| `probe.identity_one_person` | `Patel, Priya` on two works and `Patel, P.` on a third | Exactly one contributor in the `collaborator:` namespace touches any of the three works, and it holds exactly those three | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_joins_one_co_author_written_two_ways` | xfail #24 |
+| `probe.identity_distinct_people` | `Patel, Pradeep` on a fourth work | Exactly one contributor in the `collaborator:` namespace holds that work, it holds exactly that work, and it shares no contributor with the three above | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_separates_co_authors_sharing_an_initial` | xfail #56 |
+| `probe.identity_authorship` | `Lee, Lin and Lee, Lin`, two different people on one work | The document declares each authorship's `position`, and the graph carries two `authored` edges at those two positions from **one** contributor: one grouping, two addressable authorships | `examples/demo/bib/conference.bib` | `test_consumer_probes.py::test_graph_keeps_two_authorships_written_alike_apart` | xfail #56 |
