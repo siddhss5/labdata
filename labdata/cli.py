@@ -70,7 +70,7 @@ Examples:
     parser.add_argument(
         '--strict', action='store_true',
         help='Treat every coded diagnostic as an error, except those about '
-             'authors who matched nobody and redefined @string macros'
+             'authors who matched no lab member and redefined @string macros'
     )
 
     args = parser.parse_args(argv)

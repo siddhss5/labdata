@@ -38,7 +38,7 @@ BY_NAME = "exact"
 # Two things the resolver declines to decide, reported rather than guessed.
 # Both are warnings. `AMBIGUOUS_NAME` means a name fits more than one lab
 # member, and `--strict` makes it an error; `SUGGESTION` is about an author
-# who matched nobody, and an unresolved outside co-author is never an error.
+# who matched no lab member, which is never an error under `--strict`.
 AMBIGUOUS_NAME = "RESOLVE-AMBIGUOUS-NAME"
 SUGGESTION = "RESOLVE-SUGGESTION"
 

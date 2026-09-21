@@ -86,7 +86,7 @@ Flags, as `labdata.cli.main()` defines them:
 | `--output PATH` | Write the document to `PATH`. |
 | `--validate` | Report counts and problems, then exit without writing. |
 | `--unresolved` | List author names that matched no person, then exit. A name left ambiguous is one of them. |
-| `--strict` | Combines with any mode. Every coded diagnostic is an error except those the class table below marks as never an error. Any error exits `1`, and an export writes nothing. Without it, the exit codes below are unchanged. |
+| `--strict` | Combines with any mode. Every coded diagnostic is an error except those the class table below marks as never an error: a redefined `@string` macro, and anything about an author who matched no lab member. Any error exits `1`, and an export writes nothing. Without it, the exit codes below are unchanged. |
 
 **At least one** of `--output`, `--validate` or `--unresolved` is required —
 not exactly one. `labdata.cli.main()` rejects only the case where all three
@@ -134,8 +134,12 @@ table under *Diagnostic codes* below says which class each code belongs to.
 
 **Unresolved authors are not errors**, not even under `--strict`.
 `--validate` lists them and still exits `0`. This is intended, not a gap: an author who is not in `people.yaml`
-is usually an external collaborator, and #26 states the rule directly —
-"unresolved external collaborators are never errors". What fails the run is
+is usually an external collaborator, and #26 states the rule (decision 10):
+**an author who matched no lab member is never an error under `--strict`**,
+because labdata cannot tell an outside co-author from a possible member
+until #25 lets an author be declared external. The known cost is that a
+misspelt member's name passes `--strict`, reported only as a
+`RESOLVE-SUGGESTION` warning; #25 revisits this. What fails the run is
 a defect in data labdata does own: a project id naming no project, a
 repeated citation key, person id or project id, and the fatal conditions in
 the class table below.
@@ -184,14 +188,18 @@ without depending on English wording. Codes obey three rules:
    spelling.
 
    **Under `--strict`**, in every mode, every code is an **error** except
-   six, which stay **warnings** (`labdata.diagnostics.NEVER_AN_ERROR`):
+   six, which stay **warnings** (`labdata.diagnostics.NEVER_AN_ERROR`). Five
+   of them follow one rule, #26 decision 10: **an author who matched no lab
+   member is never an error under `--strict`**, because labdata cannot tell
+   an outside co-author from a possible member until #25 lets an author be
+   declared external.
 
    | Code | Why it is never an error |
    |---|---|
    | `BIB-STRING-REDEFINED` | Decided on #26: BibTeX's own last-wins rule settles a redefinition (§7), so it is reported and never fails a run. |
-   | `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `ID-GROUPING-AMBIGUOUS-DECLARED` | Each is about how authors who matched no lab member are grouped, and an unresolved outside co-author is never an error. |
-   | `RESOLVE-UNRESOLVED-NAME` | It *is* an author who matched no lab member. |
-   | `RESOLVE-SUGGESTION` | It fires only on an author who matched no one. labdata cannot tell a near miss on a member's name from an outside co-author whose name is similar, so the same exception covers it. |
+   | `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `ID-GROUPING-AMBIGUOUS-DECLARED` | Decision 10: each is about how authors who matched no lab member are grouped. |
+   | `RESOLVE-UNRESOLVED-NAME` | Decision 10: it *is* an author who matched no lab member. |
+   | `RESOLVE-SUGGESTION` | Decision 10: it is an author who matched no lab member, whose name is close to a member's. It may be a misspelt member or an outside co-author with a similar name, and labdata cannot tell which. The known cost: a misspelt member's name passes `--strict` with this warning, until #25 revisits it. |
 
    So a fatal code is an error in every mode with or without `--strict`; a
    validation error is an error under `--validate`, and under `--strict` in
@@ -211,12 +219,12 @@ Codes in use:
 | `BIB-DUPLICATE-KEY` | The same citation key appears twice in one `.bib` file, or in two of the configured files. A validation error. |
 | `BIB-CROSSREF-UNSUPPORTED` | An entry carries a `crossref` field. Reported on the field's **presence**, whatever its value: an empty `crossref = {}` is a field the entry carries. The diagnostic names the file, the entry key and the parent key, or says the entry names no parent when the field is empty; the entry is not emitted and the run fails, in every mode. |
 | `BIB-YEAR-MISSING` | An entry has no `year` field. The work is emitted with `year: null` and sorts last. A warning. |
-| `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. A warning: an external co-author is never an error. |
-| `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer, and two lineage suffixes that disagree ruling the pair out — so a particle, a second initial, a hyphenated family name, a suffix and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. A warning, for the same reason. |
+| `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. A warning, in every mode including under `--strict`: an author who matched no lab member is never an error (#26 decision 10). |
+| `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer, and two lineage suffixes that disagree ruling the pair out — so a particle, a second initial, a hyphenated family name, a suffix and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. A warning in every mode, for the same reason. |
 | `RESOLVE-AMBIGUOUS-NAME` | An author or editor name fits more than one **lab member**, so it is given no `person_id` and `resolution.status` is `ambiguous`. Located at the work — `<bib_dir>/<file>:<key>:author` or `:editor` — with the position and every id it fits in the prose. A warning; an error under `--strict`, because it is about lab members, whom labdata does own. **Narrowed** by #26 decision 6: until then it also covered an unresolved authorship that fits a declared collaborator and someone else, which is now `ID-GROUPING-AMBIGUOUS-DECLARED`. No release carried the wider meaning. |
-| `RESOLVE-SUGGESTION` | An author or editor name matched no person but is close to one: its initials fit a person's name that declares no such alias, or it is a near miss on string similarity. Nothing is linked. Located as above, naming the position and the suggested ids. A warning in every mode, including under `--strict`: it fires only on an author who matched no one, which labdata cannot tell from an outside co-author. |
-| `ID-GROUPING-AMBIGUOUS-DECLARED` | An unresolved authorship fits more than one `collaborators_file` entry, or one entry and a lab member it did not resolve to, so it joins none of them and is grouped by its own name. Located like `RESOLVE-AMBIGUOUS-NAME`, naming every candidate (`collaborator:<name>`, `person:<id>`). A warning in every mode, including under `--strict`. |
-| `RESOLVE-UNRESOLVED-NAME` | One author name that matched no person, as `--unresolved --format json` lists them: one record per name `--unresolved` would print, in the same order. Located at the first authorship, in document order, written that way and linked to nobody; the message is the name itself, with any line break as a space. Emitted **only** by `--unresolved --format json`; the text modes list these names as before, and `--validate --format json` carries only the other codes. A warning in every mode, including under `--strict`. |
+| `RESOLVE-SUGGESTION` | An author or editor name matched no person but is close to one: its initials fit a person's name that declares no such alias, or it is a near miss on string similarity. Nothing is linked. Located as above, naming the position and the suggested ids. A warning in every mode, including under `--strict`: an author who matched no lab member is never an error (#26 decision 10), because labdata cannot tell an outside co-author from a possible member until #25. The known cost is that a misspelt member's name passes `--strict` with only this warning. |
+| `ID-GROUPING-AMBIGUOUS-DECLARED` | An unresolved name fits more than one `collaborators_file` entry, or one entry and one lab member it did not resolve to, so it joins none of them and is grouped by its own name (#26 decisions 6 and 10). Located like `RESOLVE-AMBIGUOUS-NAME`, naming every candidate (`collaborator:<name>`, `person:<id>`). A warning in every mode, including under `--strict`: an author who matched no lab member is never an error. When the name fits one entry and **more than one** lab member, it is also reported here, and `RESOLVE-AMBIGUOUS-NAME` reports the members' ambiguity as well; that one is an error under `--strict`. |
+| `RESOLVE-UNRESOLVED-NAME` | One author name that matched no person, as `--unresolved --format json` lists them: one record per name `--unresolved` would print, in the same order. Located at the first authorship, in document order, written that way and linked to nobody; the message is the name itself, with any line break as a space. Emitted **only** by `--unresolved --format json`; the text modes list these names as before, and `--validate --format json` carries only the other codes. A warning in every mode, including under `--strict` (#26 decision 10). |
 | `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` | A `collaborators_file` `name` or alias equal to a lab member's name or alias. The member keeps the spelling and the collaborator entry is not used for it. Located at `<collaborators_file>:<collaborator name>:name` or `:aliases`. A warning. |
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. A warning. |
 | `BIB-YEAR-INVALID` | An entry's `year` is present but is not a number (`int()` rejects it), such as `in press`. The work is emitted with `year: null` and sorts last, as one with no year does. A warning. |

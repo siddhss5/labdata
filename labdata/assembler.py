@@ -54,21 +54,23 @@ _SLUG_LENGTH = 60
 _NOT_SLUG = re.compile(r"-+")
 
 # Two ways a grouping key can be wrong that the document would otherwise keep
-# to itself. Neither is an error: an external co-author is never an error
-# (SPEC.md section 1).
+# to itself. Neither is an error, even under `--strict`: an author who
+# matched no lab member is never an error (SPEC.md section 1).
 GROUPING_SPANS_SPELLINGS = "ID-GROUPING-SPANS-SPELLINGS"
 GROUPING_INITIALS_AMBIGUOUS = "ID-GROUPING-INITIALS-AMBIGUOUS"
 
 # An unresolved authorship that fits more than one `collaborators_file`
 # entry, or an entry and a lab member it did not resolve to, so it is grouped
 # by its own name. A warning in every mode, including under `--strict`: an
-# unresolved outside co-author is never an error. Until #26's decision 6 it
-# was reported under `RESOLVE-AMBIGUOUS-NAME`, which now means lab members only.
+# author who matched no lab member is never an error (#26 decisions 6 and
+# 10). Until decision 6 it was reported under `RESOLVE-AMBIGUOUS-NAME`, which
+# now means lab members only and is still reported, as an error under
+# `--strict`, when the name also fits more than one member.
 GROUPING_AMBIGUOUS_DECLARED = "ID-GROUPING-AMBIGUOUS-DECLARED"
 
 # One author name that matched no person, as `--unresolved --format json`
-# lists it. A warning in every mode, including under `--strict`: an
-# unresolved outside co-author is never an error.
+# lists it. A warning in every mode, including under `--strict`: an author who
+# matched no lab member is never an error (#26 decision 10).
 UNRESOLVED_NAME = "RESOLVE-UNRESOLVED-NAME"
 
 # A `collaborators_file` name or alias that a lab member already declares.
@@ -293,8 +295,8 @@ def group_collaborators(works: List[Work], bib_dir: str,
                     warnings.append(diagnostic(
                         GROUPING_AMBIGUOUS_DECLARED, *where,
                         f"position {author.position}, '{author.name}', fits "
-                        "more than one declared collaborator, or one and a lab "
-                        "member, and is grouped by its own name: "
+                        "more than one collaborators_file entry, or an entry "
+                        "and a lab member, and is grouped by its own name: "
                         f"{', '.join(ids)}"))
             key = collaborator_key(kind, normalized)
             author.collaborator_key = key

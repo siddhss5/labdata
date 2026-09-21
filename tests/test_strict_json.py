@@ -140,31 +140,111 @@ def write_lab(tmp_path, bib, people=None, collaborators=None):
     (tmp_path / "lab.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
 
 
+def strict_codes(tmp_path):
+    """The codes of a --validate --strict run as JSON, and each mode's exit."""
+    run = run_labdata(["--config", "lab.yaml", "--validate", "--strict",
+                       "--format", "json"], tmp_path)
+    records = json.loads(run.stdout)
+    exits = {run.code}
+    for mode in (["--validate"], ["--unresolved"], ["--output", tmp_path / "o.yaml"]):
+        exits.add(run_labdata(["--config", "lab.yaml", "--strict", *mode],
+                              tmp_path).code)
+    return records, exits
+
+
+MEMBERS = [{"id": "aadams", "name": "Alice Adams", "role": "pi"}]
+NOT_MATCHING = {"RESOLVE-SUGGESTION", "RESOLVE-AMBIGUOUS-NAME",
+                "ID-GROUPING-AMBIGUOUS-DECLARED", "ID-GROUPING-INITIALS-AMBIGUOUS"}
+
+
 def test_strict_passes_when_only_outside_co_authors_are_unresolved(tmp_path):
-    """Every code about an unmatched author stays a warning under --strict,
-    and so does a redefined @string macro."""
+    """Outside co-authors close to no member's name, and a redefined @string
+    macro, leave --strict at exit 0 in every mode."""
     write_lab(tmp_path,
               '@string{v = "Old"}\n@string{v = "Venue"}\n'
               "@article{a, title = {T}, journal = v, year = 2024, author = "
-              "{Adams, Alice and Davis, Dave M. and Ross, Rachel and Quinn, Q.}}\n"
+              "{Adams, Alice and Ross, Rachel and Zhou, Zelda}}\n"
               "@article{b, title = {T}, journal = {J}, year = 2023, author = "
-              "{ROSS, RACHEL and Quinn, Quentin and Patel, P.}}\n",
-              people=[{"id": "aadams", "name": "Alice Adams", "role": "pi"},
-                      {"id": "ddavis", "name": "Dave Davis", "role": "student"}],
+              "{ROSS, RACHEL and Adams, Alice}}\n",
+              people=MEMBERS)
+    records, exits = strict_codes(tmp_path)
+    codes = {r["code"] for r in records}
+    assert not codes & NOT_MATCHING, records
+    assert codes == {"BIB-STRING-REDEFINED", "ID-GROUPING-SPANS-SPELLINGS"}
+    assert {r["severity"] for r in records} == {"warning"}
+    assert exits == {0}
+    assert (tmp_path / "o.yaml").exists()
+
+
+def test_a_suggestion_alone_leaves_strict_at_exit_0(tmp_path):
+    """Decision 10: an author who matched no lab member is never an error
+    under --strict, even when the name is close to a member's."""
+    write_lab(tmp_path,
+              "@article{a, title = {T}, journal = {J}, year = 2024, author = "
+              "{Davis, Dave M.}}\n",
+              people=[{"id": "ddavis", "name": "Dave Davis", "role": "student"}])
+    records, exits = strict_codes(tmp_path)
+    assert [(r["code"], r["severity"]) for r in records] == [
+        ("RESOLVE-SUGGESTION", "warning")]
+    assert exits == {0}
+
+
+def test_an_initials_only_grouping_alone_leaves_strict_at_exit_0(tmp_path):
+    write_lab(tmp_path,
+              "@article{a, title = {T}, journal = {J}, year = 2024, author = "
+              "{Quinn, Q. and Quinn, Quentin}}\n", people=MEMBERS)
+    records, exits = strict_codes(tmp_path)
+    assert [r["code"] for r in records] == ["ID-GROUPING-INITIALS-AMBIGUOUS"]
+    assert exits == {0}
+
+
+# The boundary of ID-GROUPING-AMBIGUOUS-DECLARED (#26 decisions 6 and 10).
+
+def test_a_name_fitting_two_collaborator_entries_is_a_grouping_warning(tmp_path):
+    write_lab(tmp_path,
+              "@article{a, title = {T}, journal = {J}, year = 2024, author = "
+              "{Patel, P.}}\n", people=MEMBERS,
               collaborators=[{"name": "Priya Patel", "aliases": ["P. Patel"]},
                              {"name": "Pradeep Patel", "aliases": ["P. Patel"]}])
-    run = run_labdata(["--config", "lab.yaml", "--validate", "--strict",
-                       "--format", "json"], tmp_path)
-    codes = {r["code"] for r in json.loads(run.stdout)}
-    assert codes == {"BIB-STRING-REDEFINED", "RESOLVE-SUGGESTION",
-                     "ID-GROUPING-SPANS-SPELLINGS",
-                     "ID-GROUPING-INITIALS-AMBIGUOUS",
-                     "ID-GROUPING-AMBIGUOUS-DECLARED"}, run.stdout
-    assert run.code == 0
-    for mode in (["--validate"], ["--unresolved"], ["--output", tmp_path / "o.yaml"]):
-        run = run_labdata(["--config", "lab.yaml", "--strict", *mode], tmp_path)
-        assert run.code == 0, (mode, run.output)
-    assert (tmp_path / "o.yaml").exists()
+    records, exits = strict_codes(tmp_path)
+    assert [(r["code"], r["severity"]) for r in records] == [
+        ("ID-GROUPING-AMBIGUOUS-DECLARED", "warning")]
+    assert exits == {0}
+
+
+def test_a_name_fitting_an_entry_and_one_member_is_a_grouping_warning(tmp_path):
+    """`Patel, P.` fits the entry that declares `P. Patel` and member Paul
+    Patel, who declares no alias: one entry and one member."""
+    write_lab(tmp_path,
+              "@article{a, title = {T}, journal = {J}, year = 2024, author = "
+              "{Patel, P.}}\n",
+              people=[{"id": "ppatel", "name": "Paul Patel", "role": "student"}],
+              collaborators=[{"name": "Priya Patel", "aliases": ["P. Patel"]}])
+    records, exits = strict_codes(tmp_path)
+    codes = [r["code"] for r in records]
+    assert "ID-GROUPING-AMBIGUOUS-DECLARED" in codes
+    assert "RESOLVE-AMBIGUOUS-NAME" not in codes
+    assert {r["severity"] for r in records} == {"warning"}
+    assert exits == {0}
+
+
+def test_a_name_fitting_an_entry_and_two_members_fails_strict(tmp_path):
+    """One entry and two members: the members' ambiguity is
+    RESOLVE-AMBIGUOUS-NAME (decision 6), an error under --strict. The
+    grouping warning is reported as well, naming the entry too."""
+    write_lab(tmp_path,
+              "@article{a, title = {T}, journal = {J}, year = 2024, author = "
+              "{Kim, A.}}\n",
+              people=[{"id": "akim", "name": "Alex Kim", "role": "student"},
+                      {"id": "alankim", "name": "Alan Kim", "role": "student"}],
+              collaborators=[{"name": "Amy Kim"}])
+    records, exits = strict_codes(tmp_path)
+    by_code = {r["code"]: r for r in records}
+    assert set(by_code) == {"RESOLVE-AMBIGUOUS-NAME", "ID-GROUPING-AMBIGUOUS-DECLARED"}
+    assert by_code["RESOLVE-AMBIGUOUS-NAME"]["severity"] == "error"
+    assert by_code["ID-GROUPING-AMBIGUOUS-DECLARED"]["severity"] == "warning"
+    assert "collaborator:amy kim" in by_code["ID-GROUPING-AMBIGUOUS-DECLARED"]["message"]
+    assert exits == {1}
 
 
 def test_a_failing_strict_export_writes_nothing_and_keeps_an_existing_file(tmp_path):

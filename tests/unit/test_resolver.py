@@ -628,8 +628,8 @@ class TestDeclaredCollaboratorGrouping:
             ("P. Patel", "normalized_name")]
         assert warnings == [
             "ID-GROUPING-AMBIGUOUS-DECLARED bib/w.bib:w0:author: position 2, "
-            "'P. Patel', fits more than one declared collaborator, or one and a "
-            "lab member, and is grouped by its own name: "
+            "'P. Patel', fits more than one collaborators_file entry, or an "
+            "entry and a lab member, and is grouped by its own name: "
             "collaborator:pradeep patel, collaborator:priya patel"]
 
     def test_a_member_competes_with_a_declared_collaborator(self):

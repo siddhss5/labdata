@@ -91,7 +91,8 @@ entry, and reports every problem under a stable code that
 [`SPEC.md`](SPEC.md) registers, with its class.
 
 `--strict` combines with any mode and turns every coded problem into an
-error, except the ones about authors who matched nobody and redefined
+error, except the ones about authors who matched no lab member (labdata
+cannot yet tell an outside co-author from a misspelt member) and redefined
 `@string` macros; any error exits `1`, and an export then writes nothing.
 With `--validate` or `--unresolved`, `--format json` prints the problems as
 one JSON array of `{code, severity, file, key, field, message}` on standard

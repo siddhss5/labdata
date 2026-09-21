@@ -96,10 +96,11 @@ CLASSES: Dict[str, str] = {
 }
 
 # The codes `--strict` leaves as warnings. `BIB-STRING-REDEFINED` is decided
-# on #26; every other one is about an author who matched no lab member, and an
-# unresolved outside co-author is never an error. `RESOLVE-SUGGESTION` fires
-# only on such an author: labdata cannot tell a near miss on a member's name
-# from an outside co-author with a similar one.
+# on #26 (decision 5). Every other one is about an author who matched no lab
+# member, and such an author is never an error under `--strict` (decision 10):
+# labdata cannot tell an outside co-author from a possible member until #25
+# lets an author be declared external. The known cost is that a misspelt
+# member's name passes `--strict`, reported as a `RESOLVE-SUGGESTION` warning.
 NEVER_AN_ERROR = frozenset({
     "BIB-STRING-REDEFINED",
     "ID-GROUPING-SPANS-SPELLINGS",
