@@ -205,8 +205,8 @@ Codes in use:
 | `BIB-ENTRY-TYPE-UNSUPPORTED` | An entry's type is not one labdata documents. Those are `@article`, `@inproceedings`, `@conference`, `@proceedings`, `@incollection`, `@inbook`, `@book`, `@phdthesis`, `@mastersthesis`, `@techreport`, `@manual` and `@misc` (`labdata.parsers.bibtex.SUPPORTED_TYPES`); `@unpublished` and `@booklet`, for two, are not. Located at `<file>:<key>:entry_type`. The entry is kept, and its venue is read by the field rules alone. A warning. |
 | `LATEX-COMMAND-UNKNOWN` | A text field or a name uses a LaTeX command labdata's conversion has no rule for (`labdata.parsers.latex.unknown_commands()`): one outside the converter's table and not one of the two whose conversion labdata documents, `\textsuperscript{…}`, which becomes its argument, and the escaped star `\*`, which is consumed (`tests/COVERAGE.md` rows `names.equal_contribution` and `names.equal_contribution_escaped`). The command is dropped and a braced argument after it is kept as plain text, so no raw LaTeX reaches the document. Math is not searched. Reported once per field and command. A warning. |
 | `RESOLVE-PROJECT-UNKNOWN` | A work's `project` field names an id `projects_file` does not define. Located at `<bib_dir>/<file>:<key>:project`, naming the id. The id stays on the work (§5). A validation error. |
-| `PEOPLE-NOT-A-LIST` | `people_file` is not a list of records, or one of its entries is not a mapping. Located at the file alone; the prose numbers the entry. An empty file is no records, and is not reported. Fatal: nothing is emitted from a record that cannot be read. |
-| `PEOPLE-FIELD-MISSING` | A person has no `id` or no `name`, or an empty one. Located at `<people_file>:<id>:<field>`, with the id left empty when it is the id that is missing. The record is not loaded, and the run is fatal: a document cannot carry a person with no id or name. |
+| `PEOPLE-NOT-A-LIST` | `people_file` is not a list of records. Located at the file alone. An empty file is no records, and is not reported. An entry of the list that is not a mapping is not checked, and raises as it does on `main`. Fatal: nothing is emitted from a file that cannot be read as records. |
+| `PEOPLE-FIELD-MISSING` | A person has no `name`, or an empty one. Located at `<people_file>:<id>:name`. The record is not loaded, and the run is fatal: a document cannot carry a person with no name. A person with no `id` is not checked, and raises as it does on `main`. |
 | `PEOPLE-ID-DUPLICATE` | Two people declare one `id`. Located at the second. Both are kept, as a repeated citation key is. A validation error. |
 | `PEOPLE-ROLE-INVALID` | A person's `role` is missing, empty or not a string. Located at `<people_file>:<id>:role`. A role is otherwise open: any non-empty string is accepted, so no list of roles is checked. A warning. |
 | `PEOPLE-STATUS-INVALID` | A person's `status` is present and is not `current` or `alumni`. Located at `<people_file>:<id>:status`, naming the value. A missing status reads as `current`. A warning. |
@@ -215,7 +215,7 @@ Codes in use:
 | `PROJECTS-STATUS-INVALID` | A project's `status` is present and is not `active` or `completed`. A missing status reads as `active`. A warning. |
 | `CONFIG-NOT-A-MAPPING` | `lab.yaml` is not a mapping of keys, or is empty. Fatal at load. |
 | `CONFIG-KEY-MISSING` | A required key is absent: `bib_dir`, or the `name` or `category` of a `bib_files` entry (`lab.yaml:bib_files:name`). Fatal at load. |
-| `CONFIG-TYPE-INVALID` | A key has a value of the wrong type: `bib_dir`, `pdf_base_url`, `people_file`, `projects_file` or `collaborators_file` that is not a string, `lab` that is not a mapping, `bib_files` that is not a list of mappings, or a `bib_files` `name` or `category` that is not a string. Fatal at load. |
+| `CONFIG-TYPE-INVALID` | A key has a value of the wrong type: `bib_dir`, `pdf_base_url`, `people_file` or `projects_file` that is not a string, `lab` that is not a mapping, `bib_files` that is not a list of mappings, or a `bib_files` `name` or `category` that is not a string. Fatal at load. |
 | `CONFIG-KEY-UNKNOWN` | `lab.yaml` holds a key labdata does not read (`labdata.config.KNOWN_KEYS`), such as a misspelt `people_fil`. It is ignored. A warning. |
 | `CONFIG-BIB-FILES-MISSING` | No `bib_files` are configured, absent or empty, so the document has no works. A warning: that can be meant, but it is never silently normal. |
 | `CONFIG-FILE-NOT-FOUND` | A file the configuration names is not there: a `bib_files` entry under `bib_dir` (`lab.yaml:bib_files:name`), `people_file` or `projects_file`. A missing `collaborators_file` is not checked, and reads as no declared collaborators. Named with the path it looked for. Fatal: compiling on would emit a document without that file's works, people or projects. |
@@ -353,7 +353,7 @@ converts nor checks them:
 
 - **The person and project strings supplied in YAML.**
   `labdata.loaders.load_people()` and `load_projects()` perform no conversion
-  of any kind — they check a person's required fields, a `role`, and that a
+  of any kind — they check a person's `name` and `role`, and that a
   `status` is one they know, but emit every value as written — so a person's `name`, `role`, `current_position` or
   `thesis_title`, and a project's `title` or `description`, are copied
   straight from `people.yaml` and `projects.yaml`. Not every YAML string is

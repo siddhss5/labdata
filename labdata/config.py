@@ -40,8 +40,7 @@ KNOWN_KEYS = ("lab", "site", "bib_dir", "bib_files", "pdf_base_url",
               "people_file", "projects_file", "collaborators_file")
 
 # The keys whose value, when present, must be a string: a path or a URL.
-_STRING_KEYS = ("pdf_base_url", "people_file", "projects_file",
-                "collaborators_file")
+_STRING_KEYS = ("pdf_base_url", "people_file", "projects_file")
 
 
 class ConfigurationError(ValueError):

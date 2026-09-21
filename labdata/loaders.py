@@ -18,7 +18,7 @@ from .models import Person, Project
 
 # What can be wrong with a people or projects file, one code per condition
 # and file. A people file that is not a list of records, and a person with no
-# id or no name, cannot be emitted at all, so they fail every mode; a
+# name, cannot be emitted at all, so they fail every mode; a
 # repeated id fails `--validate`, as a repeated citation key does; the rest
 # are warnings.
 PEOPLE_NOT_A_LIST = "PEOPLE-NOT-A-LIST"
@@ -45,15 +45,15 @@ def _to(collected: Optional[List[str]]) -> Callable[[str], None]:
     return report
 
 
-def _records(path: str, not_a_list: str, missing: str, duplicate: str,
-             required: tuple, errors, diagnostics) -> List[dict]:
+def _records(path: str, errors, diagnostics) -> List[dict]:
     """The records of one people file that can be emitted.
 
     A missing file is not this function's to report (the assembler names the
     configuration key instead) and reads as no records, as does an empty one.
-    A record that is not a mapping, or that lacks a required field, is
-    reported and left out; a repeated id is reported and kept, as the parser
-    library keeps a repeated citation key.
+    A file that is not a list, and a person with no name, are reported and
+    left out; a repeated id is reported and kept, as the parser library keeps
+    a repeated citation key. A record that is not a mapping, or has no `id`,
+    raises as it always has: no contract row covers it yet.
     """
     fail, report = _to(errors), _to(diagnostics)
     if not Path(path).exists():
@@ -65,27 +65,20 @@ def _records(path: str, not_a_list: str, missing: str, duplicate: str,
     if data is None:
         return []
     if not isinstance(data, list):
-        fail(diagnostic(not_a_list, path, None, None,
+        fail(diagnostic(PEOPLE_NOT_A_LIST, path, None, None,
                         "the file must be a list of records, one per entry; "
                         f"it is a {type(data).__name__}"))
         return []
 
     records, seen = [], set()
     for number, entry in enumerate(data, start=1):
-        if not isinstance(entry, dict):
-            fail(diagnostic(not_a_list, path, None, None,
-                            f"entry {number} is not a mapping"))
-            continue
-        key = entry.get('id')
-        absent = [name for name in required
-                  if entry.get(name) is None or str(entry[name]).strip() == ""]
-        for name in absent:
-            fail(diagnostic(missing, path, key if name != 'id' else None, name,
-                            f"entry {number} has no {name}"))
-        if absent:
+        key = entry['id']
+        if entry.get('name') is None or str(entry['name']).strip() == "":
+            fail(diagnostic(PEOPLE_FIELD_MISSING, path, key, 'name',
+                            f"entry {number} has no name"))
             continue
         if key in seen:
-            report(diagnostic(duplicate, path, key, 'id',
+            report(diagnostic(PEOPLE_ID_DUPLICATE, path, key, 'id',
                               f"the id '{key}' is declared more than once"))
         seen.add(key)
         records.append(entry)
@@ -111,9 +104,7 @@ def load_people(path: str, errors: Optional[List[str]] = None,
     """
     warn = _to(warnings)
     people = []
-    for entry in _records(path, PEOPLE_NOT_A_LIST, PEOPLE_FIELD_MISSING,
-                          PEOPLE_ID_DUPLICATE, ('id', 'name'),
-                          errors, diagnostics):
+    for entry in _records(path, errors, diagnostics):
         role = entry.get('role')
         if not isinstance(role, str) or not role.strip():
             warn(diagnostic(PEOPLE_ROLE_INVALID, path, entry['id'], 'role',
