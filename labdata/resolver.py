@@ -62,9 +62,10 @@ _INITIAL = re.compile(r"^[^\W\d_]\.?(?:-[^\W\d_]\.?)*$", re.UNICODE)
 
 # Initials written without a space between them: two or more letters, each
 # but the last followed by a period, the last period optional -- `S.S.`,
-# `S.S`, `T.A.K.`. Read as one initial per letter, so `S.S.` matches as
-# `S. S.` does. A part with no period inside it (`SS`, `Al.`) is a name, and
-# a hyphenated one (`J.-P.`) is left as written.
+# `S.S`, `T.A.K.`. In a given name they are read as one initial per letter,
+# so `S.S.` matches as `S. S.` does. A part with no period inside it (`SS`,
+# `Al.`) is a name, and a hyphenated one (`J.-P.`) is left as written. Never
+# applied to a family name, a particle, a suffix or a brace-protected name.
 _RUN_TOGETHER = re.compile(r"(?<!\S)[^\W\d_](?:\.[^\W\d_])+\.?(?!\S)",
                            re.UNICODE)
 
@@ -88,8 +89,6 @@ def normalize_name(name: str) -> str:
         c for c in unicodedata.normalize('NFD', name)
         if unicodedata.category(c) != 'Mn'
     )
-    # Space run-together initials: S.S. → S. S.
-    name = _spaced_initials(name)
     # Remove periods
     name = name.replace('.', '')
     # Remove superscript HTML tags
@@ -297,18 +296,46 @@ class Candidates:
     """
 
     def __init__(self, entries: Sequence[Tuple[str, Sequence[str]]]):
-        self.forms: List[Tuple[str, str]] = []
+        self.forms: List[Tuple[str, str, List[Tuple[str, List[str]]]]] = []
         self.exact: Dict[str, Set[str]] = {}
         for entity_id, names in entries:
             for name in names:
                 key = normalize_name(name)
                 if not key:
                     continue
-                self.forms.append((entity_id, key))
+                self.forms.append((entity_id, key, _declared_parts(name, key)))
                 self.exact.setdefault(key, set()).add(entity_id)
 
     def ids_for(self, key: str) -> Set[str]:
         return set(self.exact.get(key, ()))
+
+    def _given(self, contributor: Contributor):
+        """``(id, declared given parts)`` for every form ending in this
+        name's particles, family name and suffix.
+
+        A declared string is not parsed into name parts: its given name is
+        what is left once the contributor's own tail is taken off, and only
+        there are run-together initials read one per letter.
+        """
+        tail = normalize_name(" ".join(part for part in (contributor.von,
+                                                     contributor.family) if part))
+        if contributor.suffix:
+            tail = f"{tail}, {normalize_name(contributor.suffix)}"
+        size = len(tail.split())
+        for entity_id, _, parts in self.forms:
+            if len(parts) < size or " ".join(
+                    plain for plain, _ in parts[len(parts) - size:]) != tail:
+                continue
+            yield entity_id, [piece for _, spaced in parts[:len(parts) - size]
+                              for piece in spaced]
+
+    def named(self, contributor: Contributor, given: List[str]) -> Set[str]:
+        """Every entity with a form equal to this name, its given name read
+        as ``given``. A brace-protected name is compared as written."""
+        if contributor.literal:
+            return self.ids_for(normalize_name(contributor.literal))
+        return {entity_id for entity_id, declared in self._given(contributor)
+                if declared == given}
 
     def compatible(self, contributor: Contributor) -> Set[str]:
         """Every entity one of whose forms this name could be.
@@ -321,21 +348,29 @@ class Candidates:
         """
         if contributor.literal or not contributor.family:
             return set()
-        tail = normalize_name(" ".join(part for part in (contributor.von,
-                                                     contributor.family) if part))
-        if contributor.suffix:
-            tail = f"{tail}, {normalize_name(contributor.suffix)}"
-        written = [normalize_name(part) for part in _given_parts(contributor.given)]
-        written = [part for part in written if part]
-        found = set()
-        for entity_id, key in self.forms:
-            if not key.endswith(" " + tail):
-                continue
-            declared = key[:-len(tail) - 1].split()
-            if written and declared and all(
-                    _tokens_agree(w, d) for w, d in zip(written, declared)):
-                found.add(entity_id)
-        return found
+        written = _normalized_given(contributor.given)
+        return {entity_id for entity_id, declared in self._given(contributor)
+                if written and declared and all(
+                    _tokens_agree(w, d) for w, d in zip(written, declared))}
+
+
+def _declared_parts(name: str, key: str) -> List[Tuple[str, List[str]]]:
+    """Each word of a declared name as ``(normalised, normalised with
+    run-together initials spaced)``, lined up with the words of ``key``."""
+    parts = [(normalize_name(word),
+              [piece for piece in (normalize_name(p)
+                                   for p in _spaced_initials(word).split()) if piece])
+             for word in name.split()]
+    parts = [(plain, spaced) for plain, spaced in parts if plain]
+    if " ".join(plain for plain, _ in parts) != key:
+        return [(word, [word]) for word in key.split()]
+    return parts
+
+
+def _normalized_given(given: Optional[str]) -> List[str]:
+    """The parts of a given name, normalised, run-together initials spaced."""
+    return [piece for piece in (normalize_name(part) for part in _given_parts(given))
+            if piece]
 
 
 class Match:
@@ -368,7 +403,7 @@ def match(contributor: Contributor, candidates: Candidates) -> Match:
     3. Otherwise nothing is linked, and every entity the name could be is a
        suggestion.
     """
-    exact = candidates.ids_for(normalize_name(full_form(contributor)))
+    exact = candidates.named(contributor, _normalized_given(contributor.given))
     if len(exact) == 1 and not (contributor.given and has_initial(contributor.given)):
         return Match(RESOLVED, exact)
     if len(exact) > 1:
@@ -378,7 +413,8 @@ def match(contributor: Contributor, candidates: Candidates) -> Match:
     if contributor.literal or not has_initial(contributor.given):
         return Match(UNRESOLVED, compatible)
 
-    declared = exact | candidates.ids_for(normalize_name(match_form(contributor)))
+    declared = exact | candidates.named(contributor, [
+        normalize_name(_initials(part)) for part in _given_parts(contributor.given)])
     fits = compatible | declared
     if len(fits) > 1:
         return Match(AMBIGUOUS, fits)

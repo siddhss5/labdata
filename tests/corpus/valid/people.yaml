@@ -134,6 +134,14 @@
   role: "postdoc"
   status: "current"
 
+# A two-letter given name. `E.D.` is two initials, not `Ed`, so a
+# run-together form must not reach him.
+# CASE names.initials_run_together_unmatched
+- id: "equill"
+  name: "Ed Quill"
+  role: "ms_student"
+  status: "current"
+
 # A multi-letter given name that could be read as two initials.
 # CASE names.initials_multiletter_whole
 - id: "jnash"

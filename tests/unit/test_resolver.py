@@ -32,27 +32,7 @@ class TestNormalizeName:
         assert normalize_name("H. Müller") == "h muller"
 
     def test_periods(self):
-        assert normalize_name("A.J. Adams") == "a j adams"
-
-    @pytest.mark.parametrize("written", ["S.S. Ivers", "S. S. Ivers",
-                                         "S S Ivers", "S.S Ivers"])
-    def test_run_together_initials_are_spaced(self, written):
-        assert normalize_name(written) == "s s ivers"
-
-    def test_three_run_together_initials(self):
-        assert normalize_name("T.A.K. Moss") == normalize_name("T. A. K. Moss") \
-            == "t a k moss"
-
-    @pytest.mark.parametrize("written, normalized", [
-        ("SS Ivers", "ss ivers"),        # no period inside: a name, not initials
-        ("Jo Nash", "jo nash"),
-        ("Al. Nash", "al nash"),
-        ("Ng Nash", "ng nash"),
-        ("J.-P. Wren", "j-p wren"),      # hyphenated initials stay as written
-        ("J.P.-A. Wren", "jp-a wren"),
-    ])
-    def test_other_parts_are_not_split(self, written, normalized):
-        assert normalize_name(written) == normalized
+        assert normalize_name("A.J. Adams") == "aj adams"
 
     def test_whitespace(self):
         assert normalize_name("  A.  Adams  ") == "a adams"
@@ -411,6 +391,74 @@ class TestMatchingPolicy:
         assert unresolved == []
         assert warnings[0].startswith(
             "RESOLVE-AMBIGUOUS-NAME bib/w.bib:k1:editor: position 1")
+
+
+def _resolved(people, **parts):
+    """The person_id one name resolves to, or None."""
+    author = Author(name=parts.pop("name", "n"), position=1, **parts)
+    resolve_authors([Work(bib_id="k", title="T", category="C",
+                          entry_type="article", year=2024,
+                          authors=[author])], people)
+    return author.person_id
+
+
+class TestRunTogetherInitials:
+    """`S.S.` in a given name is `S. S.`, on both sides of a match (#81)."""
+
+    IVERS = [Person(id="sivers", name="Stella Sky Ivers", aliases=["S. S. Ivers"])]
+
+    @pytest.mark.parametrize("given", ["S.S.", "S.S", "S S", "S. S."])
+    def test_written_forms_match_a_spaced_alias(self, given):
+        assert _resolved(self.IVERS, given=given, family="Ivers") == "sivers"
+
+    @pytest.mark.parametrize("alias", ["S.S. Ivers", "S.S Ivers", "S S Ivers"])
+    def test_declared_forms_match_spaced_initials(self, alias):
+        people = [Person(id="sivers", name="Stella Sky Ivers", aliases=[alias])]
+        assert _resolved(people, given="S. S.", family="Ivers") == "sivers"
+
+    def test_three_initials(self):
+        people = [Person(id="umoss", name="Uma Ann Kaye Moss",
+                         aliases=["T.A.K. Moss"])]
+        assert _resolved(people, given="T. A. K.", family="Moss") == "umoss"
+
+    @pytest.mark.parametrize("given", ["SS", "Ss"])
+    def test_a_part_with_no_period_inside_is_not_split(self, given):
+        assert _resolved(self.IVERS, given=given, family="Ivers") is None
+
+    def test_an_undotted_name_is_not_run_together_initials(self):
+        people = [Person(id="equill", name="Ed Quill")]
+        assert _resolved(people, given="E.D.", family="Quill") is None
+        assert _resolved(people, given="Ed", family="Quill") == "equill"
+
+    def test_a_family_name_is_not_split(self):
+        people = [Person(id="ada", name="Ada S. S.")]
+        assert _resolved(people, given="Ada", family="S.S.") is None
+        people = [Person(id="ada", name="Ada S.S.")]
+        assert _resolved(people, given="Ada", family="S.S.") == "ada"
+
+    def test_a_brace_protected_name_is_not_split(self):
+        people = [Person(id="ssr", name="S. S. Robotics")]
+        assert _resolved(people, name="S.S. Robotics",
+                         literal="S.S. Robotics") is None
+        people = [Person(id="ssr", name="S.S. Robotics")]
+        assert _resolved(people, name="S.S. Robotics",
+                         literal="S.S. Robotics") == "ssr"
+
+    def test_a_declaration_whose_words_normalise_apart_is_read_whole(self):
+        """A `<sup>` span across two words is removed from the whole string
+        only, so the words do not line up with it; the declaration is then
+        compared as normalised, without spacing any initials."""
+        people = [Person(id="sivers", name="Stella Sky Ivers",
+                         aliases=["S.S. Ivers<sup>1 2</sup>"])]
+        assert _resolved(people, given="S. S.", family="Ivers") is None
+        assert _resolved(people, given="SS", family="Ivers") == "sivers"
+
+    @pytest.mark.parametrize("given, found", [
+        ("J.-P.", "jwren"), ("J-P", "jwren"),
+        ("J.P.", None), ("J. P.", None), ("JP", None)])
+    def test_hyphenated_initials_are_left_as_written(self, given, found):
+        people = [Person(id="jwren", name="Jana-Pia Wren", aliases=["J.-P. Wren"])]
+        assert _resolved(people, given=given, family="Wren") == found
 
 
 class TestResolveAuthors:

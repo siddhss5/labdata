@@ -747,36 +747,42 @@ function does exactly this, in this order:
    `jose`, but also any other `Mn` character, such as the emoji variation
    selector U+FE0F and the Devanagari virama. Marks of category `Mc` and `Me`
    are kept, and the result stays decomposed: `각` comes out as three jamo.
-3. Spaces run-together initials. A whitespace-separated token that is two or
-   more letters, each but the last followed by a full stop and the last one's
-   optional, becomes one initial per letter: `s.s.` and `s.s` become
-   `s. s.`, and `t.a.k.` becomes `t. a. k.` So `S.S. Adams`, `S.S Adams`,
-   `S. S. Adams` and `S S Adams` all normalise to `s s adams`. A token with
-   no full stop between its letters is a name and is never split: `SS`,
-   `Jo`, `Al.` and `Ng` stay whole. A hyphenated token is left as written:
-   `J.-P.` normalises to `j-p`, which equals only itself (and `J-P`), not
-   `J.P.` or `J. P.`
-4. Deletes every ASCII full stop (U+002E). Other full stops, such as the
+3. Deletes every ASCII full stop (U+002E). Other full stops, such as the
    fullwidth `．`, stay.
-5. Deletes each non-overlapping match of the regular expression
+4. Deletes each non-overlapping match of the regular expression
    `<sup>.*?</sup>`. Because it runs after lower-casing, it matches the tags
    in any letter case. The `.` matches any character except a line feed, so
    a span containing `\n` is not removed but one containing `\r` is. The
    match is non-greedy and ends at the first `</sup>`, so nested tags are
    not handled: `<sup>outer<sup>inner</sup>tail</sup>X` becomes
    `tail</sup>x`.
-6. Replaces each run of whitespace with one space and strips both ends.
+5. Replaces each run of whitespace with one space and strips both ends.
 
 Nothing else is changed. A `*` that is not an equal-contribution marker
-stays part of the name unless step 5 removed it with a `<sup>` span.
+stays part of the name unless step 4 removed it with a `<sup>` span.
 
-Step 3 applies to the structured given name as well: the resolver reads
-`S.S.` as the two initials `S.` and `S.` wherever it compares given names
-part by part, abbreviates it, or asks whether a part is an initial. The
-emitted `name` and name parts keep `S.S.` as written; only the form a name
-is matched on changes. Because a collaborator key is built from the
-normalised name, `S.S. Quinn` and `S. S. Quinn` are one key. The match
-decides in this order:
+**Run-together initials in a given name.** A given-name part written as two
+or more letters, each but the last followed by a full stop and the last
+one's optional, is read as one initial per letter before it is normalised:
+`S.S.` and `S.S` are `S. S.`, and `T.A.K.` is `T. A. K.` So a given name
+written `S.S.`, `S.S`, `S S` or `S. S.` matches any of the others. On the
+`.bib` side this applies to the structured given name only, never to the
+family name, a particle, a suffix or a brace-protected name. A declared name
+or alias in `people_file` or `collaborators_file` is not parsed into parts:
+its given name is what is left once the compared name's particles, family
+name and suffix are taken off its end, and the rule applies there only. A
+part with no full stop between its letters is a name and is never split:
+`SS`, `Ed`, `Jo`, `Al.` and `Ng` stay whole, so `E.D. Quill` is not
+`Ed Quill`. Hyphenated initials are left as written and go through the
+steps above like any other part: step 3 still removes their full stops, so
+`J.-P.` equals `J-P`, but it is not equal to `J.P.`, `J. P.` or `JP`. The
+emitted `name` and name parts keep what the entry wrote, and
+`normalize_name()` itself is unchanged, so a collaborator key is too.
+Comparisons between two declarations, such as `PEOPLE-ALIAS-AMBIGUOUS`,
+have no compared name to take a given name from and read each declaration
+through `normalize_name()` alone.
+
+The match decides in this order:
 
 1. **The full name.** The parts joined as `given von family, suffix`, equal to
    exactly one person's name or alias: resolved, `method: exact`. Equal to two
