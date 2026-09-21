@@ -9,7 +9,9 @@ wording or at parser-library messages.
 import pytest
 import yaml
 
-from .support import EXPECTED, INVALID, covers, export, run_labdata
+from .support import (
+    EXPECTED, EXPECTED_FAILURE, INVALID, covers, export, run_labdata,
+)
 
 with open(EXPECTED / "diagnostics.yaml", encoding="utf-8") as f:
     DIAGNOSTICS = yaml.safe_load(f)
@@ -23,7 +25,10 @@ def params(check):
         if check not in spec:
             continue
         issue = spec.get("xfail", {}).get(check)
-        marks = [pytest.mark.xfail(strict=True, reason=issue)] if issue else []
+        # `raises` is not decoration: it is what stops a marked row that
+        # breaks before its own assertion from being counted as expected.
+        marks = [pytest.mark.xfail(strict=True, reason=issue,
+                                   raises=EXPECTED_FAILURE)] if issue else []
         rows.append(pytest.param(case_id, spec, id=case_id, marks=marks))
     return rows
 
@@ -77,12 +82,54 @@ def test_duplicate_keys_warn_but_do_not_block_nonvalidation_modes(tmp_path, case
     assert data is not None
 
 
+@covers("config.bib_files.name_absolute")
+def test_a_fatal_at_load_code_goes_to_standard_error_in_every_mode(tmp_path):
+    """The one shape that carries a code inside another one.
+
+    Nothing is assembled, so there is no `--validate` report to gather the
+    diagnostic into and it cannot be on standard output the way an
+    assembly-time code is. It is on standard error, after the
+    `Error loading configuration: ` prefix, in every mode -- which is why
+    SPEC.md tells a consumer to search a line for a code rather than anchor
+    at its start.
+    """
+    where = INVALID / DIAGNOSTICS["config.bib_files.name_absolute"]["dir"]
+    out = tmp_path / "lab.json"
+    for args in (["--validate"],
+                 ["--unresolved"],
+                 ["--format", "json", "--output", out]):
+        run = run_labdata(["--config", "lab.yaml", *args], where)
+        assert run.crash is None, (args, run.crash)
+        assert run.code == 1, (args, run.output)
+        assert "CONFIG-BIB-FILE-ABSOLUTE" in run.stderr, (args, run.output)
+        assert "CONFIG-BIB-FILE-ABSOLUTE" not in run.stdout, (args, run.output)
+        assert run.stderr.startswith("Error loading configuration: "), run.stderr
+    assert not out.exists(), "a document was written despite a fatal diagnostic"
+
+
+@covers("structure.crossref")
+def test_a_fatal_diagnostic_stops_a_normal_compile(tmp_path):
+    """A user cannot produce a document by skipping --validate.
+
+    The error is reachable from a normal compile as well, and nothing is
+    written: an exit code nobody reads and a file that exists anyway is the
+    silent path #65 removed, one step further along.
+    """
+    out = tmp_path / "lab.json"
+    run = run_labdata(["--config", "lab.yaml", "--format", "json", "--output", out],
+                      INVALID / DIAGNOSTICS["structure.crossref"]["dir"])
+    assert run.crash is None, run.crash
+    assert run.code != 0, run.output
+    assert "BIB-CROSSREF-UNSUPPORTED" in run.output
+    assert not out.exists(), "a document was written despite a fatal diagnostic"
+
+
 @pytest.mark.parametrize("case_id, spec", params("kept"))
 def test_kept(tmp_path, case_id, spec):
     run, data = export(INVALID / spec["dir"], tmp_path)
     assert run.crash is None, f"labdata crashed: {run.crash}"
     assert data is not None, run.output
-    keys = [p["bib_id"] for p in data["publications"]]
+    keys = [w["bib_id"] for w in data["works"]]
     missing = [k for k in spec["kept"] if k not in keys]
     assert not missing, f"entries dropped: {missing}"
 
@@ -92,7 +139,7 @@ def test_unknown_macro_keeps_its_text(tmp_path):
     """The macro's argument survives and no raw LaTeX reaches the output."""
     run, data = export(INVALID / DIAGNOSTICS["latex.unknown_macro"]["dir"], tmp_path)
     assert run.crash is None, run.crash
-    title = next(p["title"] for p in data["publications"] if p["bib_id"] == "unknown-macro")
+    title = next(w["title"] for w in data["works"] if w["bib_id"] == "unknown-macro")
     assert "Strange" in title
     assert "\\" not in title, title
 

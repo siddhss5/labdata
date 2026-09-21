@@ -3,90 +3,171 @@
 import pytest
 from pathlib import Path
 
+from labdata.config import BIB_FILE_ABSOLUTE as CONFIG_BIB_FILE_ABSOLUTE
 from labdata.parsers.bibtex import (
+    CROSSREF_UNSUPPORTED,
     DUPLICATE_CITATION_KEY,
+    YEAR_MISSING,
     _Parser,
     _convert,
-    format_authors_string,
-    format_venue,
+    bare_doi,
+    build_identifiers,
+    build_links,
+    build_venue,
     extract_note,
-    extract_video_url,
-    construct_doi_url,
-    construct_arxiv_url,
+    is_video_url,
     parse_project_ids,
-    parse_all_publications,
+    parse_all_works,
+    pdf_link,
 )
+from labdata.config import ConfigurationError
 from labdata.models import Author
 
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
-class TestFormatAuthorsString:
-    def test_single(self):
-        assert format_authors_string([Author(name="A. Adams")]) == "A. Adams"
-
-    def test_two(self):
-        result = format_authors_string([
-            Author(name="A. Adams"),
-            Author(name="B. Brown"),
-        ])
-        assert result == "A. Adams and B. Brown"
-
-    def test_three(self):
-        result = format_authors_string([
-            Author(name="A. Adams"),
-            Author(name="B. Brown"),
-            Author(name="H. Müller"),
-        ])
-        assert result == "A. Adams, B. Brown, and H. Müller"
-
-
-class TestFormatVenue:
+class TestBuildVenue:
     def test_article(self):
-        entry = {
-            "ENTRYTYPE": "article",
-            "journal": "IEEE Transactions on Robotics",
-            "volume": "40",
-            "number": "3",
-            "year": "2024",
-        }
-        result = format_venue(entry)
-        assert "*IEEE Transactions on Robotics*" in result
-        assert "40" in result
-        assert "(3)" in result
-        assert "2024" in result
+        venue = build_venue({"ENTRYTYPE": "article",
+                             "journal": "IEEE Transactions on Robotics"})
+        assert venue.to_dict() == {"kind": "journal",
+                                   "name": "IEEE Transactions on Robotics"}
 
     def test_inproceedings(self):
-        entry = {
+        venue = build_venue({
             "ENTRYTYPE": "inproceedings",
-            "booktitle": "Proceedings of Robotics: Science and Systems",
-            "year": "2023",
-        }
-        result = format_venue(entry)
-        assert "*Proceedings of Robotics: Science and Systems*" in result
-        assert "2023" in result
+            "booktitle": "Proceedings of Robotics: Science and Systems"})
+        assert venue.to_dict() == {
+            "kind": "conference",
+            "name": "Proceedings of Robotics: Science and Systems"}
+
+    def test_incollection_is_a_book_not_a_conference(self):
+        """One field name, two kinds of container: the entry type decides."""
+        venue = build_venue({"ENTRYTYPE": "incollection",
+                             "booktitle": "Handbook of Robots"})
+        assert venue.to_dict() == {"kind": "book", "name": "Handbook of Robots"}
 
     def test_phdthesis(self):
-        entry = {
-            "ENTRYTYPE": "phdthesis",
-            "school": "MIT",
-            "year": "2023",
-        }
-        assert format_venue(entry) == "PhD thesis, MIT, 2023"
+        venue = build_venue({"ENTRYTYPE": "phdthesis", "school": "MIT"})
+        assert venue.to_dict() == {"kind": "institution", "name": "MIT"}
+
+    def test_techreport(self):
+        venue = build_venue({"ENTRYTYPE": "techreport",
+                             "institution": "Example University"})
+        assert venue.to_dict() == {"kind": "institution",
+                                   "name": "Example University"}
 
     def test_misc_arxiv(self):
-        entry = {
-            "ENTRYTYPE": "misc",
-            "eprint": "2301.12345",
-            "year": "2023",
-        }
-        result = format_venue(entry)
-        assert "*arXiv:2301.12345*" in result
+        """A preprint's container is the repository archivePrefix names."""
+        venue = build_venue({"ENTRYTYPE": "misc", "eprint": "2301.12345",
+                             "archivePrefix": "arXiv"})
+        assert venue.to_dict() == {"kind": "repository", "name": "arXiv"}
 
-    def test_unknown_type(self):
-        entry = {"ENTRYTYPE": "unknown", "year": "2024"}
-        assert format_venue(entry) == "2024"
+    def test_misc_arxiv_without_a_prefix(self):
+        venue = build_venue({"ENTRYTYPE": "misc", "eprint": "2301.12345"})
+        assert venue.to_dict() == {"kind": "repository", "name": "arXiv"}
+
+    def test_no_container_field(self):
+        assert build_venue({"ENTRYTYPE": "book", "year": "2024"}) is None
+
+    def test_journal_wins_over_booktitle(self):
+        """The precedence is the field order, so one entry gets one venue."""
+        venue = build_venue({"ENTRYTYPE": "article", "journal": "J",
+                             "booktitle": "B"})
+        assert venue.name == "J"
+
+
+class TestBareDoi:
+    def test_already_bare(self):
+        assert bare_doi("10.1109/TRO.2024.1234567") == "10.1109/TRO.2024.1234567"
+
+    def test_written_as_a_resolver_url(self):
+        assert bare_doi("https://doi.org/10.1109/TRO.2024.1234567") == \
+            "10.1109/TRO.2024.1234567"
+
+    def test_written_as_a_dx_resolver_url(self):
+        assert bare_doi("http://dx.doi.org/10.1/x") == "10.1/x"
+
+    def test_some_other_url_is_left_alone(self):
+        """Only the registered resolvers are stripped; nothing else is guessed."""
+        assert bare_doi("https://example.org/10.1/x") == "https://example.org/10.1/x"
+
+
+class TestBuildIdentifiers:
+    def test_each_scheme(self):
+        assert build_identifiers({
+            "doi": "10.1/x", "isbn": "978-1", "issn": "2999-0001",
+            "eprint": "2301.12345", "archivePrefix": "arXiv",
+        }) == {"doi": ["10.1/x"], "isbn": ["978-1"], "issn": ["2999-0001"],
+               "arxiv": ["2301.12345"]}
+
+    def test_the_prefix_is_the_scheme(self):
+        """archivePrefix names the repository, which is what the scheme says."""
+        assert build_identifiers({"eprint": "hal-1", "archivePrefix": "HAL"}) == \
+            {"hal": ["hal-1"]}
+
+    def test_a_doi_url_is_recorded_as_an_identifier(self):
+        assert build_identifiers({"doi": "https://doi.org/10.1/x"}) == \
+            {"doi": ["10.1/x"]}
+
+    def test_nothing_to_read(self):
+        assert build_identifiers({"ENTRYTYPE": "misc"}) == {}
+
+
+class TestIsVideoUrl:
+    def test_youtube(self):
+        assert is_video_url("https://www.youtube.com/watch?v=abc")
+
+    def test_vimeo(self):
+        assert is_video_url("https://vimeo.com/123")
+
+    def test_non_video(self):
+        assert not is_video_url("https://example.com/paper.pdf")
+
+
+class TestBuildLinks:
+    def test_the_entrys_own_url_comes_from_the_input(self):
+        links = build_links({"url": "https://example.org/p"}, "k", {}, None)
+        assert [l.to_dict() for l in links["url"]] == [{
+            "url": "https://example.org/p", "label": None, "origin": "input",
+            "verification": {"status": "unchecked", "checked_at": None}}]
+
+    def test_a_video_host_is_filed_as_a_video(self):
+        links = build_links({"url": "https://vimeo.com/1"}, "k", {}, None)
+        assert "url" not in links
+        assert links["video"][0].url == "https://vimeo.com/1"
+
+    def test_links_built_from_identifiers_say_they_are_derived(self):
+        identifiers = {"doi": ["10.1/x"], "arxiv": ["2301.12345"]}
+        links = build_links({}, "k", identifiers, None)
+        assert links["doi"][0].url == "https://doi.org/10.1/x"
+        assert links["arxiv"][0].url == "https://arxiv.org/abs/2301.12345"
+        assert {l[0].origin for l in (links["doi"], links["arxiv"])} == {"derived"}
+
+    def test_no_base_and_no_fields(self):
+        assert build_links({}, "k", {}, None) == {}
+
+
+class TestPdfLink:
+    def test_no_base_configured(self):
+        assert pdf_link("k", None) is None
+
+    def test_a_remote_base_is_never_fetched(self):
+        link = pdf_link("k", "https://example.org/pdfs")
+        assert link.url == "https://example.org/pdfs/k.pdf"
+        assert link.status == "unchecked"
+
+    def test_a_local_file_that_is_there(self, tmp_path):
+        (tmp_path / "k.pdf").write_bytes(b"%PDF-1.4\n")
+        assert pdf_link("k", str(tmp_path)).status == "verified"
+
+    def test_a_local_file_that_is_not_there_is_kept_and_labelled(self, tmp_path):
+        """The link is not deleted: `missing` and `unchecked` are different
+        answers, and so is having no base at all."""
+        link = pdf_link("k", str(tmp_path))
+        assert link.url == f"{tmp_path}/k.pdf"
+        assert link.status == "missing"
 
 
 class TestExtractNote:
@@ -98,49 +179,6 @@ class TestExtractNote:
         assert extract_note({}) is None
         assert extract_note({"note": ""}) is None
         assert extract_note({"note": "   "}) is None
-
-
-class TestExtractVideoUrl:
-    def test_youtube(self):
-        entry = {"url": "https://www.youtube.com/watch?v=abc"}
-        assert extract_video_url(entry) == "https://www.youtube.com/watch?v=abc"
-
-    def test_vimeo(self):
-        entry = {"url": "https://vimeo.com/123"}
-        assert extract_video_url(entry) == "https://vimeo.com/123"
-
-    def test_non_video(self):
-        entry = {"url": "https://example.com/paper.pdf"}
-        assert extract_video_url(entry) is None
-
-    def test_no_url(self):
-        assert extract_video_url({}) is None
-
-
-class TestConstructDoiUrl:
-    def test_basic(self):
-        entry = {"doi": "10.1109/TRO.2024.1234567"}
-        assert construct_doi_url(entry) == "https://doi.org/10.1109/TRO.2024.1234567"
-
-    def test_full_url(self):
-        entry = {"doi": "https://doi.org/10.1109/TRO.2024.1234567"}
-        assert construct_doi_url(entry) == "https://doi.org/10.1109/TRO.2024.1234567"
-
-    def test_no_doi(self):
-        assert construct_doi_url({}) is None
-
-
-class TestConstructArxivUrl:
-    def test_with_prefix(self):
-        entry = {"eprint": "2301.12345", "archivePrefix": "arXiv"}
-        assert construct_arxiv_url(entry) == "https://arxiv.org/abs/2301.12345"
-
-    def test_without_prefix(self):
-        entry = {"eprint": "2301.12345"}
-        assert construct_arxiv_url(entry) == "https://arxiv.org/abs/2301.12345"
-
-    def test_no_eprint(self):
-        assert construct_arxiv_url({}) is None
 
 
 class TestParseProjectIds:
@@ -162,39 +200,167 @@ class TestParseProjectIds:
         assert parse_project_ids({"project": ""}) == []
 
 
-class TestParseAllPublications:
+class TestParseAllWorks:
     def test_parse_fixtures(self):
         bib_files = [
             {"name": "sample.bib", "category": "Test Papers"},
         ]
-        pubs = parse_all_publications(
+        works = parse_all_works(
             bib_dir=str(FIXTURES),
             bib_files=bib_files,
         )
-        assert len(pubs) == 3
+        assert len(works) == 3
         # Should be sorted by year descending
-        assert pubs[0].year >= pubs[-1].year
-        # Check first pub has structured authors
-        assert all(isinstance(a, Author) for a in pubs[0].authors)
+        assert works[0].year >= works[-1].year
+        # Check first work has structured authors
+        assert all(isinstance(a, Author) for a in works[0].authors)
+
+    def test_a_work_with_no_year_sorts_last_and_says_so(self, tmp_path):
+        """Null rather than 0: the position is the same, the meaning is not."""
+        (tmp_path / "y.bib").write_text(
+            "@article{no-year,\n  title = {No Year},\n"
+            "  author = {Adams, Alice},\n  journal = {J}\n}\n"
+            "@article{old,\n  title = {Old},\n"
+            "  author = {Adams, Alice},\n  journal = {J},\n  year = {1999}\n}\n",
+            encoding="utf-8")
+        warnings = []
+        works = parse_all_works(bib_dir=str(tmp_path),
+                                bib_files=[{"name": "y.bib", "category": "T"}],
+                                warnings=warnings)
+        assert [w.bib_id for w in works] == ["old", "no-year"]
+        assert works[-1].year is None
+        assert len(warnings) == 1
+        assert warnings[0].startswith(YEAR_MISSING)
+        assert "y.bib:no-year:year" in warnings[0]
+
+
+class TestSourceFileIsNeverAbsolute:
+    """`parse_all_works()` takes the configured name and does not check it.
+
+    It is private, so nothing reaches it without going past
+    `LabDataConfig`; but it is the shortest path to a `Work` carrying an
+    absolute `source_file`, and what stops that reaching a document is the
+    check at the serialization boundary rather than any check here.
+    """
+
+    def parse(self, tmp_path, name):
+        (tmp_path / "journal.bib").write_text(
+            "@article{a2024,\n  title   = {A Title},\n"
+            "  author  = {Adams, Alice},\n  journal = {J},\n  year    = {2024}\n}\n",
+            encoding="utf-8")
+        # An empty bib_dir with an absolute name still resolves to the file,
+        # which is how a name that escapes bib_dir gets read at all.
+        return parse_all_works(
+            bib_dir="", warnings=[],
+            bib_files=[{"name": str(tmp_path / "journal.bib"),
+                        "category": "Journal Papers"}])
+
+    def test_the_parser_carries_the_name_it_was_given(self, tmp_path):
+        works = self.parse(tmp_path, "journal.bib")
+        assert works[0].source_file == str(tmp_path / "journal.bib")
+
+    def test_serializing_it_is_refused(self, tmp_path):
+        works = self.parse(tmp_path, "journal.bib")
+        with pytest.raises(ConfigurationError) as raised:
+            works[0].to_dict()
+        assert type(raised.value) is ConfigurationError, type(raised.value)
+        assert str(raised.value).startswith(CONFIG_BIB_FILE_ABSOLUTE)
+        assert str(tmp_path / "journal.bib") in str(raised.value)
 
 
 class TestCrossref:
-    """A crossref that points nowhere is reported; the entry is still read."""
+    """An entry carrying a crossref is rejected rather than resolved (#65)."""
 
-    def test_missing_parent_is_reported_and_the_entry_is_kept(self, tmp_path, capsys):
-        (tmp_path / "child.bib").write_text(
+    CHILD = ("@proceedings{a-parent,\n"
+             "  title  = {Proceedings of the Fictional Workshop},\n"
+             "  author = {Adams, Alice},\n"
+             "  year   = {2024}\n"
+             "}\n"
+             "@inproceedings{a-child,\n"
+             "  title    = {A Child Paper},\n"
+             "  crossref = {a-parent}\n"
+             "}\n")
+
+    def parse(self, tmp_path, text, errors):
+        (tmp_path / "child.bib").write_text(text, encoding="utf-8")
+        return parse_all_works(
+            bib_dir=str(tmp_path),
+            bib_files=[{"name": "child.bib", "category": "Test Papers"}],
+            errors=errors)
+
+    def test_the_child_is_rejected_and_the_parent_still_compiles(self, tmp_path):
+        errors = []
+        works = self.parse(tmp_path, self.CHILD, errors)
+        assert [w.bib_id for w in works] == ["a-parent"]
+        assert len(errors) == 1
+        assert errors[0].startswith(CROSSREF_UNSUPPORTED)
+        assert "child.bib:a-child:crossref" in errors[0]
+        assert "a-parent" in errors[0]
+
+    def test_a_missing_parent_is_the_same_error_not_a_warning(self, tmp_path):
+        errors = []
+        works = self.parse(
+            tmp_path,
             "@inproceedings{a-child,\n"
             "  title    = {A Child Paper},\n"
             "  author   = {Adams, Alice},\n"
-            "  year     = {2024},\n"
             "  crossref = {no-such-parent}\n"
-            "}\n", encoding="utf-8")
-        pubs = parse_all_publications(
-            bib_dir=str(tmp_path),
-            bib_files=[{"name": "child.bib", "category": "Test Papers"}],
-        )
-        assert [p.bib_id for p in pubs] == ["a-child"]
-        assert "no-such-parent" in capsys.readouterr().err
+            "}\n", errors)
+        assert works == []
+        assert len(errors) == 1
+        assert errors[0].startswith(CROSSREF_UNSUPPORTED)
+        assert "no-such-parent" in errors[0]
+
+    EMPTY = ("@inproceedings{empty-child,\n"
+             "  title    = {A Child With an Empty Crossref},\n"
+             "  author   = {Adams, Alice},\n"
+             "  year     = {2024},\n"
+             "  crossref = {}\n"
+             "}\n")
+
+    @pytest.mark.parametrize("field", ["crossref = {}", "crossref = {   }",
+                                       "CROSSREF = {}"])
+    def test_the_field_is_rejected_on_its_presence_not_on_its_value(self, tmp_path,
+                                                                    field):
+        """An empty crossref is a field the entry carries, so it is an error.
+
+        pybtex keeps `crossref = {}` as a present field whose value is the
+        empty string. Rejecting on the value would let it through and put the
+        silent path back under a different spelling.
+        """
+        errors = []
+        works = self.parse(tmp_path, self.EMPTY.replace("crossref = {}", field),
+                           errors)
+        assert works == []
+        assert len(errors) == 1, errors
+        assert errors[0].startswith(CROSSREF_UNSUPPORTED)
+        assert "child.bib:empty-child:crossref" in errors[0]
+
+    def test_an_empty_crossref_is_not_reported_as_a_blank_parent(self, tmp_path):
+        """The diagnostic says the entry names no parent rather than quoting one.
+
+        Asserted on shape rather than on wording: a pair of empty quotes is a
+        diagnostic that reads as though it had found a parent called "".
+        """
+        errors = []
+        self.parse(tmp_path, self.EMPTY, errors)
+        assert "''" not in errors[0] and '""' not in errors[0], errors[0]
+        # A named parent is still quoted, so the check above is about the
+        # empty case and not about quoting in general.
+        named = []
+        self.parse(tmp_path, self.CHILD, named)
+        assert "'a-parent'" in named[0], named[0]
+
+    def test_no_work_can_be_emitted_with_an_empty_author_list(self, tmp_path):
+        """The failure crossref caused: a child with no author of its own.
+
+        Rejecting the entry removes the path rather than patching it, so
+        there is no code path left that emits a work with no authors because
+        of a crossref.
+        """
+        errors = []
+        works = self.parse(tmp_path, self.CHILD, errors)
+        assert [w.bib_id for w in works if not w.authors] == []
 
 
 class TestDuplicateCitationKeys:
@@ -206,13 +372,13 @@ class TestDuplicateCitationKeys:
         second.write_text(entry("firstkey"), encoding="utf-8")
 
         errors = []
-        parse_all_publications(
+        parse_all_works(
             bib_dir=str(tmp_path),
             bib_files=[
                 {"name": first.name, "category": "Test Papers"},
                 {"name": second.name, "category": "Test Papers"},
             ],
-            duplicate_errors=errors,
+            diagnostics=errors,
         )
 
         assert errors == [
@@ -237,7 +403,7 @@ def entry(key: str, title: str = "A Fictional Title") -> str:
 # commented-out entry leaked, which is how the quoted-value defect got through.
 #
 # labdata differs from pybtex on exactly one thing: a balanced @comment group
-# is a comment, so entries inside it are not publications. Everywhere else the
+# is a comment, so entries inside it are not works. Everywhere else the
 # expectations below are pybtex's own reading of the file.
 #
 # (label, source, keys that must be read, keys that must not be)
@@ -306,7 +472,7 @@ COMMENT_HAZARDS = [
 
 def read_source(tmp_path, source, name="hazard.bib"):
     (tmp_path / name).write_text(source, encoding="utf-8")
-    return parse_all_publications(
+    return parse_all_works(
         bib_dir=str(tmp_path),
         bib_files=[{"name": name, "category": "Test Papers"}],
     )
@@ -333,13 +499,13 @@ class TestCommentHandling:
         """
         source = ('@article(host,title="Host ) @comment(unclosed",'
                   ' author="Adams, Alice", journal="J", year=2024)\n' + entry("real"))
-        pubs = {pub.bib_id: pub for pub in read_source(tmp_path, source)}
-        assert sorted(pubs) == ["host", "real"]
-        host = pubs["host"]
+        works = {work.bib_id: work for work in read_source(tmp_path, source)}
+        assert sorted(works) == ["host", "real"]
+        host = works["host"]
         assert host.title == "Host ) @comment(unclosed"
         assert host.year == 2024
-        assert [a.name for a in host.authors] == ["A. Adams"]
-        assert "J" in host.venue
+        assert [a.name for a in host.authors] == ["Alice Adams"]
+        assert host.venue.name == "J"
 
 
 class TestLatexFallback:
@@ -352,11 +518,11 @@ class TestLatexFallback:
 
     def test_the_entry_is_still_published(self, tmp_path, capsys):
         """End to end: the entry is read, with the raw text of the bad field."""
-        pubs = read_source(tmp_path, entry("kept", title=r"Speed: \verb"))
-        assert [pub.bib_id for pub in pubs] == ["kept"]
-        assert pubs[0].title == r"Speed: \verb"
-        assert pubs[0].year == 2024
-        assert [a.name for a in pubs[0].authors] == ["A. Adams"]
+        works = read_source(tmp_path, entry("kept", title=r"Speed: \verb"))
+        assert [work.bib_id for work in works] == ["kept"]
+        assert works[0].title == r"Speed: \verb"
+        assert works[0].year == 2024
+        assert [a.name for a in works[0].authors] == ["Alice Adams"]
         assert "hazard.bib:kept:title" in capsys.readouterr().err
 
 

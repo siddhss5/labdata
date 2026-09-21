@@ -8,32 +8,33 @@ the intended behavior, which issue #N delivers.
 import pytest
 
 from .support import (
-    VALID, AllOf, Contains, Excludes, assert_field, case, covers, item, publication,
+    VALID, AllOf, Contains, Excludes, assert_field, case, covers, item, work,
 )
 
 
-def check_publication(output, bib_key, path, expected):
-    assert_field(publication(output, bib_key), path, expected, where=f"{bib_key}: ")
+def check_work(output, bib_key, path, expected):
+    assert_field(work(output, bib_key), path, expected, where=f"{bib_key}: ")
 
 
 # --- @string macros ----------------------------------------------------------
 
 STRINGS = [
-    case("strings.macro", "str-repeat", "venue", Contains("Robotics Venue")),
-    case("strings.repeat_last_wins", "str-repeat", "venue", Excludes("Old Robotics Venue")),
+    case("strings.macro", "str-repeat", "venue.name", Contains("Robotics Venue")),
+    case("strings.repeat_last_wins", "str-repeat", "venue.name",
+         Excludes("Old Robotics Venue")),
     case("strings.concat", "str-concat", "title", "Joined Title"),
-    case("strings.concat", "str-concat", "venue",
+    case("strings.concat", "str-concat", "venue.name",
          AllOf(Contains("Proceedings of the Fictional Conference"), Excludes("Old"))),
-    case("strings.macro_journal", "str-journal", "venue",
-         Contains("Journal of Fictional Robots Letters")),
-    case("strings.defined_once", "str-once", "venue",
-         Contains("Journal of Fictional Robots")),
+    case("strings.macro_journal", "str-journal", "venue.name",
+         "Journal of Fictional Robots Letters"),
+    case("strings.defined_once", "str-once", "venue.name",
+         "Journal of Fictional Robots"),
 ]
 
 
 @pytest.mark.parametrize("case_id, bib_key, path, expected", STRINGS)
 def test_strings(valid_output, case_id, bib_key, path, expected):
-    check_publication(valid_output, bib_key, path, expected)
+    check_work(valid_output, bib_key, path, expected)
 
 
 @covers("strings.redefined_report", xfail="#21", owns=())
@@ -55,27 +56,28 @@ def test_macro_defined_once_is_not_reported(valid_validate, valid_export):
 # --- Names and identity ------------------------------------------------------
 
 NAMES = [
-    case("names.last_first", "name-last-first", "authors.0.name", "A. Adams"),
+    case("names.last_first", "name-last-first", "authors.0.name", "Alice Adams"),
     case("names.last_first", "name-last-first", "authors.0.person_id", "aadams"),
-    case("names.first_last", "name-first-last", "authors.0.name", "B. Brown"),
+    case("names.first_last", "name-first-last", "authors.0.name", "Bob Brown"),
     case("names.first_last", "name-first-last", "authors.0.person_id", "bbrown"),
-    case("names.particle_last_first", "name-particle-van", "authors.0.name", "V. van den Berg"),
+    case("names.particle_last_first", "name-particle-van", "authors.0.name",
+         "Victor van den Berg"),
     case("names.particle_last_first", "name-particle-van", "authors.0.person_id", "vvandenberg"),
-    case("names.particle_first_last", "name-particle-de", "authors.0.name", "R. de la Cruz"),
+    case("names.particle_first_last", "name-particle-de", "authors.0.name",
+         "Rupert de la Cruz"),
     case("names.particle_first_last", "name-particle-de", "authors.0.person_id", "rdelacruz"),
-    case("names.suffix", "name-suffix", "authors.0.name",
-         AllOf(Contains("Smith", "Jr."), Excludes("J. J."))),
+    case("names.suffix", "name-suffix", "authors.0.name", "John Smith Jr."),
     case("names.suffix", "name-suffix", "authors.1.person_id", "aadams"),
     case("names.corporate", "name-corporate", "authors.0.name",
          "Example Robotics Consortium"),
     case("names.corporate", "name-corporate", "authors.0.person_id", None),
     case("names.corporate_escaped", "name-corporate-amp", "authors.0.name", "AT&T Research"),
     case("names.corporate_escaped", "name-corporate-amp", "authors.1.person_id", "aadams"),
-    case("names.hyphenated", "name-hyphen", "authors.0.name", "G.-A. Green"),
+    case("names.hyphenated", "name-hyphen", "authors.0.name", "Grace-Ann Green"),
     case("names.hyphenated", "name-hyphen", "authors.0.person_id", "ggreen"),
-    case("names.accent_tex", "name-accent-tex", "authors.0.name", "C. Côté"),
+    case("names.accent_tex", "name-accent-tex", "authors.0.name", "Carol Côté"),
     case("names.accent_tex", "name-accent-tex", "authors.0.person_id", "ccote"),
-    case("names.accent_utf8", "name-accent-utf8", "authors.0.name", "C. Côté"),
+    case("names.accent_utf8", "name-accent-utf8", "authors.0.name", "Carol Côté"),
     case("names.accent_utf8", "name-accent-utf8", "authors.0.person_id", "ccote"),
     case("names.others", "name-others", "authors.*.person_id", Contains("aadams", "bbrown")),
     case("names.others", "name-others", "authors.*.name", Excludes("others")),
@@ -94,7 +96,7 @@ NAMES = [
 
 @pytest.mark.parametrize("case_id, bib_key, path, expected", NAMES)
 def test_names(valid_output, case_id, bib_key, path, expected):
-    check_publication(valid_output, bib_key, path, expected)
+    check_work(valid_output, bib_key, path, expected)
 
 
 # --- Equal contribution ------------------------------------------------------
@@ -105,7 +107,8 @@ def test_names(valid_output, case_id, bib_key, path, expected):
 
 EQUAL_ENTRIES = ["name-equal-dollar", "name-equal-caret",
                  "name-equal-superscript", "name-equal-star"]
-EQUAL_NAMES = ["B. Brown", "C. Côté", "V. van den Berg", "J. Smith, Jr.", "A. Adams"]
+EQUAL_NAMES = ["Bob Brown", "Carol Côté", "Victor van den Berg",
+               "John Smith Jr.", "Alice Adams"]
 EQUAL_IDS = ["bbrown", "ccote", "vvandenberg", "jsmith", "aadams"]
 # The part each author carries the marker on, and how that part reads once it
 # is off. The last author is never marked.
@@ -132,11 +135,11 @@ EQUAL_CONTRIBUTION = [
     case("names.equal_contribution_normalized", "name-equal-normalized",
          "authors.*.equal_contribution", [True, True, True, False, False]),
     case("names.equal_contribution_normalized", "name-equal-normalized",
-         "authors.0.name", "B. Brown"),
+         "authors.0.name", "Bob Brown"),
     case("names.equal_contribution_normalized", "name-equal-normalized",
-         "authors.1.name", "A. Kim"),
+         "authors.1.name", "Alex Kim"),
     case("names.equal_contribution_normalized", "name-equal-normalized",
-         "authors.2.name", "G.-A. Green"),
+         "authors.2.name", "Grace-Ann Green"),
     case("names.equal_contribution_normalized", "name-equal-normalized",
          "authors.3.name", Contains("Davis", "*")),
     # A spaced marker followed by another, in each of the four forms: the
@@ -144,7 +147,8 @@ EQUAL_CONTRIBUTION = [
     # either is left in the name.
     case("names.equal_contribution_normalized", "name-equal-stacked",
          "authors.*.name",
-         ["B. Brown", "D. Davis", "G.-A. Green", "A. Kim", "A. Adams"]),
+         ["Bob Brown", "Dave Davis", "Grace-Ann Green", "Alex Kim",
+          "Alice Adams"]),
     case("names.equal_contribution_normalized", "name-equal-stacked",
          "authors.*.person_id", ["bbrown", "ddavis", "ggreen", "akim", "aadams"]),
     case("names.equal_contribution_normalized", "name-equal-stacked",
@@ -154,8 +158,17 @@ EQUAL_CONTRIBUTION = [
     # is the ordinary LaTeX conversion's doing, and is pinned here as it is.
     case("names.equal_contribution_escaped", "name-equal-escaped",
          "authors.*.equal_contribution", [False, False, False, False, False]),
+    # Two of these resolve to nobody because the escaped marker stayed in
+    # the family name, which is no person's. The third of them --
+    # `Green\$^{*}$` -- is one of the three corpus authorships whose
+    # `person_id` would move if matching read the emitted name instead of
+    # the private form (#56 section 7), so it is pinned here as well as in
+    # `test_matching_never_reads_the_emitted_name`.
     case("names.equal_contribution_escaped", "name-equal-escaped",
-         "authors.0.name", "B. Brown"),
+         "authors.*.person_id",
+         ["bbrown", "ddavis", None, None, "aadams"]),
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.0.name", "Bob Brown"),
     case("names.equal_contribution_escaped", "name-equal-escaped",
          "authors.1.name", Contains("Davis", "*")),
     case("names.equal_contribution_escaped", "name-equal-escaped",
@@ -167,7 +180,7 @@ EQUAL_CONTRIBUTION = [
 
 @pytest.mark.parametrize("case_id, bib_key, path, expected", EQUAL_CONTRIBUTION)
 def test_equal_contribution(valid_output, case_id, bib_key, path, expected):
-    check_publication(valid_output, bib_key, path, expected)
+    check_work(valid_output, bib_key, path, expected)
 
 
 # The parts BibTeX split each name into, carried through to the output rather
@@ -198,43 +211,46 @@ NAME_PARTS = [
 @pytest.mark.parametrize("case_id, bib_key, path, expected", NAME_PARTS)
 def test_name_parts(valid_output, case_id, bib_key, path, expected):
     """The structured parts survive on the author, not only the display name."""
-    check_publication(valid_output, bib_key, path, expected)
+    check_work(valid_output, bib_key, path, expected)
 
 
-def display_name_from_parts(author):
-    """The display form the parts imply: ``F. M. van Last, Jr.``
+def readable_name_from_parts(contributor):
+    """The readable form the parts imply: the parts joined in reading order.
 
-    Each given name is abbreviated to its initial, and each half of a
-    hyphenated one keeps its own: ``Grace-Ann`` is ``G.-A.``, ``Dave M.`` is
-    ``D. M.``
+    It abbreviates nothing. ``Grace-Ann Green`` stays whole, and ``Brown, B.``
+    yields ``B. Brown`` because that is what the entry supplied.
     """
-    initials = " ".join(
-        "-".join(f"{piece[0]}." for piece in part.split("-") if piece)
-        for part in (author["given"] or "").split())
-    name = " ".join(part for part in (initials, author["von"], author["family"]) if part)
-    return f"{name}, {author['suffix']}" if author["suffix"] else name
+    ordered = (contributor["given"], contributor["von"], contributor["family"],
+               contributor["suffix"])
+    return " ".join(part for part in ordered if part)
 
 
 @covers("names.structured")
-def test_every_display_name_agrees_with_its_parts(valid_output):
-    """Across the whole corpus, the display name follows from the parts.
+def test_every_readable_name_agrees_with_its_parts(valid_output):
+    """Across the whole corpus, the readable name follows from the parts, and
+    abbreviates nothing.
 
     A row-by-row check of the parts would still pass if the parts were filled
-    in beside a display name built some other way, and a containment check
-    would still pass if the initials were dropped. This rebuilds the whole
-    name from the parts and compares it.
+    in beside a name built some other way. This rebuilds the whole name from
+    the parts and compares it, for authorships and editors alike, and then
+    asserts that no full given name came out as an initial -- which is what
+    the name used to be and what a consumer must not be handed here.
     """
     checked = 0
-    for publication in valid_output["publications"]:
-        for author in publication["authors"]:
-            where = f"{publication['bib_id']}: {author}"
-            if author["literal"]:
-                assert author["name"] == author["literal"], where
-                assert [author[part] for part in ("given", "von", "family", "suffix")] \
+    for work_ in valid_output["works"]:
+        for contributor in work_["authors"] + work_["editors"]:
+            where = f"{work_['bib_id']}: {contributor}"
+            if contributor["literal"]:
+                assert contributor["name"] == contributor["literal"], where
+                assert [contributor[part]
+                        for part in ("given", "von", "family", "suffix")] \
                     == [None, None, None, None], where
             else:
-                assert author["family"], where
-                assert author["name"] == display_name_from_parts(author), where
+                assert contributor["family"], where
+                assert contributor["name"] == readable_name_from_parts(contributor), where
+                given = contributor["given"]
+                if given and not given.endswith("."):
+                    assert given in contributor["name"], where
             checked += 1
     # The loop has to have run over the names the corpus is built from.
     assert checked > 40, checked
@@ -252,8 +268,8 @@ def test_only_marked_authors_are_equal_contributors(valid_output):
     corporate name, an accent written in TeX, an escaped star — picks the flag
     up. Nor does a marked name keep a star once the marker is off.
     """
-    marked = {(p["bib_id"], a["name"]) for p in valid_output["publications"]
-              for a in p["authors"] if a["equal_contribution"]}
+    marked = {(w["bib_id"], a["name"]) for w in valid_output["works"]
+              for a in w["authors"] if a["equal_contribution"]}
     assert {bib_id for bib_id, _ in marked} == MARKED_ENTRIES
     # Four parts marked in each of the four form entries, three of the five
     # authors of name-equal-normalized, and four of name-equal-stacked.
@@ -269,9 +285,9 @@ def test_ambiguous_initials_listed(valid_unresolved):
 
 @covers("identity.external")
 def test_external_author_listed(valid_unresolved, valid_output):
-    assert "Q. Quinn" in valid_unresolved.stdout
-    quinn = item(valid_output, "collaborators", "name", "Q. Quinn")
-    assert quinn["publication_count"] == 2
+    assert "Quentin Quinn" in valid_unresolved.stdout
+    quinn = item(valid_output, "collaborators", "name", "Quentin Quinn")
+    assert quinn["work_count"] == 2
 
 
 # --- LaTeX and text ----------------------------------------------------------
@@ -306,26 +322,49 @@ LATEX = [
 
 @pytest.mark.parametrize("case_id, bib_key, path, expected", LATEX)
 def test_latex(valid_output, case_id, bib_key, path, expected):
-    check_publication(valid_output, bib_key, path, expected)
+    check_work(valid_output, bib_key, path, expected)
 
 
 # --- Links -------------------------------------------------------------------
 
 LINKS = [
-    case("links.doi_bare", "link-doi-bare", "doi_url", "https://doi.org/10.5555/corpus.0001"),
-    case("links.doi_url", "link-doi-url", "doi_url", "https://doi.org/10.5555/corpus.0002"),
-    case("links.arxiv_prefixed", "link-arxiv-prefix", "arxiv_url",
+    case("links.doi_bare", "link-doi-bare", "links.doi.0.url",
+         "https://doi.org/10.5555/corpus.0001"),
+    case("links.doi_url", "link-doi-url", "links.doi.0.url",
+         "https://doi.org/10.5555/corpus.0002"),
+    case("links.arxiv_prefixed", "link-arxiv-prefix", "links.arxiv.0.url",
          "https://arxiv.org/abs/2401.00001"),
-    case("links.arxiv_unprefixed", "link-arxiv-bare", "arxiv_url",
+    case("links.arxiv_unprefixed", "link-arxiv-bare", "links.arxiv.0.url",
          "https://arxiv.org/abs/2401.00002"),
-    case("links.youtube", "link-youtube", "video_url",
+    # An eprint in another repository gets no arXiv URL: the link is built
+    # from the arXiv identifier, and this is not one.
+    case("links.arxiv_other_repository", "link-eprint-hal", "links.arxiv", None),
+    case("links.arxiv_other_repository", "link-eprint-hal", "identifiers.hal",
+         ["hal-04001234"]),
+    case("links.youtube", "link-youtube", "links.video.0.url",
          "https://www.youtube.com/watch?v=corpus00001"),
-    case("links.youtube", "link-youtube", "url", None),
-    case("links.vimeo", "link-vimeo", "video_url", "https://vimeo.com/000000001"),
-    case("links.url", "link-url", "url", "https://example.org/papers/link-url"),
-    case("links.url", "link-url", "video_url", None),
-    case("links.pdf.local_present", "present", "pdf_url", Contains("present.pdf")),
-    case("links.pdf.local_missing", "missing", "pdf_url", None),
+    case("links.youtube", "link-youtube", "links.url", None),
+    case("links.vimeo", "link-vimeo", "links.video.0.url", "https://vimeo.com/000000001"),
+    case("links.url", "link-url", "links.url.0.url",
+         "https://example.org/papers/link-url"),
+    case("links.url", "link-url", "links.video", None),
+    # Where a link came from, which is what tells a consumer whether the
+    # entry itself supplied it.
+    case("links.origin", "link-url", "links.url.0.origin", "input"),
+    case("links.origin", "link-doi-bare", "links.doi.0.origin", "derived"),
+    case("links.pdf.local_present", "present", "links.pdf.0.url",
+         Contains("present.pdf")),
+    case("links.pdf.local_present", "present", "links.pdf.0.verification.status",
+         "verified"),
+    # Kept and labelled, not deleted: "the file is not there" and "no base is
+    # configured" are different answers.
+    case("links.pdf.local_missing", "missing", "links.pdf.0.url",
+         Contains("missing.pdf")),
+    case("links.pdf.local_missing", "missing", "links.pdf.0.verification.status",
+         "missing"),
+    # A build never fetches, so nothing records a time of its own.
+    case("links.pdf.local_present", "present", "links.pdf.0.verification.checked_at",
+         None),
     case("links.note_link_award", "link-note-award", "note",
          Contains("https://example.org/papers/award")),
     case("links.note_link_award", "link-note-award", "award", "Best Paper Award Finalist",
@@ -335,7 +374,7 @@ LINKS = [
 
 @pytest.mark.parametrize("case_id, bib_key, path, expected", LINKS)
 def test_links(valid_output, case_id, bib_key, path, expected):
-    check_publication(valid_output, bib_key, path, expected)
+    check_work(valid_output, bib_key, path, expected)
 
 
 # --- BibTeX structure, entry types and fields -------------------------------
@@ -344,70 +383,103 @@ STRUCTURE = [
     case("structure.uppercase", "struct-upper", "entry_type", "article"),
     case("structure.uppercase", "struct-upper", "title", "Upper-Case Type and Fields"),
     case("structure.uppercase", "struct-upper", "authors.0.person_id", "aadams"),
-    case("structure.uppercase", "struct-upper", "venue", Contains("Journal of Fictional Robots")),
+    case("structure.uppercase", "struct-upper", "venue.name",
+         "Journal of Fictional Robots"),
     case("structure.value_quoted", "struct-quoted", "title", "A Quoted Title"),
     case("structure.value_quoted", "struct-quoted", "year", 2019),
     case("structure.value_braced", "struct-braced", "title", "A Braced Title"),
     case("structure.value_numeric", "struct-numeric", "year", 2019),
-    case("structure.value_numeric", "struct-numeric", "venue", Contains("7(2)")),
-    case("structure.crossref", "struct-child", "year", 2018),
-    case("structure.crossref", "struct-child", "title", "A Child Paper"),
-    case("structure.crossref", "struct-child", "venue",
-         Contains("Proceedings of the Fictional Workshop")),
+    case("structure.value_numeric", "struct-numeric", "volume", "7"),
+    case("structure.value_numeric", "struct-numeric", "number", "2"),
+    # An ordinary @proceedings entry, of the kind a crossref used to point
+    # at. Rejecting crossref must not change how one of these is read.
+    case("structure.proceedings", "struct-parent", "year", 2018),
+    case("structure.proceedings", "struct-parent", "entry_type", "proceedings"),
+    case("structure.proceedings", "struct-parent", "venue.name",
+         "Proceedings of the Fictional Workshop"),
+    case("structure.proceedings", "struct-parent", "authors.0.person_id", "aadams"),
     case("structure.bom_crlf", "enc-bom-crlf", "title", "Byte Order Mark and CRLF"),
     case("structure.bom_crlf", "enc-bom-crlf", "authors.0.person_id", "ccote"),
     case("structure.bom_crlf", "enc-second", "title", "Second Entry After CRLF"),
     case("types.article", "type-article", "venue",
-         AllOf(Contains("Journal of Fictional Robots", "12(3)", "2020"))),
+         {"kind": "journal", "name": "Journal of Fictional Robots"}),
+    case("types.article", "type-article", "volume", "12"),
+    case("types.article", "type-article", "number", "3"),
+    case("types.article", "type-article", "year", 2020),
     case("types.inproceedings", "type-inproceedings", "venue",
-         AllOf(Contains("Proceedings of the Fictional Conference", "2020"), Excludes("{"))),
+         {"kind": "conference", "name": "Proceedings of the Fictional Conference"}),
     case("types.phdthesis", "type-phdthesis", "venue",
-         Contains("PhD thesis", "Example University", "2020")),
+         {"kind": "institution", "name": "Example University"}),
     case("types.mastersthesis", "type-mastersthesis", "venue",
-         Contains("Masters thesis", "Example University", "2020")),
+         {"kind": "institution", "name": "Example University"}),
     case("types.techreport", "type-techreport", "venue",
-         Contains("Technical Report EU-TR-7", "Example University", "2020")),
+         {"kind": "institution", "name": "Example University"}),
+    case("types.techreport", "type-techreport", "type", "Technical Report"),
+    # BibTeX's `number`, with BibTeX's meaning: a report number here, an
+    # issue number on the article above.
+    case("types.techreport", "type-techreport", "number", "EU-TR-7"),
     case("types.techreport_default", "type-techreport-plain", "venue",
-         Contains("Technical Report", "Example University", "2020")),
-    case("types.misc_arxiv", "type-misc-arxiv", "venue", Contains("arXiv:2401.00007", "2020")),
-    case("types.misc", "type-misc", "venue", "2020"),
-    case("fields.journal", "type-article", "venue", Contains("Journal of Fictional Robots")),
-    case("fields.volume", "type-article", "venue", Contains("12")),
-    case("fields.number", "type-article", "venue", Contains("(3)")),
-    case("fields.booktitle", "type-inproceedings", "venue",
-         Contains("Proceedings of the Fictional Conference")),
-    case("fields.school", "type-phdthesis", "venue", Contains("Example University")),
-    case("fields.institution", "type-techreport", "venue", Contains("Example University")),
-    case("fields.type", "type-techreport", "venue", Contains("Technical Report")),
-    case("fields.eprint", "type-misc-arxiv", "arxiv_url", "https://arxiv.org/abs/2401.00007"),
-    case("fields.archiveprefix", "link-arxiv-prefix", "arxiv_url",
-         "https://arxiv.org/abs/2401.00001"),
-    case("fields.doi", "link-doi-bare", "doi_url", "https://doi.org/10.5555/corpus.0001"),
-    case("fields.url", "link-url", "url", "https://example.org/papers/link-url"),
+         {"kind": "institution", "name": "Example University"}),
+    case("types.techreport_default", "type-techreport-plain", "type", None),
+    case("types.misc_arxiv", "type-misc-arxiv", "venue",
+         {"kind": "repository", "name": "arXiv"}),
+    case("types.misc_arxiv", "type-misc-arxiv", "identifiers.arxiv", ["2401.00007"]),
+    # Nothing names a container, so there is none: null, not a bare year.
+    case("types.misc", "type-misc", "venue", None),
+    case("types.misc", "type-misc", "year", 2020),
+    case("fields.journal", "type-article", "venue.name", "Journal of Fictional Robots"),
+    case("fields.volume", "type-article", "volume", "12"),
+    case("fields.number", "type-article", "number", "3"),
+    case("fields.pages", "type-article", "pages", "1--10"),
+    case("fields.publisher", "type-article", "publisher", "Fictional Press"),
+    case("fields.booktitle", "type-inproceedings", "venue.name",
+         AllOf(Contains("Proceedings of the Fictional Conference"), Excludes("{"))),
+    case("fields.school", "type-phdthesis", "venue.name", "Example University"),
+    case("fields.institution", "type-techreport", "venue.name", "Example University"),
+    case("fields.type", "type-techreport", "type", "Technical Report"),
+    case("fields.eprint", "type-misc-arxiv", "identifiers.arxiv", ["2401.00007"]),
+    # The prefix is the scheme: naming the repository is all it did, and the
+    # scheme says it, so it needs no property of its own. Which means the
+    # prefix has to *determine* the scheme rather than be assumed -- a
+    # compiler that defaulted to arXiv would pass the row below and lose the
+    # field, so the entry that names another repository is what pins it.
+    case("fields.archiveprefix", "link-arxiv-prefix", "identifiers.arxiv",
+         ["2401.00001"]),
+    case("fields.archiveprefix", "link-eprint-hal", "identifiers.hal",
+         ["hal-04001234"]),
+    case("fields.archiveprefix", "link-eprint-hal", "identifiers.arxiv", None),
+    case("fields.archiveprefix", "link-eprint-hal", "venue",
+         {"kind": "repository", "name": "HAL"}),
+    case("fields.doi", "link-doi-bare", "identifiers.doi", ["10.5555/corpus.0001"]),
+    # A DOI written as a resolver URL is recorded as the identifier it is.
+    case("fields.doi", "link-doi-url", "identifiers.doi", ["10.5555/corpus.0002"]),
+    case("fields.url", "link-url", "links.url.0.url",
+         "https://example.org/papers/link-url"),
     case("fields.project", "proj-single", "project_ids", ["homebot"]),
-    case("fields.unread", "type-article", "bibtex", Contains("Fictional Press")),
+    # A field labdata emits no property for is still not dropped.
+    case("fields.unread", "proj-keywords", "bibtex", Contains("keywords")),
 ]
 
 
 @pytest.mark.parametrize("case_id, bib_key, path, expected", STRUCTURE)
 def test_structure(valid_output, case_id, bib_key, path, expected):
-    check_publication(valid_output, bib_key, path, expected)
+    check_work(valid_output, bib_key, path, expected)
 
 
 @covers("structure.comment_lines", "structure.comment_entry", "structure.preamble",
         "structure.comment_mentions_command")
-def test_comments_and_preamble_are_not_publications(valid_output):
-    structure = {p["bib_id"] for p in valid_output["publications"]
-                 if p["category"] == "Structure"}
+def test_comments_and_preamble_are_not_works(valid_output):
+    structure = {w["bib_id"] for w in valid_output["works"]
+                 if w["category"] == "Structure"}
     # Entries on both sides of the comments and the preamble are all read.
     assert {"struct-upper", "type-article", "type-misc"} <= structure
-    # The @article inside @comment{...} is not a publication.
+    # The @article inside @comment{...} is not a work.
     assert "fake" not in structure
     # A % comment line that only mentions @comment{ is prose, not a command:
     # the entry after it is read like any other.
     assert "struct-comment-prose" in structure
-    assert not [p for p in valid_output["publications"]
-                if p["entry_type"] in ("comment", "preamble", "string")]
+    assert not [w for w in valid_output["works"]
+                if w["entry_type"] in ("comment", "preamble", "string")]
 
 
 @covers("structure.bom_crlf")
@@ -431,15 +503,15 @@ PROJECTS = [
 
 @pytest.mark.parametrize("case_id, bib_key, path, expected", PROJECTS)
 def test_projects(valid_output, case_id, bib_key, path, expected):
-    check_publication(valid_output, bib_key, path, expected)
+    check_work(valid_output, bib_key, path, expected)
 
 
 @covers("projects.single", "projects.multiple")
 def test_project_backlinks(valid_output):
     homebot = item(valid_output, "projects", "id", "homebot")
     sharedarm = item(valid_output, "projects", "id", "sharedarm")
-    assert homebot["publication_ids"] == ["proj-single", "proj-multiple"]
-    assert sharedarm["publication_ids"] == ["proj-multiple"]
+    assert homebot["work_ids"] == ["proj-single", "proj-multiple"]
+    assert sharedarm["work_ids"] == ["proj-multiple"]
     assert homebot["people_ids"] == ["aadams", "bbrown", "ccote"]
     assert sharedarm["people_ids"] == ["aadams", "ccote"]
 
@@ -448,41 +520,77 @@ def test_project_backlinks(valid_output):
 # (case_id, section, lookup key, lookup value, field path, expected)
 
 OUTPUT_FIELDS = [
-    case("output.schema_version", "", "", "", "schema_version", 3),
+    case("output.schema_version", "", "", "", "schema_version", 4),
+    case("output.generator", "", "", "", "generator.name", "labdata"),
+    case("output.generator", "", "", "", "generator.schema_version", 4),
     case("output.lab", "", "", "", "lab.name", "Corpus Lab"),
-    case("output.publication.bib_id", "publications", "bib_id", "type-article", "bib_id",
+    case("output.work.bib_id", "works", "bib_id", "type-article", "bib_id",
          "type-article"),
-    case("output.publication.title", "publications", "bib_id", "tex-unicode", "title",
+    case("output.work.source", "works", "bib_id", "type-article", "source",
+         {"file": "structure.bib", "key": "type-article"}),
+    case("output.work.title", "works", "bib_id", "tex-unicode", "title",
          "Robots 机器人 and Émoji 🤖"),
-    case("output.publication.authors", "publications", "bib_id", "name-last-first", "authors",
-         [{"name": "A. Adams", "person_id": "aadams", "given": "Alice", "von": None,
-           "family": "Adams", "suffix": None, "literal": None,
+    case("output.work.authors", "works", "bib_id", "name-last-first", "authors",
+         [{"name": "Alice Adams", "position": 1, "person_id": "aadams",
+           "given": "Alice", "von": None, "family": "Adams", "suffix": None,
+           "literal": None,
+           "resolution": {"status": "resolved", "method": "exact"},
+           "derived": {}, "collaborator_key": None,
            "equal_contribution": False}]),
-    case("output.publication.year", "publications", "bib_id", "type-article", "year", 2020),
-    case("output.publication.venue", "publications", "bib_id", "type-article", "venue",
-         Contains("Journal of Fictional Robots")),
-    case("output.publication.category", "publications", "bib_id", "type-article", "category",
+    case("output.work.authors", "works", "bib_id", "name-suffix",
+         "authors.*.position", [1, 2]),
+    # An authorship that matched nobody references the grouping it fell into
+    # instead, and never a person.
+    case("output.work.authors", "works", "bib_id", "id-external-2023",
+         "authors.1.person_id", None),
+    case("output.work.authors", "works", "bib_id", "id-external-2023",
+         "authors.1.collaborator_key", Contains("quentin-quinn")),
+    case("output.work.authors", "works", "bib_id", "id-external-2023",
+         "authors.1.resolution", {"status": "unresolved", "method": None}),
+    # No editors in the corpus: an empty list, never null and never absent.
+    case("output.work.editors", "works", "bib_id", "type-article", "editors", []),
+    case("output.work.year", "works", "bib_id", "type-article", "year", 2020),
+    case("output.work.venue", "works", "bib_id", "type-article", "venue",
+         {"kind": "journal", "name": "Journal of Fictional Robots"}),
+    case("output.work.venue", "works", "bib_id", "type-misc", "venue", None),
+    case("output.work.bibliographic", "works", "bib_id", "type-article", "volume", "12"),
+    case("output.work.bibliographic", "works", "bib_id", "type-article", "number", "3"),
+    case("output.work.bibliographic", "works", "bib_id", "type-article", "pages", "1--10"),
+    case("output.work.bibliographic", "works", "bib_id", "type-article", "publisher",
+         "Fictional Press"),
+    # Declared and null when the entry wrote none, not absent.
+    case("output.work.bibliographic", "works", "bib_id", "type-article", "series", None),
+    case("output.work.bibliographic", "works", "bib_id", "type-article", "edition", None),
+    case("output.work.bibliographic", "works", "bib_id", "type-article", "address", None),
+    case("output.work.bibliographic", "works", "bib_id", "type-article",
+         "organization", None),
+    case("output.work.bibliographic", "works", "bib_id", "type-article", "chapter", None),
+    case("output.work.bibliographic", "works", "bib_id", "type-article", "month", None),
+    case("output.work.bibliographic", "works", "bib_id", "type-article",
+         "howpublished", None),
+    case("output.work.bibliographic", "works", "bib_id", "type-article", "type", None),
+    case("output.work.category", "works", "bib_id", "type-article", "category",
          "Structure"),
-    case("output.publication.entry_type", "publications", "bib_id", "type-phdthesis",
+    case("output.work.entry_type", "works", "bib_id", "type-phdthesis",
          "entry_type", "phdthesis"),
-    case("output.publication.abstract", "publications", "bib_id", "tex-abstract", "abstract",
+    case("output.work.abstract", "works", "bib_id", "tex-abstract", "abstract",
          Contains("$O(n)$")),
-    case("output.publication.note", "publications", "bib_id", "tex-note-href", "note",
+    case("output.work.note", "works", "bib_id", "tex-note-href", "note",
          Contains("our site")),
-    case("output.publication.pdf_url", "publications", "bib_id", "present", "pdf_url",
-         Contains("present.pdf")),
-    case("output.publication.doi_url", "publications", "bib_id", "link-doi-bare", "doi_url",
-         "https://doi.org/10.5555/corpus.0001"),
-    case("output.publication.arxiv_url", "publications", "bib_id", "link-arxiv-prefix",
-         "arxiv_url", "https://arxiv.org/abs/2401.00001"),
-    case("output.publication.url", "publications", "bib_id", "link-url", "url",
-         "https://example.org/papers/link-url"),
-    case("output.publication.video_url", "publications", "bib_id", "link-vimeo", "video_url",
-         "https://vimeo.com/000000001"),
-    case("output.publication.project_ids", "publications", "bib_id", "proj-multiple",
+    case("output.work.identifiers", "works", "bib_id", "link-doi-bare", "identifiers",
+         {"doi": ["10.5555/corpus.0001"]}),
+    # An open map carries only the keys that have values: no identifier is
+    # an empty map, not a map of nulls over an unbounded key set.
+    case("output.work.identifiers", "works", "bib_id", "type-misc", "identifiers", {}),
+    case("output.work.links", "works", "bib_id", "link-url", "links.url",
+         [{"url": "https://example.org/papers/link-url", "label": None,
+           "origin": "input",
+           "verification": {"status": "unchecked", "checked_at": None}}]),
+    case("output.work.project_ids", "works", "bib_id", "proj-multiple",
          "project_ids", ["homebot", "sharedarm"]),
-    case("output.publication.bibtex", "publications", "bib_id", "type-article", "bibtex",
+    case("output.work.bibtex", "works", "bib_id", "type-article", "bibtex",
          Contains("@article{type-article,", "Journal of Fictional Robots")),
+    case("output.work.derived", "works", "bib_id", "type-article", "derived", {}),
     case("output.person.id", "people", "name", "Alice Adams", "id", "aadams"),
     case("output.person.name", "people", "id", "ccote", "name", "Carol Côté"),
     case("output.person.role", "people", "id", "aadams", "role", "professor"),
@@ -490,20 +598,26 @@ OUTPUT_FIELDS = [
     case("output.person.website", "people", "id", "aadams", "website",
          "https://example.org/people/aadams"),
     case("output.person.photo", "people", "id", "aadams", "photo", "images/aadams.jpg"),
+    # Declared and null for the people who have none, not omitted.
+    case("output.person.photo", "people", "id", "bbrown", "photo", None),
     case("output.person.email", "people", "id", "aadams", "email", "aadams@example.org"),
     case("output.person.co_advisor", "people", "id", "bbrown", "co_advisor", "Peggy Park"),
     case("output.person.start_year", "people", "id", "aadams", "start_year", 2015),
     case("output.person.end_year", "people", "id", "eevans", "end_year", 2020),
+    # The alumni fields are declared for everyone, whatever the status.
+    case("output.person.end_year", "people", "id", "aadams", "end_year", None),
     case("output.person.degree", "people", "id", "eevans", "degree", "PhD"),
+    case("output.person.degree", "people", "id", "aadams", "degree", None),
     case("output.person.thesis_title", "people", "id", "eevans", "thesis_title",
          "Learning to Tidy"),
     case("output.person.current_position", "people", "id", "eevans", "current_position",
          "Research Scientist, Example Robotics Inc."),
-    case("output.person.publication_count", "people", "id", "ccote", "publication_count", 8),
-    case("output.person.publication_ids", "people", "id", "ccote", "publication_ids",
+    case("output.person.work_count", "people", "id", "ccote", "work_count", 8),
+    case("output.person.work_ids", "people", "id", "ccote", "work_ids",
          ["proj-multiple", "name-accent-tex", "name-accent-utf8", "name-equal-dollar",
           "name-equal-caret", "name-equal-superscript", "name-equal-star",
           "enc-bom-crlf"]),
+    case("output.person.derived", "people", "id", "aadams", "derived", {}),
     case("output.project.id", "projects", "title", "Household Manipulation", "id", "homebot"),
     case("output.project.title", "projects", "id", "sharedarm", "title", "Shared Control"),
     case("output.project.description", "projects", "id", "homebot", "description",
@@ -511,15 +625,40 @@ OUTPUT_FIELDS = [
     case("output.project.website", "projects", "id", "homebot", "website",
          "https://example.org/projects/homebot"),
     case("output.project.status", "projects", "id", "sharedarm", "status", "completed"),
-    case("output.project.publication_ids", "projects", "id", "homebot", "publication_ids",
+    case("output.project.work_ids", "projects", "id", "homebot", "work_ids",
          ["proj-single", "proj-multiple"]),
     case("output.project.people_ids", "projects", "id", "homebot", "people_ids",
          ["aadams", "bbrown", "ccote"]),
-    case("output.collaborator.name", "collaborators", "name", "R. Ross", "name", "R. Ross"),
-    case("output.collaborator.publication_count", "collaborators", "name", "Q. Quinn",
-         "publication_count", 2),
-    case("output.collaborator.last_year", "collaborators", "name", "Q. Quinn", "last_year",
-         2023),
+    case("output.project.derived", "projects", "id", "homebot", "derived", {}),
+    case("output.collaborator.key", "collaborators", "name", "Rachel Ross", "key",
+         Contains("rachel-ross-")),
+    case("output.collaborator.grouped_by", "collaborators", "name", "Rachel Ross",
+         "grouped_by", "normalized_name"),
+    case("output.collaborator.name_kind", "collaborators", "name", "Rachel Ross",
+         "name_kind", "personal"),
+    # A brace-protected name is `literal`, not `organization`: braces say
+    # "do not parse this", which covers mononyms too.
+    case("output.collaborator.name_kind", "collaborators", "name", "AT&T Research",
+         "name_kind", "literal"),
+    case("output.collaborator.name", "collaborators", "name", "Rachel Ross", "name",
+         "Rachel Ross"),
+    case("output.collaborator.name", "collaborators", "name", "Rachel Ross", "family",
+         "Ross"),
+    case("output.collaborator.name_variants", "collaborators", "name", "Rachel Ross",
+         "name_variants", ["RACHEL ROSS", "Rachel Ross"]),
+    case("output.collaborator.authorships", "collaborators", "name", "Rachel Ross",
+         "authorships", [{"work_id": "id-external-2019", "position": 3},
+                         {"work_id": "id-grouping", "position": 2}]),
+    case("output.collaborator.work_ids", "collaborators", "name", "Quentin Quinn",
+         "work_ids", ["id-external-2023", "id-external-2019"]),
+    case("output.collaborator.work_count", "collaborators", "name", "Quentin Quinn",
+         "work_count", 2),
+    case("output.collaborator.authorship_count", "collaborators", "name",
+         "Quentin Quinn", "authorship_count", 2),
+    case("output.collaborator.last_year", "collaborators", "name", "Quentin Quinn",
+         "last_year", 2023),
+    case("output.collaborator.derived", "collaborators", "name", "Quentin Quinn",
+         "derived", {}),
 ]
 
 
@@ -531,9 +670,183 @@ def test_output_fields(valid_output, case_id, section, key, value, path, expecte
 
 @covers("output.collaborators.order")
 def test_collaborators_order(valid_output):
-    """Most recent first, then most papers, then name."""
-    rows = [(-c["last_year"], -c["publication_count"], c["name"])
-            for c in valid_output["collaborators"]]
+    """Most recent first, then most works, then name, then key.
+
+    `name` is the tie-break it has always been. `key` follows it rather than
+    replacing it, because two keys can carry the same readable name -- a
+    parsed and a brace-protected spelling of one string are two keys -- so
+    the name alone is no longer total.
+    """
+    rows = [(c["last_year"] is None, -(c["last_year"] or 0), -c["work_count"],
+             c["name"], c["key"]) for c in valid_output["collaborators"]]
     assert rows == sorted(rows)
-    assert valid_output["collaborators"][0]["name"] == "Q. Quinn"
-    assert valid_output["collaborators"][-1]["name"] == "R. Ross"
+    assert valid_output["collaborators"][0]["name"] == "Quentin Quinn"
+
+    # Three that share a year and a work count, so only the name and the key
+    # decide. Their two orders disagree, which is what makes this a test of
+    # which one is used rather than of a coincidence.
+    tied = [(c["name"], c["key"]) for c in valid_output["collaborators"]
+            if c["last_year"] == 2014]
+    assert [name for name, _ in tied] == ["Ada Zima", "Ada \u00dcnal", "Ada \u00dcnal"]
+    keys = [key for _, key in tied]
+    assert keys != sorted(keys), keys
+    # The two that share a name are separated by their keys, ascending, and
+    # the entries wrote them the other way round -- so a sort that stopped at
+    # the name would leave them in the order the input happened to use.
+    assert tied[1][1] < tied[2][1], tied
+
+
+@covers("identity.alike_authorships")
+def test_two_authorships_written_alike_stay_apart(valid_output):
+    """Two different people written identically on one work stay two records.
+
+    Not two contributors: any grouping by a name puts them together, and the
+    key is a grouping by a name. What survives the grouping is the
+    occurrence, addressed by `(work.bib_id, position)` -- which is why the
+    counts differ, one work and two authorships, and why a consumer that
+    distrusts the grouping can still tell there were two.
+    """
+    alike = [a for a in work(valid_output, "id-alike")["authors"]
+             if a["family"] == "Young"]
+    assert len(alike) == 2, alike
+    assert [a["position"] for a in alike] == [2, 3]
+    assert len({a["collaborator_key"] for a in alike}) == 1, alike
+
+    entry = item(valid_output, "collaborators", "key", alike[0]["collaborator_key"])
+    assert entry["work_ids"] == ["id-alike"]
+    assert entry["work_count"] == 1
+    assert entry["authorship_count"] == 2
+    assert entry["authorships"] == [{"work_id": "id-alike", "position": 2},
+                                    {"work_id": "id-alike", "position": 3}]
+
+
+# The two codes, restated rather than imported: a published code is a
+# permanent interface (SPEC.md, "Diagnostic codes"), and outside tests/unit
+# the suite uses only labdata's public names.
+SPANS_SPELLINGS = "ID-GROUPING-SPANS-SPELLINGS"
+INITIALS_AMBIGUOUS = "ID-GROUPING-INITIALS-AMBIGUOUS"
+
+# (label, the initials-only spelling, the fuller one it could be). One row
+# per thing the check compares -- the initials, the family name, the
+# particles and the lineage suffix -- and each is a shape that a check
+# pattern-matching the normalised key cannot see, except `Q. Quinn`, which is
+# the one initial and one plain family name that such a check could match.
+INITIALS_SHADOWS = [
+    ("a surname particle", "A. van der Meer", "Anna van der Meer"),
+    ("two initials", "A. J. Smithson", "Anna Jane Smithson"),
+    ("a hyphenated family name", "B. Smith-Jones", "Bella Smith-Jones"),
+    ("a name outside ASCII", "\u00c7. A. \u00d6zt\u00fcrk",
+     "\u00c7i\u011fdem Ay\u015fe \u00d6zt\u00fcrk"),
+    ("one initial and one family name", "Q. Quinn", "Quentin Quinn"),
+    ("a lineage suffix that agrees", "T. Tate Jr.", "Tobias Tate Jr."),
+    ("a lineage suffix on one side only", "V. Vance", "Victor Vance Jr."),
+]
+
+
+# The complete set of pairs the corpus produces, by readable name. Every
+# name the corpus writes in initials is here, with exactly the fuller names
+# it could be -- so a check that compared one thing less would add a pair and
+# a check that compared one thing more would drop one. The five names under
+# `id-grouping-distinct` appear in no list on purpose: each differs from an
+# initials-only key above in exactly one of the things the check compares --
+# the particle, the family name, the second initial, the second half of a
+# hyphenated given name, and a lineage suffix that disagrees.
+INITIALS_PAIRS = {
+    "A. van der Meer": ["Anna van der Meer"],
+    "A. J. Smithson": ["Anna Jane Smithson"],
+    "B. Smith-Jones": ["Bella Smith-Jones"],
+    "\u00c7. A. \u00d6zt\u00fcrk": ["\u00c7i\u011fdem Ay\u015fe \u00d6zt\u00fcrk"],
+    "Q. Quinn": ["Quentin Quinn"],
+    "T. Tate Jr.": ["Tobias Tate Jr."],
+    "V. Vance": ["Victor Vance Jr."],
+}
+
+
+def reported_initials_keys(output):
+    """The collaborator key each initials-only warning is about."""
+    return {line.split("'")[1] for line in output.splitlines()
+            if INITIALS_AMBIGUOUS in line}
+
+
+def reported_initials_pairs(output, valid_output):
+    """{name: [fuller names]} for every initials-only warning, by readable name."""
+    by_key = {c["key"]: c["name"] for c in valid_output["collaborators"]}
+    pairs = {}
+    for line in output.splitlines():
+        if INITIALS_AMBIGUOUS not in line:
+            continue
+        quoted = [part for index, part in enumerate(line.split("'")) if index % 2]
+        pairs[by_key[quoted[0]]] = sorted(by_key[key] for key in quoted[1:])
+    return pairs
+
+
+@covers("identity.grouping_initials", "identity.grouping_distinct",
+        "identity.grouping_suffix")
+def test_the_initials_warnings_are_exactly_these_pairs(valid_validate, valid_output):
+    """Both directions at once, over the whole corpus.
+
+    Comparing one thing less -- dropping the particles, the family name, the
+    second initial, the second half of a hyphenated one, or a lineage suffix
+    that disagrees -- adds a pair that is not there. Comparing one thing more
+    drops a pair that is: treating a suffix against none as a disagreement is
+    the case that does it. A test that only asserted the pairs it wanted
+    would catch the second and not the first, which is the direction a
+    warning gets wrong most easily.
+    """
+    assert reported_initials_pairs(valid_validate.output, valid_output) == INITIALS_PAIRS
+
+
+@pytest.mark.parametrize("label,initials,fuller",
+                         [pytest.param(*row, id=row[0]) for row in INITIALS_SHADOWS])
+@covers("identity.grouping_initials", "identity.grouping_suffix")
+def test_an_initials_only_key_that_could_be_a_fuller_one_is_reported(
+        valid_validate, valid_output, label, initials, fuller):
+    """Each shape a check over the normalised key would miss.
+
+    The test is on the structured parts -- the initials of the given name
+    against a fuller given name, with the family name and the particles equal
+    -- so a particle, a second initial, a hyphen in the family name and a
+    letter outside ASCII are all seen. Both keys are asserted to exist and to
+    differ, so each row is about a real pair rather than about a message.
+    """
+    short = item(valid_output, "collaborators", "name", initials)
+    fuller_entry = item(valid_output, "collaborators", "name", fuller)
+    assert short["key"] != fuller_entry["key"], label
+
+    named = [line for line in valid_validate.output.splitlines()
+             if INITIALS_AMBIGUOUS in line and short["key"] in line]
+    assert len(named) == 1, (label, valid_validate.output)
+    assert fuller_entry["key"] in named[0], (label, named[0])
+
+
+@covers("identity.grouping_spellings", "identity.grouping_initials")
+def test_grouping_risks_are_reported(valid_validate, valid_output):
+    """The two ways the key can be wrong are said out loud, not left silent.
+
+    One key spans two spellings of a name; another is initials only and could
+    be either of two fuller keys. Neither is an error -- an external
+    co-author never is -- and both are reported so the merge risk is visible.
+    """
+    output = valid_validate.output
+    assert valid_validate.code == 0, output
+    spanning = item(valid_output, "collaborators", "name", "Rachel Ross")
+    initials = item(valid_output, "collaborators", "name", "Q. Quinn")
+    fuller = item(valid_output, "collaborators", "name", "Quentin Quinn")
+
+    assert len(spanning["name_variants"]) == 2, spanning
+    assert f"{SPANS_SPELLINGS} ./names.bib:id-external-2019:author" in output
+    assert spanning["key"] in output
+
+    assert f"{INITIALS_AMBIGUOUS} ./names.bib:id-grouping:author" in output
+    assert initials["key"] in output and fuller["key"] in output
+    # The two keys really are different, which is the instability being
+    # recorded: a consumer must not build a URL on one and expect the other.
+    assert initials["key"] != fuller["key"]
+
+    # The warning is about the pair, so the fuller key is not reported as
+    # though it were the ambiguous one, and a key with no fuller counterpart
+    # is not reported at all.
+    reported = reported_initials_keys(output)
+    assert fuller["key"] not in reported
+    alone = item(valid_output, "collaborators", "name", "Yolanda Young")
+    assert alone["key"] not in reported

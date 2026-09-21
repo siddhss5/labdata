@@ -1,7 +1,11 @@
-<div class="pub-entry" style="margin-bottom: 1.5em;" data-searchable="{{ include.pub.title | downcase }} {{ include.pub.authors | map: 'name' | join: ' ' | downcase }} {{ include.pub.venue | downcase }} {{ include.pub.bib_id | downcase }}">
+{% capture pdf_url %}{% include link_url.html work=include.pub kind="pdf" %}{% endcapture %}
+{% capture doi_url %}{% include link_url.html work=include.pub kind="doi" %}{% endcapture %}
+{% capture arxiv_url %}{% include link_url.html work=include.pub kind="arxiv" %}{% endcapture %}
+{% capture video_url %}{% include link_url.html work=include.pub kind="video" %}{% endcapture %}
+<div class="pub-entry" style="margin-bottom: 1.5em;" data-searchable="{{ include.pub.title | downcase }} {{ include.pub.authors | map: 'name' | join: ' ' | downcase }} {{ include.pub.venue.name | downcase }} {{ include.pub.bib_id | downcase }}">
   <div style="margin-bottom: 0.3em;">
-    {% if include.pub.pdf_url %}
-      <a href="{{ include.pub.pdf_url }}"><strong>{{ include.pub.title }}</strong></a>
+    {% if pdf_url != "" %}
+      <a href="{{ pdf_url }}"><strong>{{ include.pub.title }}</strong></a>
     {% else %}
       <strong>{{ include.pub.title }}</strong>
     {% endif %}
@@ -10,15 +14,15 @@
     {% include author_list.html authors=include.pub.authors %}
   </div>
   <div style="margin-bottom: 0.3em;">
-    {{ include.pub.venue | markdownify | remove: "<p>" | remove: "</p>" }}
+    {% include venue.html work=include.pub %}
     {% if include.pub.note %}<br><strong>{{ include.pub.note | markdownify | remove: "<p>" | remove: "</p>" }}</strong>{% endif %}
   </div>
   <div>
-    {% if include.pub.doi_url %}
-      <a href="{{ include.pub.doi_url }}" class="btn btn--inverse btn--small" target="_blank">DOI</a>
+    {% if doi_url != "" %}
+      <a href="{{ doi_url }}" class="btn btn--inverse btn--small" target="_blank">DOI</a>
     {% endif %}
-    {% if include.pub.arxiv_url %}
-      <a href="{{ include.pub.arxiv_url }}" class="btn btn--inverse btn--small" target="_blank">arXiv</a>
+    {% if arxiv_url != "" %}
+      <a href="{{ arxiv_url }}" class="btn btn--inverse btn--small" target="_blank">arXiv</a>
     {% endif %}
     {% if include.pub.abstract %}
       <button class="btn btn--inverse btn--small" onclick="this.parentElement.parentElement.querySelector('.pub-abstract').toggleAttribute('open')">Abstract</button>
@@ -26,8 +30,8 @@
     {% if include.pub.bibtex %}
       <button class="btn btn--inverse btn--small" onclick="var b=this.parentElement.parentElement.querySelector('.pub-bibtex');b.toggleAttribute('open');if(b.open){b.querySelector('code').scrollIntoView({block:'nearest'})}">BibTeX</button>
     {% endif %}
-    {% if include.pub.video_url %}
-      <a href="{{ include.pub.video_url }}" class="btn btn--inverse btn--small" target="_blank">Video</a>
+    {% if video_url != "" %}
+      <a href="{{ video_url }}" class="btn btn--inverse btn--small" target="_blank">Video</a>
     {% endif %}
     {% if include.pub.project_ids.size > 0 %}
       {% for pid in include.pub.project_ids %}

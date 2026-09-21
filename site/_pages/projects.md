@@ -6,7 +6,7 @@ classes: wide
 ---
 
 {% assign projects = site.data.lab.projects %}
-{% assign pubs = site.data.lab.publications %}
+{% assign works = site.data.lab.works %}
 
 {% if projects.size == 0 %}
 <p><em>No projects data configured yet. Add a <code>projects_file</code> to your labdata config to populate this page.</em></p>
@@ -31,17 +31,20 @@ classes: wide
 <p style="margin-top: 0.8em;">{{ project.description }}</p>
 {% endif %}
 
-{% if project.publication_ids.size > 0 %}
+{% if project.work_ids.size > 0 %}
 <details>
-<summary style="cursor: pointer; font-size: 1.17em; font-weight: bold; margin-top: 0.5em; margin-bottom: 0.5em;">Publications ({{ project.publication_ids.size }})</summary>
+<summary style="cursor: pointer; font-size: 1.17em; font-weight: bold; margin-top: 0.5em; margin-bottom: 0.5em;">Publications ({{ project.work_ids.size }})</summary>
 <div style="margin-top: 0.8em;">
-{% for pub_id in project.publication_ids %}
-  {% assign pub = pubs | where: "bib_id", pub_id | first %}
+{% for work_id in project.work_ids %}
+  {% assign pub = works | where: "bib_id", work_id | first %}
   {% if pub %}
+  {% capture pdf_url %}{% include link_url.html work=pub kind="pdf" %}{% endcapture %}
+  {% capture web_url %}{% include link_url.html work=pub kind="url" %}{% endcapture %}
+  {% capture video_url %}{% include link_url.html work=pub kind="video" %}{% endcapture %}
 <div style="margin-bottom: 1.2em;">
   <div>
-    {% if pub.pdf_url %}
-      <a href="{{ pub.pdf_url }}">{{ pub.title }}</a>
+    {% if pdf_url != "" %}
+      <a href="{{ pdf_url }}">{{ pub.title }}</a>
     {% else %}
       {{ pub.title }}
     {% endif %}
@@ -54,12 +57,12 @@ classes: wide
   <div style="font-size: 0.85em; color: #494e52;"><sup>*</sup> equal contribution</div>
   {% endif %}
   <div style="font-size: 0.9em; color: #494e52;">
-    {{ pub.venue | markdownify | remove: "<p>" | remove: "</p>" }}
+    {% include venue.html work=pub %}
   </div>
-  {% if pub.note or pub.url or pub.video_url %}
+  {% if pub.note or web_url != "" or video_url != "" %}
   <div style="font-size: 0.9em; margin-top: 0.2em;">
-    {% if pub.url %}<a href="{{ pub.url }}" style="margin-right: 0.6em;">Website</a>{% endif %}
-    {% if pub.video_url %}<a href="{{ pub.video_url }}" style="margin-right: 0.6em;">Video</a>{% endif %}
+    {% if web_url != "" %}<a href="{{ web_url }}" style="margin-right: 0.6em;">Website</a>{% endif %}
+    {% if video_url != "" %}<a href="{{ video_url }}" style="margin-right: 0.6em;">Video</a>{% endif %}
     {% if pub.note %}<strong>{{ pub.note | markdownify | remove: "<p>" | remove: "</p>" }}</strong>{% endif %}
   </div>
   {% endif %}

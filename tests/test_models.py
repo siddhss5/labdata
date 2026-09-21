@@ -1,60 +1,116 @@
 """Tests for labdata data models."""
 
-from labdata.models import Author, Publication, Person, Project, LabData
+from labdata import (
+    Author, Collaborator, Contributor, LabData, Link, Person, Project, Venue,
+    Work,
+)
 
 
 class TestAuthor:
     def test_basic(self):
-        a = Author(name="B. Brown")
-        assert a.name == "B. Brown"
+        a = Author(name="Bob Brown")
+        assert a.name == "Bob Brown"
         assert a.person_id is None
 
     def test_resolved(self):
-        a = Author(name="B. Brown", person_id="bbrown")
+        a = Author(name="Bob Brown", person_id="bbrown")
         assert a.person_id == "bbrown"
 
     def test_equal_contribution(self):
-        assert Author(name="B. Brown").equal_contribution is False
-        marked = Author(name="B. Brown", equal_contribution=True)
+        assert Author(name="Bob Brown").equal_contribution is False
+        marked = Author(name="Bob Brown", equal_contribution=True)
         assert marked.to_dict()["equal_contribution"] is True
 
+    def test_contributor_reference_and_resolution(self):
+        """An authorship carries both references and its resolution record."""
+        d = Author(name="Bob Brown", position=1, person_id="bbrown",
+                   resolution_status="resolved", resolution_method="exact").to_dict()
+        assert d["position"] == 1
+        assert d["person_id"] == "bbrown"
+        assert d["collaborator_key"] is None
+        assert d["resolution"] == {"status": "resolved", "method": "exact"}
+        assert d["derived"] == {}
 
-class TestPublication:
+    def test_unresolved_authorship_references_a_grouping(self):
+        d = Author(name="Trent Turner", position=2,
+                   collaborator_key="trent-turner-9d9cc45d").to_dict()
+        assert d["person_id"] is None
+        assert d["collaborator_key"] == "trent-turner-9d9cc45d"
+        assert d["resolution"] == {"status": "unresolved", "method": None}
+
+
+class TestContributor:
+    def test_editor_has_no_authorship_fields(self):
+        """An editor is not an authorship: no grouping key, no marker."""
+        d = Contributor(name="Quentin Quinn", position=1, family="Quinn").to_dict()
+        assert "collaborator_key" not in d
+        assert "equal_contribution" not in d
+        assert d["family"] == "Quinn"
+
+
+class TestWork:
     def test_minimal(self):
-        pub = Publication(
+        work = Work(
             bib_id="brown2024",
             title="A Paper",
-            authors=[Author(name="B. Brown")],
+            authors=[Author(name="Bob Brown")],
             year=2024,
-            venue="*RSS*, 2024",
             category="Conference Papers",
             entry_type="inproceedings",
         )
-        assert pub.bib_id == "brown2024"
-        assert pub.pdf_url is None
-        assert pub.project_ids == []
+        assert work.bib_id == "brown2024"
+        assert work.venue is None
+        assert work.project_ids == []
+        assert work.links == {}
 
     def test_to_dict(self):
-        pub = Publication(
+        work = Work(
             bib_id="brown2024",
             title="A Paper",
             authors=[
-                Author(name="B. Brown", person_id="bbrown"),
-                Author(name="E. External"),
+                Author(name="Bob Brown", position=1, person_id="bbrown"),
+                Author(name="Erin External", position=2,
+                       collaborator_key="erin-external-00000000"),
             ],
             year=2024,
-            venue="*RSS*, 2024",
             category="Conference Papers",
             entry_type="inproceedings",
-            doi_url="https://doi.org/10.1234/test",
+            source_file="conference.bib",
+            venue=Venue(kind="conference", name="RSS"),
+            pages="1--10",
+            identifiers={"doi": ["10.1234/test"]},
+            links={"doi": [Link(url="https://doi.org/10.1234/test",
+                                origin="derived")]},
             project_ids=["robotics"],
         )
-        d = pub.to_dict()
+        d = work.to_dict()
         assert d["bib_id"] == "brown2024"
+        assert d["source"] == {"file": "conference.bib", "key": "brown2024"}
         assert d["authors"][0]["person_id"] == "bbrown"
         assert d["authors"][1]["person_id"] is None
-        assert d["doi_url"] == "https://doi.org/10.1234/test"
+        assert d["authors"][1]["collaborator_key"] == "erin-external-00000000"
+        assert d["venue"] == {"kind": "conference", "name": "RSS"}
+        assert d["pages"] == "1--10"
+        assert d["identifiers"] == {"doi": ["10.1234/test"]}
+        assert d["links"]["doi"] == [{
+            "url": "https://doi.org/10.1234/test", "label": None,
+            "origin": "derived",
+            "verification": {"status": "unchecked", "checked_at": None},
+        }]
         assert d["project_ids"] == ["robotics"]
+
+    def test_every_declared_property_is_present_and_null_when_it_does_not_apply(self):
+        """The closed-object policy: nothing is omitted, absent values are null."""
+        d = Work(bib_id="x", title="", authors=[], year=None, category="C",
+                 entry_type="misc").to_dict()
+        for key in ("venue", "volume", "number", "pages", "series", "edition",
+                    "publisher", "address", "organization", "chapter", "month",
+                    "howpublished", "type", "abstract", "note", "bibtex",
+                    "year"):
+            assert key in d and d[key] is None, key
+        assert d["editors"] == []
+        assert d["identifiers"] == {} and d["links"] == {}
+        assert d["derived"] == {}
 
 
 class TestPerson:
@@ -69,8 +125,9 @@ class TestPerson:
         d = p.to_dict()
         assert d["id"] == "bbrown"
         assert d["status"] == "current"
-        assert "end_year" not in d
-        assert "degree" not in d
+        # Declared, and null rather than absent, whatever the status.
+        assert d["end_year"] is None
+        assert d["degree"] is None
 
     def test_alumni(self):
         p = Person(
@@ -82,20 +139,41 @@ class TestPerson:
             end_year=2023,
             degree="PhD",
             thesis_title="Robot Manipulation",
-            current_position="Research Scientist at Google",
+            current_position="Research Scientist at Example Robotics",
         )
         d = p.to_dict()
         assert d["status"] == "alumni"
         assert d["end_year"] == 2023
         assert d["degree"] == "PhD"
-        assert d["current_position"] == "Research Scientist at Google"
+        assert d["current_position"] == "Research Scientist at Example Robotics"
+
+    def test_aliases_are_read_for_matching_and_never_emitted(self):
+        d = Person(id="bbrown", name="Bob Brown", aliases=["B. Brown"]).to_dict()
+        assert "aliases" not in d
+
+
+class TestCollaborator:
+    def test_to_dict(self):
+        c = Collaborator(
+            key="trent-turner-9d9cc45d", name="Trent Turner", family="Turner",
+            given="Trent", name_variants=["Trent Turner"],
+            authorships=[{"work_id": "brown2024", "position": 2}],
+            work_ids=["brown2024"], work_count=1, authorship_count=1,
+            last_year=2024,
+        )
+        d = c.to_dict()
+        assert d["key"] == "trent-turner-9d9cc45d"
+        assert d["grouped_by"] == "normalized_name"
+        assert d["name_kind"] == "personal"
+        assert d["authorships"] == [{"work_id": "brown2024", "position": 2}]
+        assert d["work_count"] == 1 and d["authorship_count"] == 1
 
 
 class TestProject:
     def test_basic(self):
         p = Project(id="gardenbot", title="Robot-Assisted Gardening")
         assert p.status == "active"
-        assert p.publication_ids == []
+        assert p.work_ids == []
         assert p.people_ids == []
 
     def test_to_dict(self):
@@ -105,12 +183,12 @@ class TestProject:
             description="Autonomous gardening systems",
             website="https://gardenbot.example.org",
             status="active",
-            publication_ids=["brown2024", "adams2023"],
+            work_ids=["brown2024", "adams2023"],
             people_ids=["bbrown", "aadams"],
         )
         d = p.to_dict()
         assert d["id"] == "gardenbot"
-        assert len(d["publication_ids"]) == 2
+        assert len(d["work_ids"]) == 2
         assert len(d["people_ids"]) == 2
 
 
@@ -118,19 +196,28 @@ class TestLabData:
     def test_empty(self):
         data = LabData()
         d = data.to_dict()
-        assert d["publications"] == []
+        assert d["works"] == []
         assert d["people"] == []
         assert d["projects"] == []
+        # The header is always emitted, so no header and an empty header are
+        # the same thing rather than one being invisible.
+        assert d["lab"] == {}
+
+    def test_generator_names_the_compiler_and_carries_no_timestamp(self):
+        import labdata
+
+        generator = LabData().to_dict()["generator"]
+        assert generator == {"name": "labdata", "version": labdata.__version__,
+                             "schema_version": 4}
 
     def test_to_dict(self):
         data = LabData(
-            publications=[
-                Publication(
+            works=[
+                Work(
                     bib_id="brown2024",
                     title="A Paper",
-                    authors=[Author(name="B. Brown")],
+                    authors=[Author(name="Bob Brown")],
                     year=2024,
-                    venue="RSS",
                     category="Conference Papers",
                     entry_type="inproceedings",
                 )
@@ -139,7 +226,7 @@ class TestLabData:
             projects=[Project(id="test", title="Test Project")],
         )
         d = data.to_dict()
-        assert len(d["publications"]) == 1
+        assert len(d["works"]) == 1
         assert len(d["people"]) == 1
         assert len(d["projects"]) == 1
-        assert d["publications"][0]["bib_id"] == "brown2024"
+        assert d["works"][0]["bib_id"] == "brown2024"

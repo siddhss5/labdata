@@ -10,8 +10,11 @@ Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
 MIT License - see LICENSE file for details.
 """
 
-from .config import LabDataConfig, BibFile
-from .models import LabData, Publication, Author, Person, Project, Collaborator
+from .config import ConfigurationError, LabDataConfig, BibFile
+from .models import (
+    LabData, Work, Author, Contributor, Venue, Link, Person, Project,
+    Collaborator,
+)
 from .assembler import assemble, AssemblyResult
 from .exporters import export_to_yaml, export_to_json
 
@@ -19,10 +22,14 @@ __all__ = [
     # Config
     "LabDataConfig",
     "BibFile",
+    "ConfigurationError",
     # Data model
     "LabData",
-    "Publication",
+    "Work",
     "Author",
+    "Contributor",
+    "Venue",
+    "Link",
     "Person",
     "Project",
     "Collaborator",
@@ -33,4 +40,4 @@ __all__ = [
     "export_to_yaml",
     "export_to_json",
 ]
-__version__ = "2.0.0"
+__version__ = "3.0.0"

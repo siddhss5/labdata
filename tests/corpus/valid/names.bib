@@ -1,7 +1,7 @@
 % Fictional author-name cases for tests/COVERAGE.md.
 
 % CASE names.last_first
-% CASE output.publication.authors
+% CASE output.work.authors
 @article{name-last-first,
   title   = {Last, First Form},
   author  = {Adams, Alice},
@@ -234,7 +234,15 @@
 
 % CASE identity.external
 % CASE output.collaborator.name
-% CASE output.collaborator.publication_count
+% CASE output.collaborator.key
+% CASE output.collaborator.grouped_by
+% CASE output.collaborator.name_kind
+% CASE output.collaborator.name_variants
+% CASE output.collaborator.authorships
+% CASE output.collaborator.work_ids
+% CASE output.collaborator.authorship_count
+% CASE output.collaborator.derived
+% CASE output.collaborator.work_count
 % CASE output.collaborator.last_year
 % CASE output.collaborators.order
 @article{id-external-2023,
@@ -249,4 +257,102 @@
   author  = {Adams, Alice and Quinn, Quentin and Ross, Rachel},
   journal = {Journal of Fictional Robots},
   year    = {2019}
+}
+
+% One external name written two ways that normalise alike, and one written
+% with an initial only. The grouping key is the normalised full name, so the
+% two spellings are one key -- which labdata reports, because a key spanning
+% more than one spelling is a merge a consumer cannot see -- and the
+% initials-only name is a key of its own that could be either Quinn.
+% CASE identity.grouping_spellings
+% CASE identity.grouping_initials
+@article{id-grouping,
+  title   = {Two Spellings and an Initial},
+  author  = {Adams, Alice and ROSS, RACHEL and Quinn, Q.},
+  journal = {Journal of Fictional Robots},
+  year    = {2019}
+}
+
+% Two different people listed on one work under one written name, as a
+% collaboration's style sometimes requires. Any grouping by name puts them
+% together, so what has to survive is the occurrence: two authorships at two
+% positions under one key, with a work_count of 1 and an authorship_count
+% of 2.
+% CASE identity.alike_authorships
+@article{id-alike,
+  title   = {Two Co-authors Written Alike},
+  author  = {Adams, Alice and Young, Yolanda and Young, Yolanda},
+  journal = {Journal of Fictional Robots},
+  year    = {2018}
+}
+
+% Four ways an initials-only external name can shadow a fuller one that a
+% key built by pattern-matching the normalised string does not see: a
+% surname particle, two initials, a hyphenated family name, and a name
+% outside ASCII. Each pair is two keys, and each initials-only key is
+% reported as one that could be the fuller one. None of them is a lab
+% member, so none resolves.
+% CASE identity.grouping_initials
+@article{id-grouping-parts,
+  title   = {Initials That Could Be Somebody Else},
+  author  = {Adams, Alice and
+             van der Meer, A. and van der Meer, Anna and
+             Smithson, A. J. and Smithson, Anna Jane and
+             Smith-Jones, B. and Smith-Jones, Bella and
+             Öztürk, Ç. A. and Öztürk, Çiğdem Ayşe},
+  journal = {Journal of Fictional Robots},
+  year    = {2017}
+}
+
+% The other side of the same check: names that must **not** be paired. Each
+% one differs from an initials-only key above in exactly one of the things
+% the check compares, so a check that stopped comparing that one thing would
+% report a pair that is not there.
+%
+%   Meer, Anna              no particle, where A. van der Meer has one
+%   van der Waals, Anna     the same particle, a different family name
+%   Smithson, Anna Beth     the same first initial, a different second
+%   Nolan, G.-A. / Gabriel  a hyphenated given name keeps both initials, so
+%                           `G.-A.` is not an abbreviation of `Gabriel`
+%   Tate, Sr., Tobias       a lineage suffix that disagrees with the one on
+%                           `T. Tate, Jr.` below: two suffixes that disagree
+%                           are two people
+% CASE identity.grouping_distinct
+@article{id-grouping-distinct,
+  title   = {Initials That Could Not Be Somebody Else},
+  author  = {Adams, Alice and Meer, Anna and van der Waals, Anna and
+             Smithson, Anna Beth and Nolan, G.-A. and Nolan, Gabriel and
+             Tate, Sr., Tobias},
+  journal = {Journal of Fictional Robots},
+  year    = {2016}
+}
+
+% A lineage suffix that agrees, beside the one above that does not, and a
+% pair where only one side writes a suffix at all. An entry that omits it has
+% said nothing rather than said "none", so the two suffixes are compared only
+% when both are there and `V. Vance` could still be `Victor Vance Jr.`
+% CASE identity.grouping_suffix
+@article{id-grouping-suffix,
+  title   = {A Suffix That Agrees and One That Does Not},
+  author  = {Adams, Alice and Tate, Jr., T. and Tate, Jr., Tobias and
+             Vance, V. and Vance, Jr., Victor},
+  journal = {Journal of Fictional Robots},
+  year    = {2015}
+}
+
+% Three external names sharing a year and a work count, so only the last two
+% sort keys decide between them. Their name order and their key order
+% disagree -- the slug strips the accent, so `Ada Zima` comes before
+% `Ada Ünal` by name (`Z` is U+005A, `Ü` is U+00DC) and
+% `ada-unal-...` comes before `ada-zima-...` by key -- and two of them carry
+% the same readable name, one parsed and one brace-protected, which only the
+% key separates -- and they are written in the order the key does *not* put
+% them in, so a sort that stopped at the name would leave them the other way
+% round.
+% CASE output.collaborators.order
+@article{id-order-tie,
+  title   = {Names That Sort One Way and Key Another},
+  author  = {Adams, Alice and Ünal, Ada and {Ada Ünal} and Zima, Ada},
+  journal = {Journal of Fictional Robots},
+  year    = {2014}
 }

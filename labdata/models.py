@@ -1,7 +1,7 @@
 """
 Data models for labdata.
 
-Defines the core entity types: Publication, Author, Person, Project,
+Defines the core entity types: Work, Author, Person, Project, Collaborator,
 and the assembled LabData output.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
@@ -10,99 +10,248 @@ MIT License - see LICENSE file for details.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional, List
+from typing import Dict, List, Optional
+
+# The one guarantee about an emitted value that the input can break: a
+# configured `.bib` name reaches the document as `work.source.file`, and is
+# promised never to be absolute. `labdata.config` owns the code and the
+# exception type because the condition is a configuration mistake; the check
+# is made here as well because this is the boundary every emitted document
+# passes through, whatever built the objects.
+from .config import reject_absolute_name
 
 
-# Version of the output format (see schema/output.schema.json). Bump it when
+# Version of the output format (see schema/v4/output.schema.json). Bump it when
 # a change to to_dict() output could break a consumer.
 #
 # 2: authors carry their structured name parts (#23). The schema is closed,
 #    so a consumer validating against version 1 would reject the new keys.
 # 3: authors carry equal_contribution (#46), for the same reason.
-SCHEMA_VERSION = 3
+# 4: one consolidated breaking change (#56): `publications` becomes `works`,
+#    the bibliography is structured, links and identifiers are open registries,
+#    `collaborators` is a declared grouping over unresolved authorships, and
+#    every closed object declares every property it can carry.
+SCHEMA_VERSION = 4
+
+# The name of the compiler, as the document's `generator` record reports it.
+GENERATOR_NAME = "labdata"
+
+# The one policy for closed objects (SPEC.md section 4): every declared
+# property is present, and `null` when it does not apply. The open maps --
+# `lab`, `links`, `identifiers` and every `derived` bag -- carry only the keys
+# that have values, because emitting nulls over an unbounded key set says
+# nothing.
 
 
 @dataclass
-class Author:
-    """A resolved or unresolved author reference in a publication.
+class Venue:
+    """Where a work appeared, normalised across entry types.
 
-    ``name`` is the display form. The four parts below it are the name as
-    BibTeX splits it, kept rather than collapsed so that later work has the
-    structure to go on and not only a display string. ``literal`` holds a
-    corporate name written as one brace-protected unit, such as
+    ``kind`` is an open string. v4 emits ``journal``, ``conference``, ``book``,
+    ``institution`` and ``repository``; a consumer branches on the ones it
+    knows and falls back for the rest, so a new kind is not a breaking change.
+    ``name`` is the container's own name, as plain text.
+    """
+    kind: str
+    name: str
+
+    def to_dict(self) -> dict:
+        return {'kind': self.kind, 'name': self.name}
+
+
+@dataclass
+class Link:
+    """One URL a work can be reached at, with where it came from and whether
+    anything has checked it.
+
+    ``origin`` is an open string over ``input``, ``sidecar``, ``enrichment``,
+    ``inferred`` and ``derived``: only ``input`` means the entry's own field
+    supplied it. ``status`` is ``unchecked``, ``verified`` or ``missing``; a
+    link that fails verification is kept and labelled, never deleted.
+    ``checked_at`` is null unless a committed cache supplied it — a build
+    never fetches, so it never records a time of its own.
+    """
+    url: str
+    label: Optional[str] = None
+    origin: str = "input"
+    status: str = "unchecked"
+    checked_at: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {
+            'url': self.url,
+            'label': self.label,
+            'origin': self.origin,
+            'verification': {'status': self.status, 'checked_at': self.checked_at},
+        }
+
+
+@dataclass
+class Contributor:
+    """One person named on a work: the parts of the name, and who it resolved to.
+
+    ``name`` is the structured parts joined in reading order. It is *a readable
+    form of the input name, not a citation form*: it does not abbreviate,
+    expand or normalise anything. The parts below it carry what the entry
+    supplied, after LaTeX conversion and marker removal, so an entry writing
+    ``Brown, B.`` yields ``given: "B."`` and that is correct rather than a gap.
+    ``literal`` holds a name written as one brace-protected unit, such as
     ``{Example Robotics Consortium}``, where the other parts do not apply.
 
-    ``equal_contribution`` records that the entry marked this author with a
-    ``*``; the marker itself is taken off the name, so neither the display
-    form nor the name used for matching carries it.
+    ``position`` is 1-based and is the authorship's address within its work,
+    together with the work's ``bib_id``.
+
+    This is the record ``work.editors`` carries. Editing a volume is not an
+    authorship, so an editor that matched nobody is simply ``person_id: null``
+    and produces no collaborator.
     """
     name: str
+    position: int = 0
     person_id: Optional[str] = None
     given: Optional[str] = None
     von: Optional[str] = None
     family: Optional[str] = None
     suffix: Optional[str] = None
     literal: Optional[str] = None
-    equal_contribution: bool = False
+    resolution_status: str = "unresolved"
+    resolution_method: Optional[str] = None
+    derived: Dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {
             'name': self.name,
+            'position': self.position,
             'person_id': self.person_id,
             'given': self.given,
             'von': self.von,
             'family': self.family,
             'suffix': self.suffix,
             'literal': self.literal,
-            'equal_contribution': self.equal_contribution,
+            'resolution': {'status': self.resolution_status,
+                           'method': self.resolution_method},
+            'derived': dict(self.derived),
         }
 
 
 @dataclass
-class Publication:
-    """A single publication with structured, renderer-agnostic data."""
-    bib_id: str
-    title: str
-    authors: List[Author]
-    year: int
-    venue: str
-    category: str
-    entry_type: str
+class Author(Contributor):
+    """One authorship of a work.
 
-    abstract: Optional[str] = None
-    note: Optional[str] = None
-    pdf_url: Optional[str] = None
-    doi_url: Optional[str] = None
-    arxiv_url: Optional[str] = None
-    url: Optional[str] = None
-    video_url: Optional[str] = None
+    The authorship, not the contributor, is the primary record: it is
+    addressed by ``(work.bib_id, position)``, so two people who write their
+    names identically are never merged at this level.
 
-    project_ids: List[str] = field(default_factory=list)
-    bibtex: Optional[str] = None
+    It references exactly one contributor. ``person_id`` is the id of a person
+    in ``people.yaml`` and means nothing else; ``collaborator_key`` is the
+    lookup key of the grouping an unresolved authorship fell into. Both are
+    always present and exactly one is non-null.
+
+    ``equal_contribution`` records that the entry marked this author with a
+    ``*``; the marker itself is taken off the name, so neither the readable
+    form nor the name used for matching carries it.
+    """
+    collaborator_key: Optional[str] = None
+    equal_contribution: bool = False
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
-        d = {
+        d = Contributor.to_dict(self)
+        d['collaborator_key'] = self.collaborator_key
+        d['equal_contribution'] = self.equal_contribution
+        return d
+
+
+@dataclass
+class Work:
+    """A single work with structured, renderer-agnostic data."""
+    bib_id: str
+    title: str
+    authors: List[Author]
+    year: Optional[int]
+    category: str
+    entry_type: str
+
+    # The configured `bib_files[].name` the entry was read from. A relative
+    # directory is fine -- `sub/journal.bib` is a name under `bib_dir` -- and
+    # an absolute path is not: see `to_dict()`.
+    source_file: str = ""
+
+    editors: List[Contributor] = field(default_factory=list)
+    venue: Optional[Venue] = None
+
+    # The bibliographic parts, flat on the work rather than nested in the
+    # venue: they describe the work's placement, not the container.
+    volume: Optional[str] = None
+    number: Optional[str] = None
+    pages: Optional[str] = None
+    series: Optional[str] = None
+    edition: Optional[str] = None
+    publisher: Optional[str] = None
+    address: Optional[str] = None
+    organization: Optional[str] = None
+    chapter: Optional[str] = None
+    month: Optional[str] = None
+    howpublished: Optional[str] = None
+    type: Optional[str] = None
+
+    abstract: Optional[str] = None
+    note: Optional[str] = None
+
+    identifiers: Dict[str, List[str]] = field(default_factory=dict)
+    links: Dict[str, List[Link]] = field(default_factory=dict)
+
+    project_ids: List[str] = field(default_factory=list)
+    bibtex: Optional[str] = None
+    derived: Dict[str, object] = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization.
+
+        ``source.key`` is the citation key as written, which is ``bib_id``
+        again: a consumer holding only the provenance record can still find
+        the entry it came from.
+
+        ``source.file`` is checked here rather than only where it was set.
+        This is the boundary every emitted document passes through — both
+        exporters and the CLI serialize through it — so a `Work` built by
+        hand, or one parsed straight from `labdata.parsers`, cannot carry a
+        compiling machine's directory layout into a document that is shared.
+        A relative directory is not absolute and passes.
+        """
+        reject_absolute_name(self.source_file, "bib_files:name")
+        return {
             'bib_id': self.bib_id,
+            'source': {'file': self.source_file, 'key': self.bib_id},
             'title': self.title,
             'authors': [a.to_dict() for a in self.authors],
+            'editors': [e.to_dict() for e in self.editors],
             'year': self.year,
-            'venue': self.venue,
+            'venue': self.venue.to_dict() if self.venue else None,
+            'volume': self.volume,
+            'number': self.number,
+            'pages': self.pages,
+            'series': self.series,
+            'edition': self.edition,
+            'publisher': self.publisher,
+            'address': self.address,
+            'organization': self.organization,
+            'chapter': self.chapter,
+            'month': self.month,
+            'howpublished': self.howpublished,
+            'type': self.type,
             'category': self.category,
             'entry_type': self.entry_type,
             'abstract': self.abstract,
             'note': self.note,
-            'pdf_url': self.pdf_url,
-            'doi_url': self.doi_url,
-            'arxiv_url': self.arxiv_url,
-            'url': self.url,
-            'video_url': self.video_url,
-            'project_ids': self.project_ids,
+            'identifiers': {scheme: list(values)
+                            for scheme, values in self.identifiers.items()},
+            'links': {kind: [link.to_dict() for link in links]
+                      for kind, links in self.links.items()},
+            'project_ids': list(self.project_ids),
+            'bibtex': self.bibtex,
+            'derived': dict(self.derived),
         }
-        if self.bibtex:
-            d['bibtex'] = self.bibtex
-        return d
 
 
 @dataclass
@@ -126,53 +275,90 @@ class Person:
     current_position: Optional[str] = None
 
     # Back-linked (computed, not from YAML input)
-    publication_count: int = 0
-    publication_ids: List[str] = field(default_factory=list)
+    work_count: int = 0
+    work_ids: List[str] = field(default_factory=list)
+    derived: Dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        """Convert to dictionary for serialization."""
-        d = {
+        """Convert to dictionary for serialization.
+
+        ``aliases`` are read for matching and are not emitted. Every other
+        declared property is present, and null when it does not apply — the
+        alumni fields included, whatever the status.
+        """
+        return {
             'id': self.id,
             'name': self.name,
             'role': self.role,
             'status': self.status,
+            'photo': self.photo,
+            'email': self.email,
             'website': self.website,
-            'publication_count': self.publication_count,
+            'co_advisor': self.co_advisor,
+            'start_year': self.start_year,
+            'end_year': self.end_year,
+            'degree': self.degree,
+            'thesis_title': self.thesis_title,
+            'current_position': self.current_position,
+            'work_count': self.work_count,
+            'work_ids': list(self.work_ids),
+            'derived': dict(self.derived),
         }
-        if self.photo:
-            d['photo'] = self.photo
-        if self.email:
-            d['email'] = self.email
-        if self.co_advisor:
-            d['co_advisor'] = self.co_advisor
-        if self.start_year:
-            d['start_year'] = self.start_year
-        if self.status == 'alumni':
-            if self.end_year:
-                d['end_year'] = self.end_year
-            if self.degree:
-                d['degree'] = self.degree
-            if self.thesis_title:
-                d['thesis_title'] = self.thesis_title
-            if self.current_position:
-                d['current_position'] = self.current_position
-        if self.publication_ids:
-            d['publication_ids'] = self.publication_ids
-        return d
 
 
 @dataclass
 class Collaborator:
-    """An external co-author not listed in people.yaml."""
+    """A grouping over unresolved authorships, not an identity.
+
+    ``key`` is a lookup key and explicitly not an assertion about a human:
+    a readable slug of the normalised name plus a short digest, so that
+    adding an unrelated collaborator can never change an existing key.
+    ``grouped_by`` names the policy that built it, ``normalized_name`` in v4.
+
+    ``name_kind`` is ``personal`` or ``literal``. It is not ``organization``:
+    brace protection in BibTeX means "do not parse this", which covers
+    organisations but also mononyms, so the document must not assert
+    corporate-ness.
+
+    ``authorships`` lists the occurrences that were grouped, each addressed by
+    ``(work_id, position)``. A consumer that distrusts the grouping can ignore
+    it and work from those occurrences instead.
+    """
+    key: str
     name: str
-    publication_count: int = 0
-    last_year: int = 0
+    grouped_by: str = "normalized_name"
+    name_kind: str = "personal"
+    given: Optional[str] = None
+    von: Optional[str] = None
+    family: Optional[str] = None
+    suffix: Optional[str] = None
+    literal: Optional[str] = None
+    name_variants: List[str] = field(default_factory=list)
+    authorships: List[Dict[str, object]] = field(default_factory=list)
+    work_ids: List[str] = field(default_factory=list)
+    work_count: int = 0
+    authorship_count: int = 0
+    last_year: Optional[int] = None
+    derived: Dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
+            'key': self.key,
+            'grouped_by': self.grouped_by,
+            'name_kind': self.name_kind,
             'name': self.name,
-            'publication_count': self.publication_count,
+            'given': self.given,
+            'von': self.von,
+            'family': self.family,
+            'suffix': self.suffix,
+            'literal': self.literal,
+            'name_variants': list(self.name_variants),
+            'authorships': [dict(a) for a in self.authorships],
+            'work_ids': list(self.work_ids),
+            'work_count': self.work_count,
+            'authorship_count': self.authorship_count,
             'last_year': self.last_year,
+            'derived': dict(self.derived),
         }
 
 
@@ -186,8 +372,9 @@ class Project:
     status: str = "active"
 
     # Back-linked (computed)
-    publication_ids: List[str] = field(default_factory=list)
+    work_ids: List[str] = field(default_factory=list)
     people_ids: List[str] = field(default_factory=list)
+    derived: Dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
@@ -197,29 +384,41 @@ class Project:
             'description': self.description,
             'website': self.website,
             'status': self.status,
-            'publication_ids': self.publication_ids,
-            'people_ids': self.people_ids,
+            'work_ids': list(self.work_ids),
+            'people_ids': list(self.people_ids),
+            'derived': dict(self.derived),
         }
 
 
 @dataclass
 class LabData:
     """The fully resolved output: all entities with cross-references."""
-    publications: List[Publication] = field(default_factory=list)
+    works: List[Work] = field(default_factory=list)
     people: List[Person] = field(default_factory=list)
     projects: List[Project] = field(default_factory=list)
     collaborators: List[Collaborator] = field(default_factory=list)
-    lab: Optional[Dict[str, str]] = None
+    lab: Optional[Dict[str, object]] = None
 
     def to_dict(self) -> dict:
-        """Convert to dictionary for serialization."""
-        d = {
+        """Convert to dictionary for serialization.
+
+        ``generator`` carries no timestamp: a build timestamp would make every
+        run differ and cost the determinism the project has already paid for.
+        Git records when. The version is read here rather than at import time
+        because the package imports this module while defining it.
+        """
+        from . import __version__
+
+        return {
             'schema_version': SCHEMA_VERSION,
-            'publications': [p.to_dict() for p in self.publications],
+            'generator': {
+                'name': GENERATOR_NAME,
+                'version': __version__,
+                'schema_version': SCHEMA_VERSION,
+            },
+            'lab': dict(self.lab or {}),
+            'works': [w.to_dict() for w in self.works],
             'people': [p.to_dict() for p in self.people],
             'projects': [p.to_dict() for p in self.projects],
             'collaborators': [c.to_dict() for c in self.collaborators],
         }
-        if self.lab:
-            d['lab'] = self.lab
-        return d

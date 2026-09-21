@@ -5,8 +5,9 @@
 # CASE output.project.description
 # CASE output.project.website
 # CASE output.project.status
-# CASE output.project.publication_ids
+# CASE output.project.work_ids
 # CASE output.project.people_ids
+# CASE output.project.derived
 - id: "homebot"
   title: "Household Manipulation"
   description: "Robots that tidy up a fictional kitchen."

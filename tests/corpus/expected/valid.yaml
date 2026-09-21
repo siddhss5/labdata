@@ -4,251 +4,529 @@
 # file says which they are and why the rest is left out. Regenerate with
 #   LABDATA_REGENERATE_EXPECTED=1 uv run pytest tests/conformance/test_output_format.py
 # and review the diff before committing.
-schema_version: 3
+schema_version: 4
+generator:
+  name: labdata
+  version: 3.0.0
+  schema_version: 4
 lab:
   name: Corpus Lab
   description: A fictional lab used only by the labdata conformance tests.
   university: Example University
   website: https://example.org/corpus
-publications:
+works:
 - bib_id: str-repeat
+  source:
+    file: strings.bib
+    key: str-repeat
   title: Last Definition Wins
   authors:
-  - name: A. Adams
+  - name: Alice Adams
+    position: 1
     person_id: aadams
     given: Alice
     von: null
     family: Adams
     suffix: null
     literal: null
+    resolution:
+      status: resolved
+      method: exact
+    derived: {}
+    collaborator_key: null
     equal_contribution: false
+  editors: []
   year: 2021
-  venue: '*Robotics Venue*, 2021'
+  venue:
+    kind: conference
+    name: Robotics Venue
+  volume: null
+  number: null
+  pages: null
+  series: null
+  edition: null
+  publisher: null
+  address: null
+  organization: null
+  chapter: null
+  month: null
+  howpublished: null
+  type: null
   category: Strings
   entry_type: inproceedings
   abstract: null
   note: null
-  pdf_url: null
-  doi_url: null
-  arxiv_url: null
-  url: null
-  video_url: null
+  identifiers: {}
+  links:
+    pdf:
+    - url: pdfs/str-repeat.pdf
+      label: null
+      origin: derived
+      verification:
+        status: missing
+        checked_at: null
   project_ids: []
   bibtex: "@inproceedings{str-repeat,\n    author = \"Adams, Alice\",\n    title = \"Last Definition Wins\"\
     ,\n    booktitle = \"Robotics Venue\",\n    year = \"2021\"\n}"
+  derived: {}
 - bib_id: type-article
+  source:
+    file: structure.bib
+    key: type-article
   title: An Article
   authors:
-  - name: A. Adams
+  - name: Alice Adams
+    position: 1
     person_id: aadams
     given: Alice
     von: null
     family: Adams
     suffix: null
     literal: null
+    resolution:
+      status: resolved
+      method: exact
+    derived: {}
+    collaborator_key: null
     equal_contribution: false
-  - name: B. Brown
+  - name: Bob Brown
+    position: 2
     person_id: bbrown
     given: Bob
     von: null
     family: Brown
     suffix: null
     literal: null
+    resolution:
+      status: resolved
+      method: exact
+    derived: {}
+    collaborator_key: null
     equal_contribution: false
+  editors: []
   year: 2020
-  venue: '*Journal of Fictional Robots*, 12(3), 2020'
+  venue:
+    kind: journal
+    name: Journal of Fictional Robots
+  volume: '12'
+  number: '3'
+  pages: 1--10
+  series: null
+  edition: null
+  publisher: Fictional Press
+  address: null
+  organization: null
+  chapter: null
+  month: null
+  howpublished: null
+  type: null
   category: Structure
   entry_type: article
   abstract: null
   note: null
-  pdf_url: null
-  doi_url: null
-  arxiv_url: null
-  url: null
-  video_url: null
+  identifiers: {}
+  links:
+    pdf:
+    - url: pdfs/type-article.pdf
+      label: null
+      origin: derived
+      verification:
+        status: missing
+        checked_at: null
   project_ids: []
   bibtex: "@article{type-article,\n    author = \"Adams, Alice and Brown, Bob\",\n    title = \"An Article\"\
     ,\n    journal = \"Journal of Fictional Robots\",\n    volume = \"12\",\n    number = \"3\",\n   \
     \ pages = \"1--10\",\n    publisher = \"Fictional Press\",\n    year = \"2020\"\n}"
+  derived: {}
 - bib_id: type-phdthesis
+  source:
+    file: structure.bib
+    key: type-phdthesis
   title: A Doctoral Thesis
   authors:
-  - name: E. Evans
+  - name: Erin Evans
+    position: 1
     person_id: eevans
     given: Erin
     von: null
     family: Evans
     suffix: null
     literal: null
+    resolution:
+      status: resolved
+      method: exact
+    derived: {}
+    collaborator_key: null
     equal_contribution: false
+  editors: []
   year: 2020
-  venue: PhD thesis, Example University, 2020
+  venue:
+    kind: institution
+    name: Example University
+  volume: null
+  number: null
+  pages: null
+  series: null
+  edition: null
+  publisher: null
+  address: null
+  organization: null
+  chapter: null
+  month: null
+  howpublished: null
+  type: null
   category: Structure
   entry_type: phdthesis
   abstract: null
   note: null
-  pdf_url: null
-  doi_url: null
-  arxiv_url: null
-  url: null
-  video_url: null
+  identifiers: {}
+  links:
+    pdf:
+    - url: pdfs/type-phdthesis.pdf
+      label: null
+      origin: derived
+      verification:
+        status: missing
+        checked_at: null
   project_ids: []
   bibtex: "@phdthesis{type-phdthesis,\n    author = \"Evans, Erin\",\n    title = \"A Doctoral Thesis\"\
     ,\n    school = \"Example University\",\n    year = \"2020\"\n}"
+  derived: {}
 - bib_id: link-doi-bare
+  source:
+    file: links.bib
+    key: link-doi-bare
   title: Bare DOI
   authors:
-  - name: A. Adams
+  - name: Alice Adams
+    position: 1
     person_id: aadams
     given: Alice
     von: null
     family: Adams
     suffix: null
     literal: null
+    resolution:
+      status: resolved
+      method: exact
+    derived: {}
+    collaborator_key: null
     equal_contribution: false
+  editors: []
   year: 2023
-  venue: '*Journal of Fictional Robots*, 2023'
+  venue:
+    kind: journal
+    name: Journal of Fictional Robots
+  volume: null
+  number: null
+  pages: null
+  series: null
+  edition: null
+  publisher: null
+  address: null
+  organization: null
+  chapter: null
+  month: null
+  howpublished: null
+  type: null
   category: Links
   entry_type: article
   abstract: null
   note: null
-  pdf_url: null
-  doi_url: https://doi.org/10.5555/corpus.0001
-  arxiv_url: null
-  url: null
-  video_url: null
+  identifiers:
+    doi:
+    - 10.5555/corpus.0001
+  links:
+    pdf:
+    - url: pdfs/link-doi-bare.pdf
+      label: null
+      origin: derived
+      verification:
+        status: missing
+        checked_at: null
+    doi:
+    - url: https://doi.org/10.5555/corpus.0001
+      label: null
+      origin: derived
+      verification:
+        status: unchecked
+        checked_at: null
   project_ids: []
   bibtex: "@article{link-doi-bare,\n    author = \"Adams, Alice\",\n    title = \"Bare DOI\",\n    journal\
     \ = \"Journal of Fictional Robots\",\n    year = \"2023\",\n    doi = \"10.5555/corpus.0001\"\n}"
+  derived: {}
 - bib_id: link-youtube
+  source:
+    file: links.bib
+    key: link-youtube
   title: A YouTube Video
   authors:
-  - name: A. Adams
+  - name: Alice Adams
+    position: 1
     person_id: aadams
     given: Alice
     von: null
     family: Adams
     suffix: null
     literal: null
+    resolution:
+      status: resolved
+      method: exact
+    derived: {}
+    collaborator_key: null
     equal_contribution: false
+  editors: []
   year: 2023
-  venue: '*Proceedings of the Fictional Conference*, 2023'
+  venue:
+    kind: conference
+    name: Proceedings of the Fictional Conference
+  volume: null
+  number: null
+  pages: null
+  series: null
+  edition: null
+  publisher: null
+  address: null
+  organization: null
+  chapter: null
+  month: null
+  howpublished: null
+  type: null
   category: Links
   entry_type: inproceedings
   abstract: null
   note: null
-  pdf_url: null
-  doi_url: null
-  arxiv_url: null
-  url: null
-  video_url: https://www.youtube.com/watch?v=corpus00001
+  identifiers: {}
+  links:
+    video:
+    - url: https://www.youtube.com/watch?v=corpus00001
+      label: null
+      origin: input
+      verification:
+        status: unchecked
+        checked_at: null
+    pdf:
+    - url: pdfs/link-youtube.pdf
+      label: null
+      origin: derived
+      verification:
+        status: missing
+        checked_at: null
   project_ids: []
   bibtex: "@inproceedings{link-youtube,\n    author = \"Adams, Alice\",\n    title = \"A YouTube Video\"\
     ,\n    booktitle = \"Proceedings of the Fictional Conference\",\n    year = \"2023\",\n    url = \"\
     https://www.youtube.com/watch?v=corpus00001\"\n}"
+  derived: {}
 - bib_id: present
+  source:
+    file: links.bib
+    key: present
   title: A Paper Whose PDF Is Present
   authors:
-  - name: A. Adams
+  - name: Alice Adams
+    position: 1
     person_id: aadams
     given: Alice
     von: null
     family: Adams
     suffix: null
     literal: null
+    resolution:
+      status: resolved
+      method: exact
+    derived: {}
+    collaborator_key: null
     equal_contribution: false
+  editors: []
   year: 2023
-  venue: '*Proceedings of the Fictional Conference*, 2023'
+  venue:
+    kind: conference
+    name: Proceedings of the Fictional Conference
+  volume: null
+  number: null
+  pages: null
+  series: null
+  edition: null
+  publisher: null
+  address: null
+  organization: null
+  chapter: null
+  month: null
+  howpublished: null
+  type: null
   category: Links
   entry_type: inproceedings
   abstract: null
   note: null
-  pdf_url: pdfs/present.pdf
-  doi_url: null
-  arxiv_url: null
-  url: null
-  video_url: null
+  identifiers: {}
+  links:
+    pdf:
+    - url: pdfs/present.pdf
+      label: null
+      origin: derived
+      verification:
+        status: verified
+        checked_at: null
   project_ids: []
   bibtex: "@inproceedings{present,\n    author = \"Adams, Alice\",\n    title = \"A Paper Whose PDF Is\
     \ Present\",\n    booktitle = \"Proceedings of the Fictional Conference\",\n    year = \"2023\"\n}"
+  derived: {}
 - bib_id: proj-multiple
+  source:
+    file: projects.bib
+    key: proj-multiple
   title: Two Projects
   authors:
-  - name: A. Adams
+  - name: Alice Adams
+    position: 1
     person_id: aadams
     given: Alice
     von: null
     family: Adams
     suffix: null
     literal: null
+    resolution:
+      status: resolved
+      method: exact
+    derived: {}
+    collaborator_key: null
     equal_contribution: false
-  - name: C. Côté
+  - name: Carol Côté
+    position: 2
     person_id: ccote
     given: Carol
     von: null
     family: Côté
     suffix: null
     literal: null
+    resolution:
+      status: resolved
+      method: exact
+    derived: {}
+    collaborator_key: null
     equal_contribution: false
+  editors: []
   year: 2024
-  venue: '*Proceedings of the Fictional Conference*, 2024'
+  venue:
+    kind: conference
+    name: Proceedings of the Fictional Conference
+  volume: null
+  number: null
+  pages: null
+  series: null
+  edition: null
+  publisher: null
+  address: null
+  organization: null
+  chapter: null
+  month: null
+  howpublished: null
+  type: null
   category: Projects
   entry_type: inproceedings
   abstract: null
   note: null
-  pdf_url: null
-  doi_url: null
-  arxiv_url: null
-  url: null
-  video_url: null
+  identifiers: {}
+  links:
+    pdf:
+    - url: pdfs/proj-multiple.pdf
+      label: null
+      origin: derived
+      verification:
+        status: missing
+        checked_at: null
   project_ids:
   - homebot
   - sharedarm
   bibtex: "@inproceedings{proj-multiple,\n    author = \"Adams, Alice and C{\\^o}t{\\'e}, Carol\",\n \
     \   title = \"Two Projects\",\n    booktitle = \"Proceedings of the Fictional Conference\",\n    year\
     \ = \"2024\",\n    project = \"homebot, sharedarm\"\n}"
+  derived: {}
 - bib_id: id-external-2023
+  source:
+    file: names.bib
+    key: id-external-2023
   title: External Coauthors, Later
   authors:
-  - name: A. Adams
+  - name: Alice Adams
+    position: 1
     person_id: aadams
     given: Alice
     von: null
     family: Adams
     suffix: null
     literal: null
+    resolution:
+      status: resolved
+      method: exact
+    derived: {}
+    collaborator_key: null
     equal_contribution: false
-  - name: Q. Quinn
+  - name: Quentin Quinn
+    position: 2
     person_id: null
     given: Quentin
     von: null
     family: Quinn
     suffix: null
     literal: null
+    resolution:
+      status: unresolved
+      method: null
+    derived: {}
+    collaborator_key: quentin-quinn-ec0343c4
     equal_contribution: false
+  editors: []
   year: 2023
-  venue: '*Journal of Fictional Robots*, 2023'
+  venue:
+    kind: journal
+    name: Journal of Fictional Robots
+  volume: null
+  number: null
+  pages: null
+  series: null
+  edition: null
+  publisher: null
+  address: null
+  organization: null
+  chapter: null
+  month: null
+  howpublished: null
+  type: null
   category: Names
   entry_type: article
   abstract: null
   note: null
-  pdf_url: null
-  doi_url: null
-  arxiv_url: null
-  url: null
-  video_url: null
+  identifiers: {}
+  links:
+    pdf:
+    - url: pdfs/id-external-2023.pdf
+      label: null
+      origin: derived
+      verification:
+        status: missing
+        checked_at: null
   project_ids: []
   bibtex: "@article{id-external-2023,\n    author = \"Adams, Alice and Quinn, Quentin\",\n    title =\
     \ \"External Coauthors, Later\",\n    journal = \"Journal of Fictional Robots\",\n    year = \"2023\"\
     \n}"
+  derived: {}
 people:
 - id: ccote
   name: Carol Côté
   role: phd_student
   status: current
+  photo: null
+  email: null
   website: null
-  publication_count: 8
-  publication_ids:
+  co_advisor: null
+  start_year: null
+  end_year: null
+  degree: null
+  thesis_title: null
+  current_position: null
+  work_count: 8
+  work_ids:
   - proj-multiple
   - name-accent-tex
   - name-accent-utf8
@@ -257,50 +535,104 @@ people:
   - name-equal-superscript
   - name-equal-star
   - enc-bom-crlf
+  derived: {}
 - id: eevans
   name: Erin Evans
   role: phd_student
   status: alumni
+  photo: null
+  email: null
   website: null
-  publication_count: 1
+  co_advisor: null
   start_year: 2014
   end_year: 2020
   degree: PhD
   thesis_title: Learning to Tidy
   current_position: Research Scientist, Example Robotics Inc.
-  publication_ids:
+  work_count: 1
+  work_ids:
   - type-phdthesis
+  derived: {}
 - id: vvandenberg
   name: Victor van den Berg
   role: postdoc
   status: alumni
+  photo: null
+  email: null
   website: null
-  publication_count: 5
+  co_advisor: null
   start_year: 2016
   end_year: 2018
-  publication_ids:
+  degree: null
+  thesis_title: null
+  current_position: null
+  work_count: 5
+  work_ids:
   - name-equal-dollar
   - name-equal-caret
   - name-equal-superscript
   - name-equal-star
   - name-particle-van
+  derived: {}
 projects:
 - id: homebot
   title: Household Manipulation
   description: Robots that tidy up a fictional kitchen.
   website: https://example.org/projects/homebot
   status: active
-  publication_ids:
+  work_ids:
   - proj-single
   - proj-multiple
   people_ids:
   - aadams
   - bbrown
   - ccote
+  derived: {}
 collaborators:
-- name: Q. Quinn
-  publication_count: 2
+- key: quentin-quinn-ec0343c4
+  grouped_by: normalized_name
+  name_kind: personal
+  name: Quentin Quinn
+  given: Quentin
+  von: null
+  family: Quinn
+  suffix: null
+  literal: null
+  name_variants:
+  - Quentin Quinn
+  authorships:
+  - work_id: id-external-2023
+    position: 2
+  - work_id: id-external-2019
+    position: 2
+  work_ids:
+  - id-external-2023
+  - id-external-2019
+  work_count: 2
+  authorship_count: 2
   last_year: 2023
-- name: R. Ross
-  publication_count: 1
+  derived: {}
+- key: rachel-ross-0797b357
+  grouped_by: normalized_name
+  name_kind: personal
+  name: Rachel Ross
+  given: Rachel
+  von: null
+  family: Ross
+  suffix: null
+  literal: null
+  name_variants:
+  - RACHEL ROSS
+  - Rachel Ross
+  authorships:
+  - work_id: id-external-2019
+    position: 3
+  - work_id: id-grouping
+    position: 2
+  work_ids:
+  - id-external-2019
+  - id-grouping
+  work_count: 2
+  authorship_count: 2
   last_year: 2019
+  derived: {}

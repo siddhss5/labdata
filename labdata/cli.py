@@ -72,14 +72,17 @@ Examples:
         print(f"Error loading configuration: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Assemble data with diagnostics
+    # Assemble data with diagnostics. `assemble()` rejects a configuration it
+    # will not compile from, but `from_yaml()` above has already rejected the
+    # same thing with the file named, so from here that cannot happen: the
+    # check downstream is for callers who built a configuration themselves.
     result = assemble(config, diagnostics=True)
     data = result.data
 
     # --validate mode
     if args.validate:
         errors = 0
-        print(f"Publications: {len(data.publications)}")
+        print(f"Works: {len(data.works)}")
         print(f"People: {len(data.people)}")
         print(f"Projects: {len(data.projects)}")
 
@@ -88,17 +91,23 @@ Examples:
             for name in sorted(result.unresolved_authors):
                 print(f"  - {name}")
 
+        if result.warnings:
+            print(f"\nWarnings ({len(result.warnings)}):")
+            for warning in result.warnings:
+                print(f"  - {warning}")
+
         if result.unknown_projects:
             print(f"\nUnknown project IDs ({len(result.unknown_projects)}):")
             for pid in sorted(result.unknown_projects):
                 print(f"  - {pid}")
             errors += len(result.unknown_projects)
 
-        if result.bibliography_errors:
-            print(f"\nBibliography errors ({len(result.bibliography_errors)}):")
-            for error in result.bibliography_errors:
+        reported = result.fatal_errors + result.bibliography_errors
+        if reported:
+            print(f"\nBibliography errors ({len(reported)}):")
+            for error in reported:
                 print(f"  - {error}")
-            errors += len(result.bibliography_errors)
+            errors += len(reported)
 
         if errors:
             print(f"\nValidation found {errors} error(s).")
@@ -107,10 +116,17 @@ Examples:
             print("\nValidation passed.")
         return
 
+    # Outside --validate, a fatal error still stops the run: a user must not
+    # be able to produce a document by skipping validation.
+    for error in result.fatal_errors:
+        print(error, file=sys.stderr)
+    for message in result.bibliography_errors + result.warnings:
+        print(f"Warning: {message}", file=sys.stderr)
+    if result.fatal_errors:
+        sys.exit(1)
+
     # --unresolved mode
     if args.unresolved:
-        for error in result.bibliography_errors:
-            print(f"Warning: {error}", file=sys.stderr)
         if not config.people_file:
             print("Author resolution is not configured (no people_file).")
             return
@@ -123,13 +139,11 @@ Examples:
         return
 
     # Export
-    for error in result.bibliography_errors:
-        print(f"Warning: {error}", file=sys.stderr)
     export_func = export_to_yaml if args.format == 'yaml' else export_to_json
     export_func(data, args.output)
 
     print(f"Wrote {args.output}")
-    print(f"  {len(data.publications)} publications, "
+    print(f"  {len(data.works)} works, "
           f"{len(data.people)} people, "
           f"{len(data.projects)} projects")
 

@@ -3,8 +3,8 @@ BibTeX parsing pipeline.
 
 pybtex reads the files — @string macros, BibTeX's own name splitting, entry
 order — and this module maps its Entry and Person objects onto labdata's
-Publication model: crossref resolution, per-field LaTeX conversion (latex.py),
-display rules and diagnostics.
+Work model: per-field LaTeX conversion (latex.py), the structured venue,
+identifiers, links and diagnostics.
 
 Together with latex.py this is the adapter: no other module imports pybtex or
 pylatexenc, and nothing here lets a library object or a library message reach
@@ -26,7 +26,7 @@ from pybtex.database.input.bibtex import LowLevelParser, Parser as PybtexParser,
 from pybtex.scanner import PybtexSyntaxError
 
 from .latex import latex_to_text, strip_braces
-from ..models import Author, Publication
+from ..models import Author, Contributor, Link, Venue, Work
 
 
 # Field values that hold prose and are converted from LaTeX to plain text.
@@ -44,6 +44,17 @@ OTHERS = "others"
 # only: the same duplicate is an error under --validate and a warning
 # elsewhere, so severity is not part of it. See "Diagnostic codes" in SPEC.md.
 DUPLICATE_CITATION_KEY = "BIB-DUPLICATE-KEY"
+
+# An entry that cross-refers to another is rejected rather than resolved
+# (#65). Partial inheritance dropped every author of the child entry and said
+# nothing about it; a hard error costs one edit, and going from "rejected" to
+# "supported" later is additive.
+CROSSREF_UNSUPPORTED = "BIB-CROSSREF-UNSUPPORTED"
+
+# An entry with no year is emitted with `year: null` and says so, rather than
+# claiming year 0 — a value indistinguishable from a real year 0 that also
+# put the entry somewhere meaningless in the order.
+YEAR_MISSING = "BIB-YEAR-MISSING"
 
 # Equal contribution is written as a star on one part of a name, in one of
 # these four forms. It is an annotation rather than part of the name, so it is
@@ -369,84 +380,82 @@ def person_name_parts(person: Person, where: str) -> Dict[str, Optional[str]]:
     }
 
 
-def format_name(parts: Dict[str, Optional[str]]) -> str:
-    """The display form of a name, derived from its parts: ``F. M. van Last, Jr.``
+def readable_name(parts: Dict[str, Optional[str]]) -> str:
+    """The parts of a name joined in reading order: ``John van Last Jr.``
 
-    A corporate name keeps its full form, because there is nothing to
-    abbreviate.
+    This is *a readable form of the input name, not a citation form*. It does
+    not abbreviate, expand or normalise anything, so an entry writing
+    ``Brown, B.`` yields ``B. Brown`` and one writing ``Brown, Bob`` yields
+    ``Bob Brown``. The form the resolver matches on is a separate, private
+    one (`labdata.resolver`), which is what lets #24 change matching without
+    changing what the document displays.
+
+    A name written as one brace-protected unit keeps its full form, because
+    there is nothing to join.
     """
     if parts["literal"]:
         return parts["literal"]
-    given = parts["given"] or ""
-    initials = " ".join(_initials(part) for part in given.split())
-    name = " ".join(part for part in (initials, parts["von"], parts["family"]) if part)
-    suffix = parts["suffix"]
-    return f"{name}, {suffix}" if suffix and name else (name or suffix or "")
+    ordered = (parts["given"], parts["von"], parts["family"], parts["suffix"])
+    return " ".join(part for part in ordered if part)
 
 
-def parse_author_list(entry: Entry, where: str) -> List[Author]:
-    """The entry's authors, in source order, with person_id unresolved.
+def _contributors(entry: Entry, role: str, where: str) -> List[Dict]:
+    """The entry's names for one role, in source order, as parts plus position.
 
-    Each author carries the parts BibTeX split its name into as well as the
-    display form, and whether the entry marked it as an equal contribution.
-    Matching on those parts is #24; the resolver still reads only the display
-    name, which is why the marker has to come off the name itself.
+    A terminal ``and others`` is BibTeX's "et al." and is dropped rather than
+    emitted as a person. A name that reads as empty is dropped too, so
+    ``position`` counts the names that reach the document and nothing else.
     """
-    persons = list(entry.persons.get("author", []))
+    persons = list(entry.persons.get(role, []))
     if persons and _is_others(persons[-1]):
         persons.pop()             # a terminal "and others" is BibTeX's et al.
 
-    authors = []
+    found = []
     for person in persons:
         parts = person_name_parts(person, where)
-        name = format_name(parts)
+        name = readable_name(parts)
         if name:
-            authors.append(Author(
-                name=name,
-                equal_contribution=marks_equal_contribution(person),
-                **parts))
-    return authors
+            found.append({"name": name, "position": len(found) + 1,
+                          "parts": parts, "person": person})
+    return found
 
 
-def resolve_crossref(fields: Dict[str, str], entries: Dict[str, Entry]) -> Dict[str, str]:
-    """Fill in a child entry's missing fields from the entry it cross-refers to.
+def parse_author_list(entry: Entry, where: str) -> List[Author]:
+    """The entry's authors, in source order, with no contributor resolved yet.
 
-    The parent's ``title`` becomes the child's ``booktitle``, which is what a
-    ``@proceedings`` parent means to an ``@inproceedings`` child; the parent's
-    own title is not copied over the child's.
+    Each authorship carries the parts BibTeX split its name into, a readable
+    form built from them, its 1-based position, and whether the entry marked
+    it as an equal contribution. Matching those parts to a person is the
+    resolver's, and #24's.
     """
-    parent_key = fields.get("crossref")
-    if not parent_key:
-        return fields
-
-    parent = entries.get(parent_key.lower())
-    if parent is None:
-        _warn(f"crossref '{parent_key}' names an entry that is not defined")
-        return fields
-
-    parent_fields = {name.lower(): value for name, value in parent.fields.items()}
-    resolved = dict(fields)
-    for name, value in parent_fields.items():
-        if name not in ("title", "crossref"):
-            resolved.setdefault(name, value)
-    if "booktitle" not in fields and "title" in parent_fields:
-        resolved["booktitle"] = parent_fields["title"]
-    return resolved
+    return [Author(name=found["name"],
+                   position=found["position"],
+                   equal_contribution=marks_equal_contribution(found["person"]),
+                   **found["parts"])
+            for found in _contributors(entry, "author", where)]
 
 
-def entry_fields(
-    bib_id: str,
-    entry: Entry,
-    entries: Dict[str, Entry],
-    source: str,
-) -> Dict[str, str]:
-    """The entry's fields: crossref resolved, prose converted from LaTeX.
+def parse_editor_list(entry: Entry, where: str) -> List[Contributor]:
+    """The entry's editors, read by the same machinery as its authors.
 
-    ``ENTRYTYPE`` and ``ID`` are included so the display rules below read one
-    plain dictionary and know nothing about pybtex.
+    An editor is name-parsed and resolved to a person the same way, but
+    editing a volume is not an authorship: editors are excluded from
+    `work_count`, from `person.work_ids`, from a project's people and from
+    `collaborators`, so an editor who matches nobody is simply unresolved.
+    """
+    return [Contributor(name=found["name"], position=found["position"],
+                        **found["parts"])
+            for found in _contributors(entry, "editor", where)]
+
+
+def entry_fields(bib_id: str, entry: Entry, source: str) -> Dict[str, str]:
+    """The entry's fields, with prose converted from LaTeX.
+
+    ``ENTRYTYPE`` and ``ID`` are included so the rules below read one plain
+    dictionary and know nothing about pybtex. No field is filled in from any
+    other entry: ``crossref`` is rejected rather than resolved (#65).
     """
     fields = {name.lower(): value for name, value in entry.fields.items()}
-    fields = resolve_crossref(fields, entries)
     read = {
         name: _convert(value, f"{source}:{bib_id}:{name}") if name in TEXT_FIELDS else value
         for name, value in fields.items()
@@ -459,8 +468,10 @@ def entry_fields(
 def format_bibtex(bib_id: str, entry: Entry) -> Optional[str]:
     """The entry written back out as BibTeX, for readers to copy.
 
-    This is the entry as it was read, before crossref and LaTeX conversion,
-    so fields labdata does not display are preserved rather than rewritten.
+    This is the entry as it was read, before LaTeX conversion, so fields
+    labdata does not emit as properties are preserved rather than rewritten.
+    It is a re-serialization of the entry's data and explicitly not a source
+    of properties: nothing in labdata reads a value back out of it.
     """
     try:
         return entry.to_string("bibtex").strip()
@@ -469,58 +480,175 @@ def format_bibtex(bib_id: str, entry: Entry) -> Optional[str]:
         return None
 
 
-# --- Display rules -----------------------------------------------------------
+# --- The structured bibliography ---------------------------------------------
 
-def format_authors_string(authors: List[Author]) -> str:
-    """Format a list of Authors into a display string.
+# The one place labdata normalises across entry types: the field that names
+# the container a work appeared in. Everything else bibliographic is flat on
+# the work, because it describes the work's placement rather than the
+# container. The order is the precedence, so an entry carrying more than one
+# of them gets the most specific.
+CONTAINER_FIELDS = ("journal", "booktitle", "school", "institution")
 
-    Uses 'and' for 2 authors, commas + 'and' for 3+.
+# The venue kind each container field implies. `booktitle` depends on the
+# entry type, because a proceedings volume and a collection are different
+# kinds of container under one field name.
+CONTAINER_KINDS = {"journal": "journal", "school": "institution",
+                   "institution": "institution"}
+BOOKTITLE_KINDS = {"inproceedings": "conference", "conference": "conference",
+                   "proceedings": "conference", "incollection": "book",
+                   "inbook": "book", "book": "book"}
+OTHER_KIND = "other"
+
+# A preprint's venue is the repository it sits in, which is what
+# `archivePrefix` names. arXiv is the default because `construct_arxiv_url`
+# already reads a bare `eprint` as an arXiv identifier.
+ARXIV = "arXiv"
+REPOSITORY_KIND = "repository"
+
+# The bibliographic fields carried flat on the work, under BibTeX's own names
+# and with BibTeX's own meanings. `number` in particular is an issue number
+# for an @article and a report number for a @techreport; reinterpreting it is
+# not labdata's job, and `venue.kind` gives a consumer the branch it needs.
+FLAT_FIELDS = ("volume", "number", "pages", "series", "edition", "publisher",
+               "address", "organization", "chapter", "month", "howpublished",
+               "type")
+
+# The identifier schemes labdata reads out of an entry, and the field each
+# comes from. The registry is open: a scheme is documented, never enumerated
+# in the schema, so #25 and #27 can add one without a version bump.
+IDENTIFIER_FIELDS = {"doi": "doi", "isbn": "isbn", "issn": "issn"}
+
+# A DOI written as a URL is the resolver plus the DOI; the identifier is the
+# part after it. Stripping exactly these prefixes is not a guess -- they are
+# the registered resolvers -- and it is what makes `identifiers.doi` usable
+# as an identifier rather than as a second copy of the link.
+DOI_RESOLVERS = ("https://doi.org/", "http://doi.org/",
+                 "https://dx.doi.org/", "http://dx.doi.org/")
+DOI_BASE = "https://doi.org/"
+ARXIV_BASE = "https://arxiv.org/abs/"
+
+# Link kinds, and the origin of each. Only `input` means the entry's own
+# field supplied the link; a link labdata built from an identifier or from
+# `pdf_base_url` is `derived`, and says so.
+FROM_INPUT = "input"
+DERIVED = "derived"
+VIDEO_HOSTS = ("youtube.com", "youtu.be", "vimeo.com")
+
+UNCHECKED, VERIFIED, MISSING = "unchecked", "verified", "missing"
+
+
+def build_venue(entry: dict) -> Optional[Venue]:
+    """The container this work appeared in, or None when the entry names none.
+
+    The four container fields collapse to one name plus a kind, which is the
+    single biggest gain over raw BibTeX: a consumer asks for the venue's name
+    once instead of branching on the entry type to find it.
     """
-    names = [a.name for a in authors]
-    if len(names) <= 2:
-        return ' and '.join(names)
-    return ', '.join(names[:-1]) + ', and ' + names[-1]
+    entry_type = entry.get("ENTRYTYPE", "")
+    for field_name in CONTAINER_FIELDS:
+        value = (entry.get(field_name) or "").strip()
+        if not value:
+            continue
+        if field_name == "booktitle":
+            kind = BOOKTITLE_KINDS.get(entry_type, OTHER_KIND)
+        else:
+            kind = CONTAINER_KINDS[field_name]
+        return Venue(kind=kind, name=value)
+
+    eprint = (entry.get("eprint") or "").strip()
+    if eprint:
+        return Venue(kind=REPOSITORY_KIND, name=_archive_prefix(entry))
+    return None
 
 
-def format_venue(entry: dict) -> str:
-    """Format venue string from a read BibTeX entry. Uses Markdown (not HTML)."""
-    typ = entry.get("ENTRYTYPE", "")
-    year = entry.get("year", "")
+def _archive_prefix(entry: dict) -> str:
+    """The repository an `eprint` belongs to, as the entry names it."""
+    prefix = entry.get("archivePrefix", entry.get("archiveprefix", ""))
+    return prefix.strip() or ARXIV
 
-    if typ == "phdthesis":
-        return f"PhD thesis, {entry.get('school', '')}, {year}"
-    elif typ == "mastersthesis":
-        return f"Masters thesis, {entry.get('school', '')}, {year}"
-    elif typ == "techreport":
-        kind = entry.get("type", "Technical Report")
-        num = entry.get("number", "")
-        inst = entry.get("institution", "")
-        note = kind
-        if num:
-            note += f" {num}"
-        note += f", {inst}, {year}"
-        return note
-    elif typ == "misc":
-        arxiv_id = entry.get("eprint")
-        if arxiv_id:
-            return f"*arXiv:{arxiv_id}*, {year}"
-    elif typ == "article":
-        journal = entry.get("journal", "")
-        vol = entry.get("volume", "")
-        num = entry.get("number", "")
-        note = f"*{journal}*"
-        if vol:
-            note += f", {vol}"
-            if num:
-                note += f"({num})"
-        if year:
-            note += f", {year}"
-        return note
-    elif typ == "inproceedings":
-        conf = entry.get("booktitle", "")
-        return f"*{conf}*, {year}" if conf else str(year)
 
-    return str(year)
+def bare_doi(doi: str) -> str:
+    """One DOI with its resolver prefix taken off, if it was written as a URL."""
+    doi = doi.strip()
+    for resolver in DOI_RESOLVERS:
+        if doi.lower().startswith(resolver):
+            return doi[len(resolver):]
+    return doi
+
+
+def build_identifiers(entry: dict) -> Dict[str, List[str]]:
+    """The entry's identifiers, as a map from scheme to a list of identifiers.
+
+    The list shape is there because ISBN and ISSN genuinely repeat — a print
+    and an electronic one are two values of one identifier — even though a
+    BibTeX field holds one value, so v4 emits at most one per scheme.
+    """
+    identifiers: Dict[str, List[str]] = {}
+    for scheme, field_name in IDENTIFIER_FIELDS.items():
+        value = (entry.get(field_name) or "").strip()
+        if not value:
+            continue
+        identifiers[scheme] = [bare_doi(value) if scheme == "doi" else value]
+
+    eprint = (entry.get("eprint") or "").strip()
+    if eprint:
+        # The scheme is what `archivePrefix` said, which is why the prefix
+        # field needs no property of its own: it is the scheme.
+        identifiers[_archive_prefix(entry).lower()] = [eprint]
+    return identifiers
+
+
+def is_video_url(url: str) -> bool:
+    """True when a URL names one of the video hosts labdata files separately."""
+    return any(host in url for host in VIDEO_HOSTS)
+
+
+def pdf_link(bib_id: str, pdf_base_url: Optional[str]) -> Optional[Link]:
+    """The PDF this work would be at under ``pdf_base_url``, checked if local.
+
+    A local base is checked against the filesystem and the link is labelled
+    `verified` or `missing`; a remote base is labelled `unchecked`, because a
+    build never fetches. The link is kept either way, so "no base configured",
+    "the file is not there" and "nobody has looked" are three distinct
+    answers rather than one null.
+    """
+    if not pdf_base_url:
+        return None
+    base = pdf_base_url.rstrip('/')
+    url = f"{base}/{bib_id}.pdf"
+    if pdf_base_url.startswith(('http://', 'https://')):
+        return Link(url=url, origin=DERIVED, status=UNCHECKED)
+    return Link(url=url, origin=DERIVED,
+                status=VERIFIED if Path(url).exists() else MISSING)
+
+
+def build_links(entry: dict, bib_id: str, identifiers: Dict[str, List[str]],
+                pdf_base_url: Optional[str]) -> Dict[str, List[Link]]:
+    """Every URL this work can be reached at, filed by kind.
+
+    A map from kind to a *list* of links, so that two code repositories or a
+    talk video beside a supplementary one can both be carried, which a plain
+    kind-to-url map cannot express. A link does not name the identifier it was
+    built from: that is redundant with its kind and origin, and it would be a
+    cross-record constraint JSON Schema cannot express.
+    """
+    links: Dict[str, List[Link]] = {}
+
+    def add(kind: str, link: Optional[Link]) -> None:
+        if link is not None:
+            links.setdefault(kind, []).append(link)
+
+    url = (entry.get("url") or "").strip()
+    if url:
+        add("video" if is_video_url(url) else "url",
+            Link(url=url, origin=FROM_INPUT, status=UNCHECKED))
+    add("pdf", pdf_link(bib_id, pdf_base_url))
+    for doi in identifiers.get("doi", []):
+        add("doi", Link(url=DOI_BASE + doi, origin=DERIVED, status=UNCHECKED))
+    for eprint in identifiers.get(ARXIV.lower(), []):
+        add("arxiv", Link(url=ARXIV_BASE + eprint, origin=DERIVED,
+                          status=UNCHECKED))
+    return links
 
 
 def extract_note(entry: dict) -> Optional[str]:
@@ -529,35 +657,6 @@ def extract_note(entry: dict) -> Optional[str]:
     if not note:
         return None
     return note
-
-
-def extract_video_url(entry: dict) -> Optional[str]:
-    """Extract video URL if the entry's URL points to a video platform."""
-    url = entry.get("url", "")
-    if url and any(p in url for p in ["youtube.com", "youtu.be", "vimeo.com"]):
-        return url
-    return None
-
-
-def construct_doi_url(entry: dict) -> Optional[str]:
-    """Construct a DOI URL from the doi field."""
-    doi = entry.get("doi")
-    if doi:
-        doi = doi.strip()
-        if doi.startswith("http"):
-            return doi
-        return f"https://doi.org/{doi}"
-    return None
-
-
-def construct_arxiv_url(entry: dict) -> Optional[str]:
-    """Construct an arXiv URL from the eprint field."""
-    eprint = entry.get("eprint")
-    if eprint:
-        prefix = entry.get("archivePrefix", entry.get("archiveprefix", ""))
-        if prefix.lower() == "arxiv" or not prefix:
-            return f"https://arxiv.org/abs/{eprint}"
-    return None
 
 
 def parse_project_ids(entry: dict) -> List[str]:
@@ -569,81 +668,107 @@ def parse_project_ids(entry: dict) -> List[str]:
     return [p.strip() for p in project_field.split(',') if p.strip()]
 
 
-def resolve_pdf_url(bib_id: str, pdf_base_url: Optional[str]) -> Optional[str]:
-    """Construct a PDF URL for a given bib entry."""
-    if not pdf_base_url:
+def entry_year(entry: dict, where: str, report) -> Optional[int]:
+    """The entry's year, or None with a diagnostic when it has none.
+
+    A work with no year sorts last, exactly where the old ``year: 0`` put it,
+    but a consumer can now tell "no year" from "the year zero".
+    """
+    raw = str(entry.get("year", "")).strip()
+    if not raw:
+        report(f"{YEAR_MISSING} {where}:year: entry has no year")
         return None
-    base = pdf_base_url.rstrip('/')
-    pdf_path = f"{base}/{bib_id}.pdf"
-    if pdf_base_url.startswith(('http://', 'https://')):
-        return pdf_path
-    return pdf_path if Path(pdf_path).exists() else None
+    return int(raw)
 
 
-def entry_to_publication(
+def entry_to_work(
     bib_id: str,
     entry: Entry,
     category: str,
-    entries: Optional[Dict[str, Entry]] = None,
     pdf_base_url: Optional[str] = None,
     source: str = "",
-) -> Publication:
-    """Convert one pybtex Entry to a Publication dataclass."""
-    fields = entry_fields(bib_id, entry, entries or {}, source)
+    source_file: str = "",
+    report=None,
+) -> Work:
+    """Convert one pybtex Entry to a Work dataclass."""
+    report = report if report is not None else _warn
+    fields = entry_fields(bib_id, entry, source)
+    identifiers = build_identifiers(fields)
 
-    url = fields.get("url", "")
-    video_url = extract_video_url(fields)
-
-    return Publication(
+    return Work(
         bib_id=bib_id,
         title=fields.get("title", ""),
         authors=parse_author_list(entry, f"{source}:{bib_id}:author"),
-        year=int(fields.get("year", 0)),
-        venue=format_venue(fields),
+        editors=parse_editor_list(entry, f"{source}:{bib_id}:editor"),
+        year=entry_year(fields, f"{source}:{bib_id}", report),
         category=category,
         entry_type=fields["ENTRYTYPE"],
+        source_file=source_file,
+        venue=build_venue(fields),
         abstract=fields.get("abstract"),
         note=extract_note(fields),
-        pdf_url=resolve_pdf_url(bib_id, pdf_base_url),
-        doi_url=construct_doi_url(fields),
-        arxiv_url=construct_arxiv_url(fields),
-        url=url if url and not video_url else None,
-        video_url=video_url,
+        identifiers=identifiers,
+        links=build_links(fields, bib_id, identifiers, pdf_base_url),
         project_ids=parse_project_ids(fields),
         bibtex=format_bibtex(bib_id, entry),
+        **{name: fields.get(name) for name in FLAT_FIELDS},
     )
 
 
-def parse_all_publications(
+def _crossref_error(path: str, bib_id: str, parent: str) -> str:
+    """The one diagnostic for an entry that carries a ``crossref`` field.
+
+    A field that is there but empty is reported as what it is rather than as
+    a parent whose name happens to be blank.
+    """
+    names = f"names the parent '{parent}'" if parent else "names no parent"
+    return (f"{CROSSREF_UNSUPPORTED} {path}:{bib_id}:crossref: "
+            f"crossref is not supported; this entry {names}. "
+            "Write the fields out on the entry itself.")
+
+
+def parse_all_works(
     bib_dir: str,
     bib_files: list,
     pdf_base_url: Optional[str] = None,
-    duplicate_errors: Optional[List[str]] = None,
-) -> List[Publication]:
-    """Parse all configured BibTeX files and return a flat list of Publications.
+    diagnostics: Optional[List[str]] = None,
+    warnings: Optional[List[str]] = None,
+    errors: Optional[List[str]] = None,
+) -> List[Work]:
+    """Parse all configured BibTeX files and return a flat list of Works.
 
-    Every file is read first, so a ``crossref`` may point at a parent in
-    another file.
+    Every file is read first, so a citation key repeated across two of them is
+    reported against both.
 
     Args:
         bib_dir: Directory containing the BibTeX files
         bib_files: List of dicts with 'name' and 'category' keys
         pdf_base_url: Base URL/path for PDFs
-        duplicate_errors: Optional list that receives stable duplicate-key
-            diagnostics. Without one, diagnostics are emitted as warnings.
+        diagnostics: Optional list that receives coded diagnostics that make
+            ``--validate`` fail. Without one they are emitted as warnings.
+        warnings: Optional list that receives coded diagnostics that never
+            fail a run. Without one they are emitted as warnings.
+        errors: Optional list that receives coded diagnostics that fail every
+            mode. Without one they are emitted as warnings.
 
     Returns:
-        List of Publication objects, sorted by year descending
+        List of Work objects, sorted by year descending, works with no year
+        last.
     """
-    read: List[Tuple[str, str, Entry, str]] = []
-    entries: Dict[str, Entry] = {}
+    read: List[Tuple[str, str, str, Entry, str]] = []
     first_source: Dict[str, Tuple[str, str]] = {}
 
-    def report(message: str) -> None:
-        if duplicate_errors is None:
-            _warn(message)
-        else:
-            duplicate_errors.append(message)
+    def to(collected: Optional[List[str]]):
+        def report(message: str) -> None:
+            if collected is None:
+                _warn(message)
+            else:
+                collected.append(message)
+        return report
+
+    report = to(diagnostics)
+    warn = to(warnings)
+    fail = to(errors)
 
     for bib_file in bib_files:
         name = bib_file['name'] if isinstance(bib_file, dict) else bib_file.name
@@ -660,12 +785,21 @@ def parse_all_publications(
                 report(_duplicate_key_error(path, bib_id, previous_path, previous_key))
             else:
                 first_source[normalized] = (path, bib_id)
-            read.append((path, bib_id, entry, category))
-            entries.setdefault(normalized, entry)
+            # Rejected on presence, not on value, and not emitted: a child
+            # that inherited part of a parent lost every author of its own
+            # and said nothing about it. An empty `crossref = {}` is a field
+            # the entry carries, so it is an error too -- letting it through
+            # would put the silent path back under a different spelling.
+            crossref = [value for field_name, value in entry.fields.items()
+                        if field_name.lower() == "crossref"]
+            if crossref:
+                fail(_crossref_error(path, bib_id, str(crossref[0]).strip()))
+                continue
+            read.append((path, name, bib_id, entry, category))
 
-    publications = [
-        entry_to_publication(bib_id, entry, category, entries, pdf_base_url, path)
-        for path, bib_id, entry, category in read
+    works = [
+        entry_to_work(bib_id, entry, category, pdf_base_url, path, name, warn)
+        for path, name, bib_id, entry, category in read
     ]
-    publications.sort(key=lambda p: p.year, reverse=True)
-    return publications
+    works.sort(key=lambda w: (w.year is not None, w.year or 0), reverse=True)
+    return works

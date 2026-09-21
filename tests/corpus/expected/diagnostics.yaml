@@ -14,10 +14,14 @@
 
 # --- BibTeX structure ---------------------------------------------------------
 
+# The field token matters as much as the file and the key: the entry whose
+# brace never closes also loses its year, and the year diagnostic names the
+# same file and key. A row satisfied by that one would be reporting a
+# different defect.
 structure.unclosed_brace:
   dir: unclosed_brace
   exit: any
-  locates: [broken.bib, brace-broken]
+  locates: [broken.bib, brace-broken, title]
   kept: [brace-before, brace-after]
   xfail: {locates: "#26"}
 
@@ -36,9 +40,29 @@ structure.duplicate_key_across:
 structure.missing_year:
   dir: missing_year
   exit: any
+  reports: [BIB-YEAR-MISSING]
   locates: [noyear.bib, no-year, year]
   kept: [no-year]
-  xfail: {locates: "#26"}
+
+structure.crossref:
+  dir: crossref_entry
+  exit: error
+  reports: [BIB-CROSSREF-UNSUPPORTED, proc2024]
+  locates: [crossref.bib, child2024, crossref]
+
+structure.crossref_undefined_parent:
+  dir: crossref_undefined_parent
+  exit: error
+  reports: [BIB-CROSSREF-UNSUPPORTED, no-such-parent]
+  locates: [crossref.bib, orphan-child, crossref]
+
+# The field is rejected on its presence, not on its value, so an empty one
+# and a whitespace-only one are the same error as any other.
+structure.crossref_no_parent:
+  dir: crossref_no_parent
+  exit: error
+  reports: [BIB-CROSSREF-UNSUPPORTED]
+  locates: [crossref.bib, empty-crossref, blank-crossref, crossref]
 
 structure.year_not_number:
   dir: year_not_number
@@ -190,7 +214,7 @@ config.bib_files.missing:
   dir: config_bib_files_missing
   exit: any
   reports: [bib_files]
-  locates: [lab.yaml]
+  locates: [lab.yaml, bib_files]
   xfail: {reports: "#26", locates: "#26"}
 
 config.bib_files.wrong_type:
@@ -213,6 +237,12 @@ config.bib_files.category_missing:
   reports: [category]
   locates: [lab.yaml, bib_files]
   xfail: {locates: "#26"}
+
+config.bib_files.name_absolute:
+  dir: config_bib_file_absolute
+  exit: error
+  reports: [CONFIG-BIB-FILE-ABSOLUTE, /etc/ok.bib]
+  locates: [lab.yaml, bib_files, name]
 
 config.pdf_base_url.wrong_type:
   dir: config_pdf_base_url_type
@@ -246,7 +276,7 @@ config.unknown_key:
   dir: config_unknown_key
   exit: any
   reports: [people_fil]
-  locates: [lab.yaml]
+  locates: [lab.yaml, people_fil]
   xfail: {reports: "#26", locates: "#26"}
 
 config.not_a_mapping:

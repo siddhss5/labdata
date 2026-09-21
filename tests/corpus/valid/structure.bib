@@ -52,16 +52,14 @@
   year    = 2019
 }
 
-% CASE structure.crossref
-@inproceedings{struct-child,
-  title    = {A Child Paper},
-  author   = {Adams, Alice},
-  crossref = {struct-parent}
-}
-
+% An ordinary @proceedings entry, which is the kind of entry a crossref used
+% to point at. Nothing points at it: it is read like any other entry, which
+% is what rejecting crossref must not change.
+% CASE structure.proceedings
 @proceedings{struct-parent,
   title     = {Proceedings of the Fictional Workshop},
   booktitle = {Proceedings of the Fictional Workshop},
+  author    = {Adams, Alice},
   year      = {2018}
 }
 
@@ -69,12 +67,17 @@
 % CASE fields.journal
 % CASE fields.volume
 % CASE fields.number
-% CASE output.publication.venue
-% CASE output.publication.year
-% CASE output.publication.entry_type
-% CASE output.publication.bib_id
-% CASE output.publication.bibtex
-% CASE fields.unread
+% CASE output.work.venue
+% CASE output.work.year
+% CASE output.work.entry_type
+% CASE output.work.bib_id
+% CASE output.work.source
+% CASE output.work.editors
+% CASE output.work.bibliographic
+% CASE fields.pages
+% CASE fields.publisher
+% CASE output.work.derived
+% CASE output.work.bibtex
 @article{type-article,
   title     = {An Article},
   author    = {Adams, Alice and Brown, Bob},

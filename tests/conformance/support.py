@@ -32,21 +32,38 @@ VALID = CORPUS / "valid"
 INVALID = CORPUS / "invalid"
 EXPECTED = CORPUS / "expected"
 REPO_ROOT = TESTS_DIR.parent
-SCHEMA_PATH = REPO_ROOT / "schema" / "output.schema.json"
+SCHEMA_PATH = REPO_ROOT / "schema" / "v4" / "output.schema.json"
+
+# The previous version's schema, which stays reachable byte for byte after v4
+# ships: a consumer pinned to v3 keeps a stable target (SPEC.md section 6).
+PREVIOUS_SCHEMA_PATH = REPO_ROOT / "schema" / "v3" / "output.schema.json"
 
 
-def _xfail_marks(xfail, because=None):
+# Every strict xfail in this suite names a claim the document does not yet
+# satisfy, and a test makes that claim with an ``assert``. Declaring the
+# exception makes pytest itself reject any other one: a marked test that
+# breaks on a NameError, a missing key or an unreadable fixture never reached
+# its own assertion, so the marker would be reporting nothing, and without
+# this it would be counted as expected and nobody would look. It covers the
+# fixture phase too, which is where a broken marker is hardest to see.
+#
+# A future xfail whose finding really is another exception declares that type
+# instead; what is not allowed is declaring none.
+EXPECTED_FAILURE = AssertionError
+
+
+def _xfail_marks(xfail, because=None, raises=EXPECTED_FAILURE):
     """The xfail mark for ``xfail="#N"``, with ``because`` spelled into it.
 
     The issue number alone is what tests/COVERAGE.md's status column is
     matched against, so it stays the argument. ``because`` names the specific
     property the fix has to deliver, which is what a reader of the failure
-    sees.
+    sees. ``raises`` is the exception the claim is made with; see above.
     """
     if not xfail:
         return []
     reason = "%s: %s" % (xfail, because) if because else xfail
-    return [pytest.mark.xfail(strict=True, reason=reason)]
+    return [pytest.mark.xfail(strict=True, reason=reason, raises=raises)]
 
 
 # Corpus entries whose values an open issue owns, declared by the xfailed
@@ -60,7 +77,7 @@ def _record_ownership(case_ids: Iterable[str], owns: Iterable[str]):
         XFAIL_OWNERSHIP.setdefault(case_id, set()).update(owns)
 
 
-def case(case_id, *values, xfail=None, owns=None):
+def case(case_id, *values, xfail=None, owns=None, raises=EXPECTED_FAILURE):
     """One row of a parameter table: a case ID, then the test's values.
 
     ``xfail="#N"`` marks the row as failing until issue #N is fixed. An
@@ -72,10 +89,12 @@ def case(case_id, *values, xfail=None, owns=None):
             owns = [values[0]] if values and isinstance(values[0], str) else []
         _record_ownership([case_id], owns)
     label = ":".join([case_id] + [str(v) for v in values[:2]])
-    return pytest.param(case_id, *values, id=label, marks=_xfail_marks(xfail))
+    return pytest.param(case_id, *values, id=label,
+                        marks=_xfail_marks(xfail, raises=raises))
 
 
-def covers(*case_ids, xfail=None, because=None, owns=None):
+def covers(*case_ids, xfail=None, because=None, owns=None,
+           raises=EXPECTED_FAILURE):
     """Decorate a test that checks the given case IDs.
 
     An xfailed test must say what it ``owns``: the corpus entries whose values
@@ -94,7 +113,7 @@ def covers(*case_ids, xfail=None, because=None, owns=None):
         _record_ownership(case_ids, owns)
 
     def decorate(func):
-        for mark in _xfail_marks(xfail, because):
+        for mark in _xfail_marks(xfail, because, raises):
             func = mark(func)
         return func
     return decorate
@@ -199,9 +218,9 @@ def xfail_owned_entries() -> Set[str]:
 
 # --- Looking things up in the output ---------------------------------------
 
-def publication(data, bib_id):
-    matches = [p for p in data["publications"] if p["bib_id"] == bib_id]
-    assert len(matches) == 1, f"expected one publication {bib_id!r}, found {len(matches)}"
+def work(data, bib_id):
+    matches = [w for w in data["works"] if w["bib_id"] == bib_id]
+    assert len(matches) == 1, f"expected one work {bib_id!r}, found {len(matches)}"
     return matches[0]
 
 

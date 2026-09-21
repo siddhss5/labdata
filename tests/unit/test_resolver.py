@@ -3,13 +3,14 @@
 import pytest
 from pathlib import Path
 
-from labdata.models import Author, Publication, Person, Project, LabData
+from labdata.models import Author, Contributor, Work, Person, Project, LabData
 from labdata.loaders import load_people, load_projects
 from labdata.resolver import (
     normalize_name,
     is_abbreviated,
     build_alias_index,
     fuzzy_match,
+    match_form,
     resolve_authors,
     resolve_projects,
     compute_backlinks,
@@ -86,7 +87,7 @@ class TestBuildAliasIndex:
         assert index["alex kim"] == "akim"
         assert index["alan kim"] == "alankim"
 
-    @pytest.mark.xfail(strict=True, reason="#24")
+    @pytest.mark.xfail(strict=True, reason="#24", raises=AssertionError)
     def test_same_initial_collision_without_alias(self):
         """An alias shared implicitly with another person's initials is ambiguous.
 
@@ -97,12 +98,13 @@ class TestBuildAliasIndex:
             Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
             Person(id="alankim", name="Alan Kim", aliases=[]),
         ]
-        pub = Publication(
-            bib_id="kim2024", title="Test", authors=[Author(name="A. Kim")],
-            year=2024, venue="Test", category="Test", entry_type="article",
+        work = Work(
+            bib_id="kim2024", title="Test", category="Test",
+            entry_type="article", year=2024,
+            authors=[Author(name="A. Kim", position=1, given="A.", family="Kim")],
         )
-        unresolved = resolve_authors([pub], people)
-        assert pub.authors[0].person_id is None
+        unresolved = resolve_authors([work], people)
+        assert work.authors[0].person_id is None
         assert "A. Kim" in unresolved
 
 
@@ -124,58 +126,186 @@ class TestFuzzyMatch:
         assert result is None
 
 
+class TestMatchForm:
+    """The private form the resolver matches on, which the document never shows.
+
+    Splitting it from `Contributor.name` is what lets the emitted name become
+    the full name without changing who resolves to whom (#56 section 7).
+    """
+
+    def test_given_names_are_abbreviated(self):
+        assert match_form(Author(name="Alice Jane Adams", given="Alice Jane",
+                                 family="Adams")) == "A. J. Adams"
+
+    def test_a_hyphenated_given_name_keeps_both_initials(self):
+        assert match_form(Author(name="Grace-Ann Green", given="Grace-Ann",
+                                 family="Green")) == "G.-A. Green"
+
+    def test_particles_and_suffixes(self):
+        assert match_form(Author(name="Victor van den Berg", given="Victor",
+                                 von="van den", family="Berg")) == \
+            "V. van den Berg"
+        assert match_form(Author(name="John Smith Jr.", given="John",
+                                 family="Smith", suffix="Jr.")) == "J. Smith, Jr."
+
+    def test_a_brace_protected_name_has_nothing_to_abbreviate(self):
+        assert match_form(Author(name="Example Robotics Consortium",
+                                 literal="Example Robotics Consortium")) == \
+            "Example Robotics Consortium"
+
+    def test_it_is_not_the_emitted_name(self):
+        """The two are independent, which is the whole point of the split."""
+        author = Author(name="Alice Adams", given="Alice", family="Adams")
+        assert match_form(author) == "A. Adams"
+        assert author.name == "Alice Adams"
+
+
+# The three corpus authorships #56 section 7 predicts would move if the
+# resolver read `contributor.name` instead of the private matching form:
+# (given, von, family, the person the match form finds, the person the
+# emitted name would find). Two of them are rows #24 owns, so a strict xfail
+# catches those; the third shows up in no marker at all, which is why all
+# three are pinned here.
+DECOUPLING_SENSITIVE = [
+    ("Frank", None, "Fischer", None, "ffischer"),
+    ("Alan", None, "Kim", "akim", "alankim"),
+    ("Grace-Ann", None, "Green$^*$", None, "ggreen"),
+]
+
+
+class TestTheResolverNeverReadsTheEmittedName:
+    """#56 section 7: matching and emission are separate on purpose.
+
+    `contributor.name` is the parts joined in reading order; the resolver
+    matches on `match_form()`, the abbreviated form the document no longer
+    shows. Reconnecting them would move three corpus relationships, two of
+    them into xpasses on rows #24 owns -- which is to say it would hide an
+    identity change inside a schema change.
+    """
+
+    PEOPLE = [
+        Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
+        Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
+        Person(id="alankim", name="Alan Kim"),
+        Person(id="ffischer", name="Frank Fischer"),
+        Person(id="ggreen", name="Grace-Ann Green", aliases=["G.-A. Green"]),
+    ]
+
+    def resolve(self, author):
+        work = Work(bib_id="w", title="T", category="C", entry_type="article",
+                    year=2024, authors=[author])
+        resolve_authors([work], self.PEOPLE)
+        return work.authors[0].person_id
+
+    @pytest.mark.parametrize(
+        "given,von,family,on_match_form,on_emitted_name",
+        DECOUPLING_SENSITIVE,
+        ids=[row[2] for row in DECOUPLING_SENSITIVE])
+    def test_each_sensitive_authorship_resolves_on_the_match_form(
+            self, given, von, family, on_match_form, on_emitted_name):
+        author = Author(name=" ".join(p for p in (given, von, family) if p),
+                        position=1, given=given, von=von, family=family)
+        assert self.resolve(author) == on_match_form
+
+        # And the emitted name really would give a different answer, so the
+        # row above is about the separation rather than about a coincidence.
+        assert on_match_form != on_emitted_name
+        as_if_reconnected = Author(name=author.name, position=1,
+                                   given=author.name, von=None, family=None)
+        assert match_form(as_if_reconnected) != match_form(author)
+
+    def test_the_emitted_name_is_not_the_form_that_is_matched(self):
+        """Stated once, directly: the two forms differ and matching uses one.
+
+        A test of the three rows alone would keep passing if `match_form()`
+        were quietly redefined to return the emitted name.
+        """
+        author = Author(name="Alice Adams", position=1,
+                        given="Alice", family="Adams")
+        assert match_form(author) == "A. Adams"
+        assert author.name == "Alice Adams"
+        assert self.resolve(author) == "aadams"
+
+
 class TestResolveAuthors:
-    def _make_pub(self, author_names):
-        return Publication(
+    def _make_work(self, authors, editors=()):
+        return Work(
             bib_id="test",
             title="Test",
-            authors=[Author(name=n) for n in author_names],
+            authors=list(authors),
+            editors=list(editors),
             year=2024,
-            venue="Test",
             category="Test",
             entry_type="article",
         )
+
+    def _author(self, given, family, position=1):
+        return Author(name=f"{given} {family}", position=position,
+                      given=given, family=family)
 
     def test_exact_alias_match(self):
         people = [
             Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
         ]
-        pub = self._make_pub(["A. Adams"])
-        unresolved = resolve_authors([pub], people)
-        assert pub.authors[0].person_id == "aadams"
+        work = self._make_work([self._author("Alice", "Adams")])
+        unresolved = resolve_authors([work], people)
+        assert work.authors[0].person_id == "aadams"
+        assert work.authors[0].resolution_status == "resolved"
+        assert work.authors[0].resolution_method == "exact"
         assert unresolved == []
 
     def test_unresolved_external(self):
         people = [
             Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
         ]
-        pub = self._make_pub(["E. E. Jones"])
-        unresolved = resolve_authors([pub], people)
-        assert pub.authors[0].person_id is None
-        assert "E. E. Jones" in unresolved
+        work = self._make_work([self._author("Erin E.", "Jones")])
+        unresolved = resolve_authors([work], people)
+        assert work.authors[0].person_id is None
+        assert work.authors[0].resolution_status == "unresolved"
+        assert work.authors[0].resolution_method is None
+        # The readable name is what a human is asked to add to people.yaml,
+        # not the private form the matcher compared.
+        assert "Erin E. Jones" in unresolved
 
     def test_mixed_resolved_and_unresolved(self):
         people = [
             Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
             Person(id="bbrown", name="Bob Brown", aliases=["B. A. Brown"]),
         ]
-        pub = self._make_pub(["A. Adams", "E. External", "B. A. Brown"])
-        unresolved = resolve_authors([pub], people)
-        assert pub.authors[0].person_id == "aadams"
-        assert pub.authors[1].person_id is None
-        assert pub.authors[2].person_id == "bbrown"
-        assert "E. External" in unresolved
+        work = self._make_work([
+            self._author("Alice", "Adams", 1),
+            self._author("Erin", "External", 2),
+            self._author("Bob A.", "Brown", 3),
+        ])
+        unresolved = resolve_authors([work], people)
+        assert work.authors[0].person_id == "aadams"
+        assert work.authors[1].person_id is None
+        assert work.authors[2].person_id == "bbrown"
+        assert "Erin External" in unresolved
+
+    def test_editors_resolve_but_are_never_reported_as_unresolved(self):
+        """Editing a volume is not an authorship, so an editor nobody matches
+        is not an author labdata could not resolve."""
+        people = [Person(id="aadams", name="Alice Adams", aliases=["A. Adams"])]
+        editors = [Contributor(name="Alice Adams", position=1, given="Alice",
+                               family="Adams"),
+                   Contributor(name="Quentin Quinn", position=2, given="Quentin",
+                               family="Quinn")]
+        work = self._make_work([], editors)
+        unresolved = resolve_authors([work], people)
+        assert [e.person_id for e in work.editors] == ["aadams", None]
+        assert unresolved == []
 
     def test_empty_people(self):
-        pub = self._make_pub(["A. Adams"])
-        unresolved = resolve_authors([pub], [])
+        work = self._make_work([self._author("Alice", "Adams")])
+        unresolved = resolve_authors([work], [])
         assert unresolved == []
-        assert pub.authors[0].person_id is None
+        assert work.authors[0].person_id is None
 
 
 class TestResolveProjects:
     def _make_pub(self, project_ids):
-        return Publication(
+        return Work(
             bib_id="test",
             title="Test",
             authors=[],
@@ -200,56 +330,58 @@ class TestResolveProjects:
 
 
 class TestComputeBacklinks:
-    def test_people_backlinks(self):
-        pub = Publication(
+    def _work(self, **changes):
+        fields = dict(
             bib_id="adams2024",
             title="Test",
-            authors=[Author(name="A. Adams", person_id="aadams")],
+            authors=[Author(name="Alice Adams", position=1, person_id="aadams")],
             year=2024,
-            venue="Test",
             category="Test",
             entry_type="article",
         )
+        fields.update(changes)
+        return Work(**fields)
+
+    def test_people_backlinks(self):
+        work = self._work()
         person = Person(id="aadams", name="Alice Adams")
-        data = LabData(publications=[pub], people=[person], projects=[])
+        data = LabData(works=[work], people=[person], projects=[])
         compute_backlinks(data)
-        assert "adams2024" in person.publication_ids
-        assert person.publication_count == 1
+        assert "adams2024" in person.work_ids
+        assert person.work_count == 1
 
     def test_project_backlinks(self):
-        pub = Publication(
-            bib_id="adams2024",
-            title="Test",
-            authors=[Author(name="A. Adams", person_id="aadams")],
-            year=2024,
-            venue="Test",
-            category="Test",
-            entry_type="article",
-            project_ids=["gardenbot"],
-        )
+        work = self._work(project_ids=["gardenbot"])
         person = Person(id="aadams", name="Alice Adams")
         project = Project(id="gardenbot", title="Robot Gardening")
-        data = LabData(publications=[pub], people=[person], projects=[project])
+        data = LabData(works=[work], people=[person], projects=[project])
         compute_backlinks(data)
-        assert "adams2024" in project.publication_ids
+        assert "adams2024" in project.work_ids
         assert "aadams" in project.people_ids
+
+    def test_editors_are_not_authorships(self):
+        """An editor back-links nothing: not the person, not the project."""
+        work = self._work(
+            authors=[],
+            editors=[Contributor(name="Alice Adams", position=1,
+                                 person_id="aadams")],
+            project_ids=["gardenbot"])
+        person = Person(id="aadams", name="Alice Adams")
+        project = Project(id="gardenbot", title="Robot Gardening")
+        data = LabData(works=[work], people=[person], projects=[project])
+        compute_backlinks(data)
+        assert person.work_ids == [] and person.work_count == 0
+        assert project.work_ids == ["adams2024"]
+        assert project.people_ids == []
 
     def test_no_duplicate_backlinks(self):
         """Running compute_backlinks twice should not duplicate entries."""
-        pub = Publication(
-            bib_id="adams2024",
-            title="Test",
-            authors=[Author(name="A. Adams", person_id="aadams")],
-            year=2024,
-            venue="Test",
-            category="Test",
-            entry_type="article",
-        )
+        work = self._work()
         person = Person(id="aadams", name="Alice Adams")
-        data = LabData(publications=[pub], people=[person], projects=[])
+        data = LabData(works=[work], people=[person], projects=[])
         compute_backlinks(data)
         compute_backlinks(data)
-        assert person.publication_ids.count("adams2024") == 1
+        assert person.work_ids.count("adams2024") == 1
 
 
 class TestLoadPeople:
@@ -293,29 +425,31 @@ class TestAssembleEndToEnd:
         )
         data = assemble(config)
 
-        # Publications parsed
-        assert len(data.publications) == 3
+        # Works parsed
+        assert len(data.works) == 3
 
         # Authors resolved for lab members
-        adams_pub = next(p for p in data.publications if p.bib_id == "adams2024robot")
-        adams_author = next(a for a in adams_pub.authors if "Adams" in a.name)
+        adams_work = next(w for w in data.works if w.bib_id == "adams2024robot")
+        adams_author = next(a for a in adams_work.authors if "Adams" in a.name)
         assert adams_author.person_id == "aadams"
 
-        # External author NOT resolved
-        jones_pub = next(p for p in data.publications if p.bib_id == "jones2023preprint")
-        jones_author = jones_pub.authors[0]
+        # External author NOT resolved, and grouped under a collaborator key
+        jones_work = next(w for w in data.works if w.bib_id == "jones2023preprint")
+        jones_author = jones_work.authors[0]
         assert jones_author.person_id is None
+        assert jones_author.collaborator_key
+        assert jones_author.collaborator_key in {c.key for c in data.collaborators}
 
         # Projects resolved
-        assert "gardenbot" in adams_pub.project_ids
+        assert "gardenbot" in adams_work.project_ids
 
         # Back-links computed
         aadams = next(p for p in data.people if p.id == "aadams")
-        assert aadams.publication_count > 0
-        assert "adams2024robot" in aadams.publication_ids
+        assert aadams.work_count > 0
+        assert "adams2024robot" in aadams.work_ids
 
         rf = next(p for p in data.projects if p.id == "gardenbot")
-        assert len(rf.publication_ids) > 0
+        assert len(rf.work_ids) > 0
         assert "aadams" in rf.people_ids
 
     def test_without_people_or_projects(self):
@@ -325,7 +459,7 @@ class TestAssembleEndToEnd:
             bib_files=[BibFile(name="sample.bib", category="Test Papers")],
         )
         data = assemble(config)
-        assert len(data.publications) == 3
+        assert len(data.works) == 3
         assert data.people == []
         assert data.projects == []
 
@@ -339,11 +473,11 @@ class TestAssembleEndToEnd:
         )
         data = assemble(config)
         d = data.to_dict()
-        assert "publications" in d
+        assert "works" in d
         assert "people" in d
         assert "projects" in d
-        assert len(d["publications"]) == 3
+        assert len(d["works"]) == 3
         # Check structured author format
-        first_pub = d["publications"][0]
-        assert isinstance(first_pub["authors"], list)
-        assert "name" in first_pub["authors"][0]
+        first_work = d["works"][0]
+        assert isinstance(first_work["authors"], list)
+        assert "name" in first_work["authors"][0]

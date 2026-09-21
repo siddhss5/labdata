@@ -52,7 +52,7 @@ class TestCLIOutput:
         assert Path(out).exists()
         with open(out, 'r') as f:
             data = yaml.safe_load(f)
-        assert len(data["publications"]) == 3
+        assert len(data["works"]) == 3
         assert "Wrote" in result.stdout
 
     def test_json_output(self, run_cli, tmp_path):
@@ -65,7 +65,7 @@ class TestCLIOutput:
         assert result.returncode == 0
         with open(out, 'r') as f:
             data = json.load(f)
-        assert "publications" in data
+        assert "works" in data
         assert "people" in data
         assert "projects" in data
 
@@ -86,18 +86,18 @@ class TestCLIValidate:
             "--validate",
         )
         assert result.returncode == 0
-        assert "Publications: 3" in result.stdout
+        assert "Works: 3" in result.stdout
         assert "People: 3" in result.stdout
         assert "Projects: 2" in result.stdout
         assert "Validation passed" in result.stdout
 
     def test_validate_shows_unresolved(self, run_cli):
-        """The fixture has an external author (E. E. Jones) who is unresolved."""
+        """The fixture has an external author (External E. Jones) who is unresolved."""
         result = run_cli(
             "--config", str(FIXTURES / "lab.yaml"),
             "--validate",
         )
-        # E. E. Jones is in sample.bib but not in people.yaml
+        # External E. Jones is in sample.bib but not in people.yaml
         assert "Unresolved authors" in result.stdout
 
 
@@ -108,7 +108,7 @@ class TestCLIUnresolved:
             "--unresolved",
         )
         assert result.returncode == 0
-        assert "E. E. Jones" in result.stdout
+        assert "External E. Jones" in result.stdout
 
     def test_unresolved_without_people(self, run_cli, tmp_path):
         """Without people_file, resolution never ran, so --unresolved must say so

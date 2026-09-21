@@ -2,7 +2,8 @@
 
 % CASE links.doi_bare
 % CASE fields.doi
-% CASE output.publication.doi_url
+% CASE output.work.identifiers
+% CASE links.origin
 @article{link-doi-bare,
   title   = {Bare DOI},
   author  = {Adams, Alice},
@@ -22,12 +23,25 @@
 
 % CASE links.arxiv_prefixed
 % CASE fields.archiveprefix
-% CASE output.publication.arxiv_url
 @misc{link-arxiv-prefix,
   title         = {arXiv with archivePrefix},
   author        = {Adams, Alice},
   eprint        = {2401.00001},
   archivePrefix = {arXiv},
+  year          = {2023}
+}
+
+% An eprint in a repository that is not arXiv. The scheme is whatever
+% archivePrefix named, so a compiler that defaulted to arXiv would lose which
+% repository the identifier belongs to -- and would also build an arXiv URL
+% for an identifier that is not an arXiv one.
+% CASE fields.archiveprefix
+% CASE links.arxiv_other_repository
+@misc{link-eprint-hal,
+  title         = {A Preprint in Another Repository},
+  author        = {Adams, Alice},
+  eprint        = {hal-04001234},
+  archivePrefix = {HAL},
   year          = {2023}
 }
 
@@ -41,7 +55,7 @@
 
 % CASE links.youtube
 % CASE fields.url
-% CASE output.publication.video_url
+% CASE output.work.links
 @inproceedings{link-youtube,
   title     = {A YouTube Video},
   author    = {Adams, Alice},
@@ -60,7 +74,8 @@
 }
 
 % CASE links.url
-% CASE output.publication.url
+% CASE links.origin
+% CASE output.work.links
 @inproceedings{link-url,
   title     = {A Plain Web Link},
   author    = {Adams, Alice},
@@ -71,7 +86,6 @@
 
 % pdfs/present.pdf exists for this key.
 % CASE links.pdf.local_present
-% CASE output.publication.pdf_url
 @inproceedings{present,
   title     = {A Paper Whose PDF Is Present},
   author    = {Adams, Alice},

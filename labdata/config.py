@@ -12,14 +12,72 @@ MIT License - see LICENSE file for details.
 import yaml
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
+
+
+# A configured `.bib` name reaches the document as `work.source.file`, where
+# it is promised never to be an absolute path (SPEC.md section 5): a document
+# is shared, and one carrying a compiling machine's directory layout leaks it
+# to every consumer. Rejecting the input is what makes the promise true;
+# rewriting the name would quietly discard a relative directory the user
+# meant. Both path flavours are checked, so the same configuration is
+# accepted or rejected wherever it is compiled.
+BIB_FILE_ABSOLUTE = "CONFIG-BIB-FILE-ABSOLUTE"
+
+
+class ConfigurationError(ValueError):
+    """A configuration labdata will not compile from.
+
+    Its own type, not a bare ``ValueError``, so that a caller can tell a
+    rejected configuration from the several other things that raise one --
+    a year that is not a number, most of all, which is a different failure
+    with a different owner (SPEC.md, Target #26).
+    """
+
+
+def is_absolute_path(name: str) -> bool:
+    """True when ``name`` is rooted rather than relative to ``bib_dir``.
+
+    Both path flavours, and a leading separator on its own: ``/x.bib`` is
+    absolute on POSIX, ``C:\\x.bib`` and ``\\\\server\\share\\x.bib`` are absolute
+    on Windows, and ``\\x.bib`` is rooted on Windows even though Python does
+    not call it absolute without a drive. All four escape ``bib_dir``, which
+    is the thing being ruled out.
+    """
+    return name.startswith(("/", "\\")) or PureWindowsPath(name).is_absolute()
+
+
+def reject_absolute_name(name, where: str) -> None:
+    """Raise when a configured `.bib` name would reach the document absolute.
+
+    ``where`` is the `<file>:<key>:<field>` location the diagnostic carries.
+    A caller that knows which file the configuration came from says so; one
+    that does not names the key alone.
+    """
+    if isinstance(name, str) and is_absolute_path(name):
+        raise ConfigurationError(
+            f"{BIB_FILE_ABSOLUTE} {where}: '{name}' is an absolute path; a "
+            "bib_files name is a name under bib_dir, and it is emitted as the "
+            "work's source.file, which is never absolute")
 
 
 @dataclass
 class BibFile:
-    """A single BibTeX file and its category label."""
+    """A single BibTeX file and its category label.
+
+    ``name`` is a name under ``bib_dir``, not a path of its own: it is
+    emitted as ``work.source.file`` and must never be absolute. The
+    constructor checks it, so the mistake is caught where it is made -- but
+    this class is a plain, mutable dataclass, which is public API, so a name
+    can be set after it was checked. The check that *holds* is the one
+    `labdata.models.Work.to_dict()` makes, at the boundary every emitted
+    document passes through.
+    """
     name: str
     category: str
+
+    def __post_init__(self):
+        reject_absolute_name(self.name, "bib_files:name")
 
 
 @dataclass
@@ -50,11 +108,21 @@ class LabDataConfig:
     projects_file: Optional[str] = None
     lab: Optional[Dict[str, str]] = None
 
+    # Where this configuration was read from, so a diagnostic about it can
+    # name the file the user would edit. Never emitted.
+    path: Optional[str] = None
+
     @classmethod
     def from_yaml(cls, path: str) -> 'LabDataConfig':
         """Load configuration from a YAML file."""
         with open(path, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f)
+
+        # Checked here as well as in `BibFile`, because here the file the
+        # user would edit is known and the diagnostic can name it.
+        for bf in data.get('bib_files', []):
+            if isinstance(bf, dict):
+                reject_absolute_name(bf.get('name'), f"{path}:bib_files:name")
 
         bib_files = [
             BibFile(**bf) for bf in data.get('bib_files', [])
@@ -67,4 +135,5 @@ class LabDataConfig:
             people_file=data.get('people_file'),
             projects_file=data.get('projects_file'),
             lab=data.get('lab'),
+            path=str(path),
         )
