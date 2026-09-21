@@ -25,6 +25,16 @@ from pathlib import Path, PureWindowsPath
 BIB_FILE_ABSOLUTE = "CONFIG-BIB-FILE-ABSOLUTE"
 
 
+class ConfigurationError(ValueError):
+    """A configuration labdata will not compile from.
+
+    Its own type, not a bare ``ValueError``, so that a caller can tell a
+    rejected configuration from the several other things that raise one --
+    a year that is not a number, most of all, which is a different failure
+    with a different owner (SPEC.md, Target #26).
+    """
+
+
 def is_absolute_path(name: str) -> bool:
     """True when ``name`` is rooted rather than relative to ``bib_dir``.
 
@@ -45,7 +55,7 @@ def reject_absolute_name(name, where: str) -> None:
     that does not names the key alone.
     """
     if isinstance(name, str) and is_absolute_path(name):
-        raise ValueError(
+        raise ConfigurationError(
             f"{BIB_FILE_ABSOLUTE} {where}: '{name}' is an absolute path; a "
             "bib_files name is a name under bib_dir, and it is emitted as the "
             "work's source.file, which is never absolute")
@@ -56,11 +66,11 @@ class BibFile:
     """A single BibTeX file and its category label.
 
     ``name`` is a name under ``bib_dir``, not a path of its own: it is
-    emitted as ``work.source.file`` and must never be absolute. The check is
-    here, in the constructor, rather than only where a configuration is read
-    from YAML: `BibFile` and `LabDataConfig` are public, so a caller can
-    assemble one by hand, and a guarantee about the emitted document has to
-    hold however the configuration was built.
+    emitted as ``work.source.file`` and must never be absolute. The
+    constructor checks it, so the mistake is caught where it is made -- but
+    this class is a plain, mutable dataclass, which is public API, so the
+    check that *holds* is the one `labdata.assembler.assemble()` makes on
+    every name it is about to compile.
     """
     name: str
     category: str

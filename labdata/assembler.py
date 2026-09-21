@@ -15,7 +15,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
-from .config import LabDataConfig
+from .config import LabDataConfig, reject_absolute_name
 from .models import Author, Collaborator, LabData, Work
 from .parsers.bibtex import parse_all_works
 from .loaders import load_people, load_projects
@@ -236,9 +236,13 @@ def group_collaborators(works: List[Work], bib_dir: str,
 
     warnings.extend(_grouping_warnings(groups))
 
+    # `name` stays the tie-break it was, with `key` appended after it: two
+    # keys can carry the same readable name -- a parsed and a brace-protected
+    # spelling of one string are two keys -- so the name alone is no longer
+    # total, but it is still what a reader sees and it still decides.
     ordered = sorted(groups.values(),
                      key=lambda g: (g.last_year is None, -(g.last_year or 0),
-                                    -len(g.work_ids), g.key))
+                                    -len(g.work_ids), g.author.name, g.key))
     return [group.build() for group in ordered]
 
 
@@ -281,6 +285,16 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
         diagnostics: If True, return AssemblyResult with diagnostics.
                      If False (default), return LabData directly.
     """
+    # Every configured name, checked here rather than only where it was
+    # built. `BibFile` is a public, mutable dataclass, so a name can be set
+    # after construction, and `work.source.file` is promised never to be
+    # absolute however the configuration was assembled (SPEC.md section 5).
+    # The CLI never reaches this: `LabDataConfig.from_yaml()` rejects the
+    # same thing first, with the file the user would edit named. This is for
+    # a caller who built the configuration in Python, who gets the exception.
+    for bib_file in config.bib_files:
+        reject_absolute_name(getattr(bib_file, 'name', None), "bib_files:name")
+
     # Parse works
     bib_files = [{'name': bf.name, 'category': bf.category} for bf in config.bib_files]
     bibliography_errors: List[str] = []

@@ -661,17 +661,30 @@ def test_output_fields(valid_output, case_id, section, key, value, path, expecte
 
 @covers("output.collaborators.order")
 def test_collaborators_order(valid_output):
-    """Most recent first, then most works, then key.
+    """Most recent first, then most works, then name, then key.
 
-    The key is the final tie-break rather than the name, because two keys can
-    carry the same readable name -- a personal and a brace-protected spelling
-    of one string are two keys -- and the order has to be total.
+    `name` is the tie-break it has always been. `key` follows it rather than
+    replacing it, because two keys can carry the same readable name -- a
+    parsed and a brace-protected spelling of one string are two keys -- so
+    the name alone is no longer total.
     """
-    rows = [(c["last_year"] is None, -(c["last_year"] or 0), -c["work_count"], c["key"])
-            for c in valid_output["collaborators"]]
+    rows = [(c["last_year"] is None, -(c["last_year"] or 0), -c["work_count"],
+             c["name"], c["key"]) for c in valid_output["collaborators"]]
     assert rows == sorted(rows)
     assert valid_output["collaborators"][0]["name"] == "Quentin Quinn"
-    assert valid_output["collaborators"][-1]["key"] == "victor-vance-jr-59a346c1"
+
+    # Three that share a year and a work count, so only the name and the key
+    # decide. Their two orders disagree, which is what makes this a test of
+    # which one is used rather than of a coincidence.
+    tied = [(c["name"], c["key"]) for c in valid_output["collaborators"]
+            if c["last_year"] == 2014]
+    assert [name for name, _ in tied] == ["Ada Zima", "Ada \u00dcnal", "Ada \u00dcnal"]
+    keys = [key for _, key in tied]
+    assert keys != sorted(keys), keys
+    # The two that share a name are separated by their keys, ascending, and
+    # the entries wrote them the other way round -- so a sort that stopped at
+    # the name would leave them in the order the input happened to use.
+    assert tied[1][1] < tied[2][1], tied
 
 
 @covers("identity.alike_authorships")
@@ -704,9 +717,11 @@ def test_two_authorships_written_alike_stay_apart(valid_output):
 SPANS_SPELLINGS = "ID-GROUPING-SPANS-SPELLINGS"
 INITIALS_AMBIGUOUS = "ID-GROUPING-INITIALS-AMBIGUOUS"
 
-# (label, the initials-only spelling, the fuller one it could be). Each row
-# is a shape that a check pattern-matching the normalised key cannot see:
-# only the last of them is one initial followed by one plain family name.
+# (label, the initials-only spelling, the fuller one it could be). One row
+# per thing the check compares -- the initials, the family name, the
+# particles and the lineage suffix -- and each is a shape that a check
+# pattern-matching the normalised key cannot see, except `Q. Quinn`, which is
+# the one initial and one plain family name that such a check could match.
 INITIALS_SHADOWS = [
     ("a surname particle", "A. van der Meer", "Anna van der Meer"),
     ("two initials", "A. J. Smithson", "Anna Jane Smithson"),
@@ -722,9 +737,11 @@ INITIALS_SHADOWS = [
 # The complete set of pairs the corpus produces, by readable name. Every
 # name the corpus writes in initials is here, with exactly the fuller names
 # it could be -- so a check that compared one thing less would add a pair and
-# a check that compared one thing more would drop one. The four names under
+# a check that compared one thing more would drop one. The five names under
 # `id-grouping-distinct` appear in no list on purpose: each differs from an
-# initials-only key above in exactly one of the things the check compares.
+# initials-only key above in exactly one of the things the check compares --
+# the particle, the family name, the second initial, the second half of a
+# hyphenated given name, and a lineage suffix that disagrees.
 INITIALS_PAIRS = {
     "A. van der Meer": ["Anna van der Meer"],
     "A. J. Smithson": ["Anna Jane Smithson"],
@@ -760,10 +777,12 @@ def test_the_initials_warnings_are_exactly_these_pairs(valid_validate, valid_out
     """Both directions at once, over the whole corpus.
 
     Comparing one thing less -- dropping the particles, the family name, the
-    second initial, or the second half of a hyphenated one -- adds a pair
-    that is not there. Comparing one thing more drops a pair that is. A test
-    that only asserted the pairs it wanted would catch the second and not the
-    first, which is the direction a warning gets wrong most easily.
+    second initial, the second half of a hyphenated one, or a lineage suffix
+    that disagrees -- adds a pair that is not there. Comparing one thing more
+    drops a pair that is: treating a suffix against none as a disagreement is
+    the case that does it. A test that only asserted the pairs it wanted
+    would catch the second and not the first, which is the direction a
+    warning gets wrong most easily.
     """
     assert reported_initials_pairs(valid_validate.output, valid_output) == INITIALS_PAIRS
 

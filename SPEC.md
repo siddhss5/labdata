@@ -106,17 +106,20 @@ Exit codes, as `labdata.cli.main()` returns them:
 output**: the counts, unresolved names and unknown project ids of
 `--validate` and `--unresolved`, and, in output mode, the `Wrote …` line and
 the entity counts that follow it. **Diagnostics** go to **standard error**,
-in one of three shapes:
+except where `--validate` gathers them into its report on standard output.
+There are four shapes:
 
-| Shape | Source |
-|---|---|
-| `Warning: …` | Problems with the input, from `labdata.parsers.bibtex._warn()` and `labdata.resolver.build_alias_index()`. |
-| `<CODE> <file>:<key>:<field>: …` | A diagnostic carrying a stable code, described under *Diagnostic codes* below. Under `--validate` it appears on standard output, beneath `Bibliography errors` when it fails the run and beneath `Warnings` when it does not; in the other modes a warning is prefixed with `Warning: ` on standard error and an error is written there unprefixed. |
-| `Error: …` | Configuration failures, from `labdata.cli.main()`: `Error: Configuration file not found: …` and `Error loading configuration: …`. |
-| `usage: …` / `…: error: …` | Argument errors, in the argument parser's own format. |
+| Shape | Stream | Source |
+|---|---|---|
+| `Warning: …` | standard error | Problems with the input, from `labdata.parsers.bibtex._warn()` and `labdata.resolver.build_alias_index()`. |
+| `<CODE> <file>:<key>:<field>: …` | see right | A diagnostic carrying a stable code, raised **during assembly** and described under *Diagnostic codes* below. Under `--validate` it is on standard **output**, beneath `Bibliography errors` when it fails the run and beneath `Warnings` when it does not. In the other modes it is on standard **error**: prefixed `Warning: ` when it is a warning, unprefixed when it fails the run. |
+| `Error: …` and `Error loading configuration: …` | standard error | Configuration failures, from `labdata.cli.main()`. A configuration labdata will not read or will not compile from, in **every** mode including `--validate`, because nothing is assembled and there is no report to gather it into. It **may carry a stable code**, after the prefix: `Error loading configuration: CONFIG-BIB-FILE-ABSOLUTE lab.yaml:bib_files:name: …`. That is the one place a code appears inside another shape, and it is where every fatal-at-load code appears. |
+| `usage: …` / `…: error: …` | standard error | Argument errors, in the argument parser's own format. |
 
 There is no single prefix across all diagnostics, and a consumer that greps
-for one will miss the other two.
+for one will miss the other three. A consumer looking for a **code** should
+search the whole line rather than anchor at its start, because of the third
+shape.
 
 **Where the severities live.** `labdata.assembler.AssemblyResult` carries the
 diagnostics that survive assembly in three lists: `fatal_errors` fail every
@@ -161,7 +164,7 @@ without depending on English wording. Codes obey three rules:
 
    | Class | `--validate` | Every other mode | Codes |
    |---|---|---|---|
-   | **Fatal at load** | Exits `1` before anything is compiled. | The same. | `CONFIG-BIB-FILE-ABSOLUTE` |
+   | **Fatal at load** | `Error loading configuration: <CODE> …` on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE` |
    | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY` |
    | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `CONFIG-LAB-NAME-MISSING` |
@@ -183,7 +186,7 @@ Codes in use:
 | `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. A warning: an external co-author is never an error. |
 | `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer, and two lineage suffixes that disagree ruling the pair out — so a particle, a second initial, a hyphenated family name, a suffix and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. A warning, for the same reason. |
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. A warning. |
-| `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute. Raised by `BibFile` itself, so it holds for a configuration built through the Python API as well as one read from YAML. |
+| `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute. Raised as a `labdata.config.ConfigurationError` — its own type, so that a crash still reaches the user as a crash — by `LabDataConfig.from_yaml()`, by `BibFile` itself, and by `assemble()` on every name it is about to compile. The last is the one that holds: `BibFile` is a plain, mutable dataclass, so a name can be set after it was checked. |
 
 Most diagnostics do not carry a code yet. #26 adds them incrementally, and an
 uncoded diagnostic is not a stable interface.
@@ -561,7 +564,7 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 | `generator` | Derived — the compiler's name, its package version and the schema version (`LabData.to_dict()`). No timestamp. |
 | `lab` | Input — the `lab` section of `lab.yaml`, copied unchanged (`LabDataConfig.from_yaml()`), and always emitted. |
 | `work.bib_id`, `work.source.key` | Input — the BibTeX citation key, **as written**. `labdata.parsers.bibtex.entry_fields()` preserves its case. |
-| `work.source.file` | Input — the `name` of the `bib_files` entry the file was listed under, **never an absolute path**. The guarantee is kept by rejecting the input rather than by rewriting it: `LabDataConfig.from_yaml()` fails under `CONFIG-BIB-FILE-ABSOLUTE` for a name that is absolute under POSIX or Windows rules, so a document never carries the compiling machine's directory layout, and a name with a relative directory in it is passed through as the user wrote it. |
+| `work.source.file` | Input — the `name` of the `bib_files` entry the file was listed under, **never an absolute path**. A *relative* directory is fine and is passed through as written: `sub/journal.bib` is a name under `bib_dir`. The guarantee is kept by rejecting the input rather than by rewriting it — rewriting would quietly discard that directory — and it is enforced at the point the name is about to be compiled (`labdata.assembler.assemble()`), not only where it was built, under `CONFIG-BIB-FILE-ABSOLUTE`. |
 | `work.entry_type` | Input — the BibTeX entry type, **lowercased** by `entry_fields()`. Of it and `bib_id`, it is the only one that is case-folded. |
 | `work.title`, `abstract`, `note` | Input — BibTeX fields, converted from LaTeX to text (§2). `note` additionally has trailing `.` and whitespace trimmed (`labdata.parsers.bibtex.extract_note()`). |
 | `work.year` | Input — the BibTeX `year`, as an integer; `null` when the entry supplied none, with a diagnostic (`entry_year()`). |

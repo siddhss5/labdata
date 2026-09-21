@@ -82,6 +82,31 @@ def test_duplicate_keys_warn_but_do_not_block_nonvalidation_modes(tmp_path, case
     assert data is not None
 
 
+@covers("config.bib_files.name_absolute")
+def test_a_fatal_at_load_code_goes_to_standard_error_in_every_mode(tmp_path):
+    """The one shape that carries a code inside another one.
+
+    Nothing is assembled, so there is no `--validate` report to gather the
+    diagnostic into and it cannot be on standard output the way an
+    assembly-time code is. It is on standard error, after the
+    `Error loading configuration: ` prefix, in every mode -- which is why
+    SPEC.md tells a consumer to search a line for a code rather than anchor
+    at its start.
+    """
+    where = INVALID / DIAGNOSTICS["config.bib_files.name_absolute"]["dir"]
+    out = tmp_path / "lab.json"
+    for args in (["--validate"],
+                 ["--unresolved"],
+                 ["--format", "json", "--output", out]):
+        run = run_labdata(["--config", "lab.yaml", *args], where)
+        assert run.crash is None, (args, run.crash)
+        assert run.code == 1, (args, run.output)
+        assert "CONFIG-BIB-FILE-ABSOLUTE" in run.stderr, (args, run.output)
+        assert "CONFIG-BIB-FILE-ABSOLUTE" not in run.stdout, (args, run.output)
+        assert run.stderr.startswith("Error loading configuration: "), run.stderr
+    assert not out.exists(), "a document was written despite a fatal diagnostic"
+
+
 @covers("structure.crossref")
 def test_a_fatal_diagnostic_stops_a_normal_compile(tmp_path):
     """A user cannot produce a document by skipping --validate.

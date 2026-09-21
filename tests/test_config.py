@@ -168,6 +168,23 @@ class TestBibFileNameIsNeverAbsolute:
     def test_a_relative_name_is_built_by_hand_unchanged(self, name):
         assert BibFile(name=name, category="Journal Papers").name == name
 
+    @pytest.mark.parametrize("name", ABSOLUTE)
+    def test_an_absolute_name_set_after_construction_is_rejected(self, tmp_path, name):
+        """`BibFile` is a plain, mutable dataclass, which is public API.
+
+        Checking only in the constructor leaves the guarantee one assignment
+        away from being false, and `assemble()` would emit the absolute path
+        with no diagnostic at all. The check that holds is the one made on
+        every name about to be compiled.
+        """
+        bib_file = BibFile(name="journal.bib", category="Journal Papers")
+        bib_file.name = name
+        with pytest.raises(ValueError) as raised:
+            assemble(LabDataConfig(bib_dir=str(tmp_path), bib_files=[bib_file]))
+        message = str(raised.value)
+        assert message.startswith(self.CODE), message
+        assert name in message
+
     def test_a_document_built_by_hand_never_carries_an_absolute_source(self, tmp_path):
         """End to end through the public API, with no YAML anywhere."""
         (tmp_path / "journal.bib").write_text(

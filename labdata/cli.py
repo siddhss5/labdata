@@ -72,7 +72,10 @@ Examples:
         print(f"Error loading configuration: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Assemble data with diagnostics
+    # Assemble data with diagnostics. `assemble()` rejects a configuration it
+    # will not compile from, but `from_yaml()` above has already rejected the
+    # same thing with the file named, so from here that cannot happen: the
+    # check downstream is for callers who built a configuration themselves.
     result = assemble(config, diagnostics=True)
     data = result.data
 

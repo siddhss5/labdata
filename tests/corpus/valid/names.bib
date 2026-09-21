@@ -339,3 +339,20 @@
   journal = {Journal of Fictional Robots},
   year    = {2015}
 }
+
+% Three external names sharing a year and a work count, so only the last two
+% sort keys decide between them. Their name order and their key order
+% disagree -- the slug strips the accent, so `Ada Zima` comes before
+% `Ada Ünal` by name (`Z` is U+005A, `Ü` is U+00DC) and
+% `ada-unal-...` comes before `ada-zima-...` by key -- and two of them carry
+% the same readable name, one parsed and one brace-protected, which only the
+% key separates -- and they are written in the order the key does *not* put
+% them in, so a sort that stopped at the name would leave them the other way
+% round.
+% CASE output.collaborators.order
+@article{id-order-tie,
+  title   = {Names That Sort One Way and Key Another},
+  author  = {Adams, Alice and Ünal, Ada and {Ada Ünal} and Zima, Ada},
+  journal = {Journal of Fictional Robots},
+  year    = {2014}
+}
