@@ -3,7 +3,7 @@ labdata - Renderer-agnostic academic lab data assembler.
 
 Transforms BibTeX files and YAML configuration into structured data
 (YAML/JSON) for academic lab websites. Framework-agnostic: works with
-Jekyll, Hugo, Flask, or any other consumer.
+any static site generator, web framework, or other consumer.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
 Author: Siddhartha Srinivasa <siddh@cs.washington.edu>

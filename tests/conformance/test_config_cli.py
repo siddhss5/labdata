@@ -21,8 +21,8 @@ def test_config_present(valid_output):
     categories = {w["category"] for w in valid_output["works"]}
     assert categories == {"Strings", "Names", "LaTeX", "Structure", "Encoding", "Links",
                           "Projects"}
-    # site is for scripts/generate_site_config.py; labdata accepts it and
-    # does not copy it into the output.
+    # site is for downstream renderers; labdata accepts it and does not
+    # copy it into the output.
     assert "site" not in valid_output
 
 

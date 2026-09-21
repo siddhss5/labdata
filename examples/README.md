@@ -4,8 +4,7 @@ Minimal examples showing how to use labdata from the command line and from Pytho
 
 All examples use the fictional **Example Lab** in [`demo/`](demo/): four BibTeX files,
 `people.yaml` and `projects.yaml`. Its people, works and projects, and their
-example.org, DOI, arXiv and video links, are invented. Only `site.url` and `site.baseurl`
-in `demo/lab.yaml` are real: they are where the demo is deployed.
+example.org, DOI, arXiv and video links, are invented.
 Run the commands below from this `examples/` directory.
 
 ## Command Line
@@ -40,7 +39,7 @@ See `basic_usage.py` for a more complete example that inspects the assembled dat
 
 See `config.yaml` for an annotated example of the configuration format. It points at
 the files in `demo/`. [`demo/lab.yaml`](demo/lab.yaml) configures the same lab with paths
-relative to the repository root, plus the `site` settings used to build the demo site.
+relative to the repository root.
 
 ## Consumer Probes
 
@@ -50,7 +49,8 @@ export, an edge list and a BibTeX re-emission. They are falsification tests
 rather than examples to copy: four of them cannot be written against the
 current schema, and that is the point. See [`consumers/README.md`](consumers/README.md).
 
-## Jekyll Site
+## Demo Site
 
-For a complete Jekyll site that renders labdata output, see the [`site/`](../site/) directory.
-The live demo site is built from `demo/lab.yaml`.
+[labdata-site](https://github.com/siddhss5/labdata-site) is an optional
+downstream renderer of labdata output. It keeps its own copy of the Example Lab
+and builds the demo site from it.

@@ -14,7 +14,7 @@ lab:
   university: "Example University"
   website: "https://example.org/corpus"
 
-# Read by scripts/generate_site_config.py, not by labdata, which accepts it.
+# Read by downstream renderers, not by labdata, which accepts it.
 # CASE config.site
 site:
   url: "https://example.org"

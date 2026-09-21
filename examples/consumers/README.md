@@ -3,9 +3,10 @@
 **If a consumer probe cannot be written from the emitted document alone, that
 is a schema bug, not a probe bug.**
 
-That rule is why this directory exists. The bundled Jekyll site in `site/` is
-the only other evidence that the emitted document is enough to build anything
-with, and it is weak evidence: it grew up alongside the data and quietly
+That rule is why this directory exists. The demo site in
+[labdata-site](https://github.com/siddhss5/labdata-site) is the only other
+evidence that the emitted document is enough to build anything with, and it
+is weak evidence: it grew up alongside the data and quietly
 absorbed its quirks. These five probes are the falsification test. Each one is
 a different kind of consumer, and each is written against the document and
 nothing else, so a quirk the demo absorbed shows up here as a probe that
@@ -129,11 +130,11 @@ is the apostrophe — in two abstracts and one project description — and an
 apostrophe in element text is harmless. No `<`, `>`, `&` or double quote
 appears in any field the page renders, and no demo value reaches an attribute
 carrying a character that could break out of one. So #55 names this probe as
-the renderer we own where escaping can be asserted, and the assertion needs
-values the demo does not supply. (#55 mentions #36 alongside this; #36 is
-about testing the rendered Jekyll site — snapshots, internal links,
-accessibility — and says nothing about escaping, so nothing here depends on
-it.)
+the renderer in this repository where escaping can be asserted, and the
+assertion needs values the demo does not supply. (#55 mentions
+siddhss5/labdata#36 alongside this; that issue is about testing a rendered
+site — snapshots, internal links, accessibility — and says nothing about
+escaping, so nothing here depends on it.)
 
 `test_plain_html_escapes_hostile_text` therefore puts hostile values into a
 copy of the document — markup and quotes in a title, a person's name and the

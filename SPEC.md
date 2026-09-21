@@ -37,8 +37,8 @@ would.
 ## 1. Contract hierarchy
 
 **The emitted document plus its published schema is normative.** Everything
-else in this repository — the CLI's internals, the Python classes, the
-bundled Jekyll templates — exists to produce that document.
+else in this repository — the CLI's internals, the Python classes — exists
+to produce that document.
 
 **When the emitted document and the schema disagree, the schema wins and the
 code is the bug.** A consumer that validates against the published schema and
@@ -422,9 +422,9 @@ contain markup, and it applies only to the fields under heading 1.
 > nothing left to generate. `tests/COVERAGE.md` rows `output.no_markup` and
 > the two tests behind it assert it: nothing in the demo document is Markdown
 > or HTML, and the Markdown punctuation the corpus does carry is input text
-> in a property whose value the input supplies. #18 remains open for the
-> template side — `| escape`, attribute-safe escaping and the checks on
-> rendered output.
+> in a property whose value the input supplies. #18 remains open for
+> renderers — escaping, attribute-safe escaping and the checks on rendered
+> output.
 
 ---
 
@@ -810,8 +810,8 @@ still resolves and still says `3`.
 The rule that makes it a contract rather than a guess: **the `schema-v4` tag
 is created when this version ships and is never moved.** A branch URL such as
 `blob/main` is not usable — it serves an HTML page rather than the schema, so
-no consumer can ever have resolved v3's `$id` — and this repository's Pages
-deploy is not usable either, because #57 removes it. A commit SHA would be
+no consumer can ever have resolved v3's `$id` — and this repository publishes
+no website to serve it from. A commit SHA would be
 genuinely immutable rather than immutable by convention, but a commit cannot
 reference its own SHA, so the file that introduces a version cannot carry one;
 the tag is the closest thing that can be written down at the time the file is
@@ -932,8 +932,9 @@ vocabularies, not over arbitrary content.
 ## 9. What this file is not
 
 It does not list the document's fields; `schema/v4/output.schema.json` does.
-It does not describe the Jekyll templates in `site/`, which are one
-downstream consumer and move to their own repository in #57. It does not describe the input formats `lab.yaml`,
+It does not describe renderers such as
+[labdata-site](https://github.com/siddhss5/labdata-site), which are
+downstream consumers in their own repositories. It does not describe the input formats `lab.yaml`,
 `people.yaml` and `projects.yaml` beyond what §5 needs; schemas for those are
 #37.
 

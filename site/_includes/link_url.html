@@ -1,9 +1,0 @@
-{%- comment -%}
-The first URL a work is filed under for one link kind, or nothing.
-
-`links` is an open map from kind to a *list* of link records, so a work can
-carry more than one of a kind. This takes the first, which is what a single
-button wants; a page that wants them all loops over the list itself.
-{%- endcomment -%}
-{%- assign records = include.work.links[include.kind] -%}
-{%- if records -%}{%- if records.size > 0 -%}{{ records[0].url }}{%- endif -%}{%- endif -%}

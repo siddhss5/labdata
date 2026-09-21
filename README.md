@@ -277,24 +277,17 @@ change without a version bump.
 
 ## The demo renderer
 
-[`site/`](site/) holds a Jekyll template that renders the Example Lab document,
-and [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) publishes it
-to GitHub Pages ([what it looks like](https://siddhss5.github.io/labdata/)).
-It is a **downstream consumer kept here as a worked example**,
-not part of what labdata promises; it moves to its own repository in
-[#57](https://github.com/siddhss5/labdata/issues/57).
+[labdata-site](https://github.com/siddhss5/labdata-site) renders the Example
+Lab document as a website ([what it looks like](https://siddhss5.github.io/labdata-site/)).
+It is an **optional downstream consumer**, not part of labdata and not part of
+what labdata promises; it installs labdata from a pinned tag and keeps its own
+copy of the demo. labdata ignores a `site:` section in `lab.yaml`, so a
+renderer can keep its own settings there.
 
-`scripts/generate_site_config.py` reads an optional `site:` section of
-`lab.yaml` (`url` and `baseurl`) and writes it, with the lab name and
-description, into `site/_config.generated.yml`. labdata itself ignores that
-section. To build the demo locally:
-
-```bash
-labdata --config examples/demo/lab.yaml --output site/_data/lab.yml
-python scripts/generate_site_config.py examples/demo/lab.yaml site/_config.generated.yml
-cd site && bundle install
-bundle exec jekyll serve --config _config.yml,_config.generated.yml
-```
+Before publishing a labdata release, build labdata-site against the candidate:
+run its **Release gate** workflow with the candidate's git ref as
+`labdata_ref`. It builds without deploying, and keeps the renderer's toolchain
+out of this repository's CI.
 
 ## Dependencies
 

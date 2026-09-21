@@ -266,9 +266,10 @@ def test_plain_html_page_is_complete(probe_output, demo_document):
 # (Its venues are full of `*`, which HTML does not treat specially: that is
 # the Markdown the page deliberately renders.) So these values are put into a
 # copy of the document instead, and the unmodified probe is run on that. #55
-# names this probe as the Ruby-free renderer where escaping behaviour can be
-# asserted. It mentions #36 alongside, but #36 is about testing the rendered
-# Jekyll site and says nothing about escaping, so nothing here relies on it.
+# names this probe as the renderer in this repository where escaping behaviour
+# can be asserted. It mentions siddhss5/labdata#36 alongside, but that issue
+# is about testing a rendered site and says nothing about escaping, so nothing
+# here relies on it.
 
 HOSTILE_TITLE = '</span></li><script>alert("x")</script> & <b>bold</b>'
 HOSTILE_NAME = 'Ada <b>"Lovelace"</b> & Co'
