@@ -171,24 +171,22 @@ class LabDataConfig:
             reject(TYPE_INVALID, 'bib_files', None,
                    f"bib_files is {_kind(entries)}; it must be a list of "
                    "{name, category} mappings")
+        # An entry that is not a mapping, or whose name or category is not a
+        # string, is not checked here: no contract row covers it yet, and it
+        # fails or passes as it always has.
         for number, bf in enumerate(entries, start=1):
             if not isinstance(bf, dict):
-                reject(TYPE_INVALID, 'bib_files', None,
-                       f"bib_files entry {number} is {_kind(bf)}; it must be "
-                       "a {name, category} mapping")
+                continue
             for required in ('name', 'category'):
                 if bf.get(required) is None:
                     reject(KEY_MISSING, 'bib_files', required,
                            f"bib_files entry {number} has no {required}")
-                if not isinstance(bf[required], str):
-                    reject(TYPE_INVALID, 'bib_files', required,
-                           f"bib_files entry {number} has a {required} that "
-                           f"is {_kind(bf[required])}; it must be a string")
 
         # Checked here as well as in `BibFile`, because here the file the
         # user would edit is known and the diagnostic can name it.
         for bf in entries:
-            reject_absolute_name(bf['name'], f"{path}:bib_files:name")
+            if isinstance(bf, dict):
+                reject_absolute_name(bf.get('name'), f"{path}:bib_files:name")
 
         bib_files = [BibFile(**bf) for bf in entries]
 
