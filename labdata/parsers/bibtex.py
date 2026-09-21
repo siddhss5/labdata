@@ -278,13 +278,14 @@ def _duplicate_key_error(
 
 
 def _on_comment_line(text: str, position: Optional[int]) -> bool:
-    """True when ``position`` is on a line that is a `%` comment.
+    """True when ``position`` is on a line that starts with `%`.
 
     The parser library reads an `@` anywhere outside an entry as the start of
-    a command, so prose in a `%` comment that mentions `@article` fails to
-    parse. labdata ignores `%` comment lines between entries
-    (`tests/COVERAGE.md` row `structure.comment_lines`), so such a failure is
-    not reported: the text was never meant as BibTeX.
+    a command, so prose on a `%` line that mentions `@article` fails to parse.
+    That failure is not reported: the prose was never meant as BibTeX
+    (`tests/COVERAGE.md` row `structure.comment_lines`). Only the report is
+    suppressed. A well-formed command on such a line is still read, as the
+    library reads it; whether it should be is #78.
     """
     if position is None:
         return False
