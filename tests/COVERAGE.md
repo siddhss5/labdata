@@ -44,8 +44,8 @@ A case can also be checked by tests other than the one its row names; the
 status column reports `xfail` when any of them is xfailed.
 
 Cases that fail today are not fixed here (that is the linked issue's job):
-#20 (verifying a remote link), #21 (one `@string` summary), #26 (precise
-diagnostics), #27 (explicit link and award fields), #28 (`keywords` project
+#20 (verifying a remote link), #21 (one `@string` summary),
+#27 (explicit link and award fields), #28 (`keywords` project
 tags). #18 is still open for
 renderers — escaping, attribute-safe escaping and the checks on rendered
 output — but every LaTeX-to-text row below passes, and the one place
@@ -64,7 +64,7 @@ the second definition is the one that reaches the output.
 | `strings.defined_once` | A macro defined exactly once | Expanded like any other; no message mentions it | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_macro_defined_once_is_not_reported` | pass |
 | `strings.concat` | `"Joined " # "Title"` and `"Proceedings of the " # cfx` | The parts are concatenated, macros expanded | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
 | `strings.macro_journal` | `journal = jfx # " Letters"` | The journal is the expanded macro plus the literal suffix | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
-| `strings.undefined` | `booktitle = nosuchmacro`, which no `@string` defines | Warning naming the file, key, field and macro; the entry and its neighbours are kept | `tests/corpus/invalid/undefined_string/macro.bib` | `test_invalid_corpus.py::test_kept` | xfail #26 |
+| `strings.undefined` | `booktitle = nosuchmacro`, which no `@string` defines | Warning naming the file, key, field and macro; the entry and its neighbours are kept | `tests/corpus/invalid/undefined_string/macro.bib` | `test_invalid_corpus.py::test_kept` | pass |
 | `structure.comment_lines` | A `%` comment line between entries | Ignored; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
 | `structure.comment_entry` | `@comment{...}` wrapping something that looks like an entry | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
 | `structure.preamble` | `@preamble{"..."}` | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
@@ -78,13 +78,13 @@ the second definition is the one that reaches the output.
 | `structure.crossref_undefined_parent` | A `crossref` naming an entry that does not exist | The same error, not a milder one | `tests/corpus/invalid/crossref_undefined_parent/crossref.bib` | `test_invalid_corpus.py::test_locates` | pass |
 | `structure.crossref_no_parent` | A `crossref` field with no parent key in it, written empty and written as whitespace | The same error: the field is rejected on its presence, not on its value, and the diagnostic says the entry names no parent rather than quoting a blank one | `tests/corpus/invalid/crossref_no_parent/crossref.bib` | `test_invalid_corpus.py::test_locates` | pass |
 | `structure.bom_crlf` | A file with a UTF-8 BOM and CRLF line endings | Read normally; the BOM is not part of the first key, accents still decode | `tests/corpus/valid/encoding.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `structure.unclosed_brace` | An entry whose `title` brace is never closed | Warning naming the file, key and `title`; the entries before and after it are still read | `tests/corpus/invalid/unclosed_brace/broken.bib` | `test_invalid_corpus.py::test_kept` | xfail #26 |
+| `structure.unclosed_brace` | An entry whose `title` brace is never closed | Warning naming the file, key and `title`; the entries before and after it are still read | `tests/corpus/invalid/unclosed_brace/broken.bib` | `test_invalid_corpus.py::test_kept` | pass |
 | `structure.duplicate_key_file` | The same citation key twice in one file | Stable `BIB-DUPLICATE-KEY` error names the file, key and `citation_key` field | `tests/corpus/invalid/duplicate_key_same_file/dup.bib` | `test_invalid_corpus.py::test_locates` | pass |
 | `structure.duplicate_key_across` | The same citation key in two files | Stable `BIB-DUPLICATE-KEY` error names both files, keys and `citation_key` field | `tests/corpus/invalid/duplicate_key_across_files/first.bib` | `test_invalid_corpus.py::test_locates` | pass |
 | `structure.missing_year` | An entry with no `year` | Stable `BIB-YEAR-MISSING` warning names the file, key and `year`; the work is emitted with `year: null` and sorts last | `tests/corpus/invalid/missing_year/noyear.bib` | `test_invalid_corpus.py::test_locates` | pass |
-| `structure.year_not_number` | `year = {in press}` | Warning naming the file, key and field; the entry and its neighbours are kept | `tests/corpus/invalid/year_not_number/badyear.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `structure.missing_journal` | An `@article` with no `journal` | Warning naming the file, key and field; the entry is kept | `tests/corpus/invalid/missing_journal/nojournal.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `structure.missing_booktitle` | An `@inproceedings` with no `booktitle` | Warning naming the file, key and field; the entry is kept | `tests/corpus/invalid/missing_booktitle/nobooktitle.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `structure.year_not_number` | `year = {in press}` | Warning naming the file, key and field; the entry and its neighbours are kept | `tests/corpus/invalid/year_not_number/badyear.bib` | `test_invalid_corpus.py::test_locates` | pass |
+| `structure.missing_journal` | An `@article` with no `journal` | Warning naming the file, key and field; the entry is kept | `tests/corpus/invalid/missing_journal/nojournal.bib` | `test_invalid_corpus.py::test_locates` | pass |
+| `structure.missing_booktitle` | An `@inproceedings` with no `booktitle` | Warning naming the file, key and field; the entry is kept | `tests/corpus/invalid/missing_booktitle/nobooktitle.bib` | `test_invalid_corpus.py::test_locates` | pass |
 
 ## Entry types
 Every type labdata has a venue rule for, plus one it does not.
@@ -99,7 +99,7 @@ Every type labdata has a venue rule for, plus one it does not.
 | `types.techreport_default` | `@techreport` with only `institution` | The same venue; `type` is null rather than a label labdata invented | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `types.misc_arxiv` | `@misc` with `eprint` | Venue `{kind: repository, name: arXiv}`; the identifier is `identifiers.arxiv` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `types.misc` | `@misc` with no venue fields | Venue is null: nothing names a container, so the work declares none | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `types.unsupported` | `@book`, a type labdata has no venue rule for | Warning naming the file, key and type; the entry is kept | `tests/corpus/invalid/unsupported_entry_type/book.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `types.unsupported` | `@unpublished`, a type labdata has no venue rule for | Warning naming the file, key and type; the entry is kept | `tests/corpus/invalid/unsupported_entry_type/entry.bib` | `test_invalid_corpus.py::test_locates` | pass |
 | `types.incollection` | `@incollection` with `booktitle`, `editor`, `chapter`, `pages`, `publisher`, `series`, `isbn` and `month` | The `booktitle` naming the collection is the venue's name, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
 | `types.inbook` | `@inbook` with `chapter`, `pages`, `publisher`, `address`, `edition` and `isbn` | The `publisher` of the book is a property of the work, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
 | `types.book` | `@book` with `publisher`, `address`, `series`, `edition` and `isbn` | The `publisher` is a property of the work, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
@@ -203,7 +203,7 @@ cannot be.
 | `identity.grouping_spellings` | One external name written `Ross, Rachel` on one entry and `ROSS, RACHEL` on another | One key with two `name_variants`, and a `ID-GROUPING-SPANS-SPELLINGS` warning naming the key. Not an error | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_grouping_risks_are_reported` | pass |
 | `identity.grouping_suffix` | `Tate, Jr., T.` beside `Tate, Jr., Tobias` and `Tate, Sr., Tobias`, and `Vance, V.` beside `Vance, Jr., Victor` | The pair whose suffixes agree is reported and so is the pair where only one side writes one, because an entry that omits a suffix has said nothing. The pair whose suffixes disagree is not: two lineage suffixes that disagree are two people | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_an_initials_only_key_that_could_be_a_fuller_one_is_reported` | pass |
 | `identity.grouping_initials` | `Quinn, Q.` beside `Quinn, Quentin`, and six more pairs: a surname particle, two initials, a hyphenated family name, a name outside ASCII, a lineage suffix that agrees, and a lineage suffix on one side only | Two keys each, which differ — the instability is intended, not a merge — and an `ID-GROUPING-INITIALS-AMBIGUOUS` warning naming both. Decided on the structured parts — the initials, the family name, the particles and the suffix — so none of those shapes is missed. Not an error | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_an_initials_only_key_that_could_be_a_fuller_one_is_reported` | pass |
-| `identity.ambiguous_alias` | Two people declaring the same alias | Warning naming both ids and the alias; the name resolves to neither | `tests/corpus/invalid/ambiguous_alias/people.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `identity.ambiguous_alias` | Two people declaring the same alias | Warning naming both ids and the alias; the name resolves to neither | `tests/corpus/invalid/ambiguous_alias/people.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 
 ## LaTeX and text
 Titles, abstracts and notes are meant to reach the site as plain Unicode text,
@@ -232,7 +232,7 @@ the source text are not markup and must survive unchanged.
 | `latex.unicode_raw` | Raw CJK and emoji | Passed through unchanged | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.abstract` | An abstract with accents, math and `\emph` | Same rules as a title: plain text with math left as TeX | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
 | `latex.note_href` | `note = {Code at \href{url}{our site}}` | The link and its text both survive; the entry is never dropped | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_latex` | pass |
-| `latex.unknown_macro` | `\fictionalmacro{Strange}` | Warning naming the file, key and field; the macro's text is kept and no raw LaTeX reaches the output | `tests/corpus/invalid/unknown_macro/macro.bib` | `test_invalid_corpus.py::test_unknown_macro_keeps_its_text` | xfail #26 |
+| `latex.unknown_macro` | `\fictionalmacro{Strange}` | Warning naming the file, key and field; the macro's text is kept and no raw LaTeX reaches the output | `tests/corpus/invalid/unknown_macro/macro.bib` | `test_invalid_corpus.py::test_unknown_macro_keeps_its_text` | pass |
 
 ## Links
 
@@ -260,19 +260,19 @@ the source text are not markup and must survive unchanged.
 | `projects.multiple` | `project = {homebot, sharedarm}` | Both ids, in source order; both projects back-link the paper | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_projects` | pass |
 | `projects.none` | No project tag | Empty `project_ids` | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_projects` | pass |
 | `projects.keywords` | `keywords = {project:sharedarm, manipulation}` | The namespaced keyword is read as a project tag | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_projects` | xfail #28 |
-| `projects.undefined` | A tag no `projects.yaml` entry defines | Error naming the file, key, field and tag; `--validate` exits non-zero | `tests/corpus/invalid/undefined_project/tagged.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `projects.duplicate_id` | The same project id twice in `projects.yaml` | Error naming the file and the repeated id | `tests/corpus/invalid/duplicate_project_id/projects.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `projects.invalid_status` | `status: sometimes` | Warning naming the file, project and field | `tests/corpus/invalid/invalid_project_status/projects.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `projects.undefined` | A tag no `projects.yaml` entry defines | Error naming the file, key, field and tag; `--validate` exits non-zero | `tests/corpus/invalid/undefined_project/tagged.bib` | `test_invalid_corpus.py::test_locates` | pass |
+| `projects.duplicate_id` | The same project id twice in `projects.yaml` | Error naming the file and the repeated id | `tests/corpus/invalid/duplicate_project_id/projects.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `projects.invalid_status` | `status: sometimes` | Warning naming the file, project and field | `tests/corpus/invalid/invalid_project_status/projects.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 
 ## People file
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `people.duplicate_id` | The same person id twice in `people.yaml` | Error naming the file and the repeated id | `tests/corpus/invalid/duplicate_person_id/people.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `people.invalid_role` | `role: wizard`, outside the roles the site groups by | Warning naming the file, person and field | `tests/corpus/invalid/invalid_person_role/people.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `people.invalid_status` | `status: retired`, neither current nor alumni | Warning naming the file, person and field | `tests/corpus/invalid/invalid_person_status/people.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `people.missing_name` | A person with an `id` but no `name` | Error naming the file, the person and the missing field | `tests/corpus/invalid/people_missing_name/people.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `people.not_a_list` | A mapping where labdata expects a list of people | Error naming the file | `tests/corpus/invalid/people_not_a_list/people.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `people.duplicate_id` | The same person id twice in `people.yaml` | Error naming the file and the repeated id | `tests/corpus/invalid/duplicate_person_id/people.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `people.invalid_role` | A `role` that is missing, empty, or not a string | Warning naming the file, person and field | `tests/corpus/invalid/invalid_person_role/people.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `people.invalid_status` | `status: retired`, neither current nor alumni | Warning naming the file, person and field | `tests/corpus/invalid/invalid_person_status/people.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `people.missing_name` | A person with an `id` but no `name` | Error naming the file, the person and the missing field | `tests/corpus/invalid/people_missing_name/people.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `people.not_a_list` | A mapping where labdata expects a list of people | Error naming the file | `tests/corpus/invalid/people_not_a_list/people.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 
 ## Config keys
 Every key of `lab.yaml`, present, missing and wrong-typed. Wrong-typed and
@@ -282,32 +282,32 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 |---|---|---|---|---|---|
 | `config.lab.present` | A `lab:` section | Copied into the output as `lab` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
 | `config.lab.missing` | No `lab:` section | Accepted; `lab` is emitted as `{}`, so no header and an empty header are the same document | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_lab_missing` | pass |
-| `config.lab.wrong_type` | `lab: "Corpus Lab"`, a string | Error naming the file and the key | `tests/corpus/invalid/config_lab_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `config.lab.wrong_type` | `lab: "Corpus Lab"`, a string | Error naming the file and the key | `tests/corpus/invalid/config_lab_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 | `config.site` | A `site:` section, read by downstream renderers | Accepted by labdata and not copied into the output | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
 | `config.bib_dir.present` | `bib_dir: "."` | The `.bib` files are read from that directory | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
-| `config.bib_dir.missing` | No `bib_dir` | Error naming the missing key | `tests/corpus/invalid/config_bib_dir_missing/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `config.bib_dir.wrong_type` | `bib_dir` as a list | Error naming the file and the key | `tests/corpus/invalid/config_bib_dir_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `config.bib_dir.missing` | No `bib_dir` | Error naming the missing key | `tests/corpus/invalid/config_bib_dir_missing/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `config.bib_dir.wrong_type` | `bib_dir` as a list | Error naming the file and the key | `tests/corpus/invalid/config_bib_dir_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 | `config.bib_files.present` | `bib_files` with a name and category each | Each file is read and its category lands on every publication in it | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
-| `config.bib_files.missing` | No `bib_files` | Warning naming the key; an empty publication list is not silently normal | `tests/corpus/invalid/config_bib_files_missing/lab.yaml` | `test_invalid_corpus.py::test_reports` | xfail #26 |
-| `config.bib_files.wrong_type` | `bib_files` as a string | Error naming the file and the key | `tests/corpus/invalid/config_bib_files_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `config.bib_files.name_missing` | A `bib_files` entry with no `name` | Error naming the file, the section and the missing key | `tests/corpus/invalid/config_bib_file_no_name/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `config.bib_files.missing` | No `bib_files` | Warning naming the key; an empty publication list is not silently normal | `tests/corpus/invalid/config_bib_files_missing/lab.yaml` | `test_invalid_corpus.py::test_reports` | pass |
+| `config.bib_files.wrong_type` | `bib_files` as a string | Error naming the file and the key | `tests/corpus/invalid/config_bib_files_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `config.bib_files.name_missing` | A `bib_files` entry with no `name` | Error naming the file, the section and the missing key | `tests/corpus/invalid/config_bib_file_no_name/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 | `config.bib_files.name_absolute` | A `bib_files` entry whose `name` is an absolute path | Error naming the file, the section, the key and the offending name; the configuration does not load, because the name is emitted as `source.file`, which is never absolute | `tests/corpus/invalid/config_bib_file_absolute/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
-| `config.bib_files.category_missing` | A `bib_files` entry with no `category` | Error naming the file, the section and the missing key | `tests/corpus/invalid/config_bib_file_no_category/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `config.bib_files.not_found` | A `bib_files` entry naming a file that is not there | Error naming the missing file | `tests/corpus/invalid/bib_file_not_found/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `config.bib_files.category_missing` | A `bib_files` entry with no `category` | Error naming the file, the section and the missing key | `tests/corpus/invalid/config_bib_file_no_category/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `config.bib_files.not_found` | A `bib_files` entry naming a file that is not there | Error naming the missing file | `tests/corpus/invalid/bib_file_not_found/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 | `config.pdf_base_url.present` | `pdf_base_url` pointing at a local directory | PDF links are built from it | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_pdf_base_url_present` | pass |
 | `config.pdf_base_url.missing` | No `pdf_base_url` | Accepted; no work gets a link of kind `pdf` at all, which is a third answer beside `verified` and `missing` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_pdf_base_url_missing` | pass |
-| `config.pdf_base_url.wrong_type` | `pdf_base_url: 42` | Error naming the file and the key | `tests/corpus/invalid/config_pdf_base_url_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `config.pdf_base_url.wrong_type` | `pdf_base_url: 42` | Error naming the file and the key | `tests/corpus/invalid/config_pdf_base_url_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 | `config.people_file.present` | `people_file` pointing at a people list | People are loaded and authors are resolved against them | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_people_file_present` | pass |
 | `config.people_file.missing` | No `people_file` | Accepted; every author is a collaborator, and `--unresolved` says resolution is not configured | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_people_file_missing` | pass |
-| `config.people_file.not_found` | `people_file` naming a file that is not there | Error naming the key and the missing file | `tests/corpus/invalid/people_file_not_found/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `config.people_file.wrong_type` | `people_file` as a list | Error naming the file and the key | `tests/corpus/invalid/config_people_file_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `config.people_file.not_found` | `people_file` naming a file that is not there | Error naming the key and the missing file | `tests/corpus/invalid/people_file_not_found/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `config.people_file.wrong_type` | `people_file` as a list | Error naming the file and the key | `tests/corpus/invalid/config_people_file_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 | `config.projects_file.present` | `projects_file` pointing at a project list | Projects are loaded and tags are validated against them | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_projects_file_present` | pass |
 | `config.projects_file.missing` | No `projects_file` | Accepted; no projects, and project tags are kept on works | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_projects_file_missing` | pass |
 | `config.collaborators_file.present` | `collaborators_file` pointing at a list of `{name, aliases}` | Accepted; the spellings it declares are grouped into one collaborator each, and nothing resolves to a person through it | `tests/corpus/valid/collaborators.yaml` | `test_config_cli.py::test_config_collaborators_file_present` | pass |
-| `config.projects_file.not_found` | `projects_file` naming a file that is not there | Error naming the key and the missing file | `tests/corpus/invalid/projects_file_not_found/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `config.projects_file.wrong_type` | `projects_file` as a list | Error naming the file and the key | `tests/corpus/invalid/config_projects_file_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `config.unknown_key` | A misspelled key such as `people_fil` | Warning naming the file and the unknown key | `tests/corpus/invalid/config_unknown_key/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `config.not_a_mapping` | A `lab.yaml` holding a list | Error naming the file | `tests/corpus/invalid/config_not_a_mapping/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `config.projects_file.not_found` | `projects_file` naming a file that is not there | Error naming the key and the missing file | `tests/corpus/invalid/projects_file_not_found/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `config.projects_file.wrong_type` | `projects_file` as a list | Error naming the file and the key | `tests/corpus/invalid/config_projects_file_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `config.unknown_key` | A misspelled key such as `people_fil` | Warning naming the file and the unknown key | `tests/corpus/invalid/config_unknown_key/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `config.not_a_mapping` | A `lab.yaml` holding a list | Error naming the file | `tests/corpus/invalid/config_not_a_mapping/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 
 ## CLI flags and output formats
 

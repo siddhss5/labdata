@@ -23,7 +23,6 @@ structure.unclosed_brace:
   exit: any
   locates: [broken.bib, brace-broken, title]
   kept: [brace-before, brace-after]
-  xfail: {locates: "#26"}
 
 structure.duplicate_key_file:
   dir: duplicate_key_same_file
@@ -69,21 +68,18 @@ structure.year_not_number:
   exit: any
   locates: [badyear.bib, bad-year, year]
   kept: [bad-year, ok-entry]
-  xfail: {exit: "#26", locates: "#26", kept: "#26"}
 
 structure.missing_journal:
   dir: missing_journal
   exit: any
   locates: [nojournal.bib, no-journal, journal]
   kept: [no-journal]
-  xfail: {locates: "#26"}
 
 structure.missing_booktitle:
   dir: missing_booktitle
   exit: any
   locates: [nobooktitle.bib, no-booktitle, booktitle]
   kept: [no-booktitle]
-  xfail: {locates: "#26"}
 
 strings.undefined:
   dir: undefined_string
@@ -91,15 +87,13 @@ strings.undefined:
   reports: [nosuchmacro]
   locates: [macro.bib, undefined-macro, booktitle]
   kept: [undefined-macro, ok-entry]
-  xfail: {locates: "#26"}
 
 types.unsupported:
   dir: unsupported_entry_type
   exit: any
-  reports: [book]
-  locates: [book.bib, a-book]
-  kept: [a-book]
-  xfail: {reports: "#26", locates: "#26"}
+  reports: [unpublished]
+  locates: [entry.bib, draft-note, entry_type]
+  kept: [draft-note]
 
 latex.unknown_macro:
   dir: unknown_macro
@@ -107,7 +101,6 @@ latex.unknown_macro:
   reports: [fictionalmacro]
   locates: [macro.bib, unknown-macro, title]
   kept: [unknown-macro]
-  xfail: {reports: "#26", locates: "#26"}
 
 # --- Projects, people and identity -------------------------------------------
 
@@ -117,54 +110,48 @@ projects.undefined:
   reports: [nosuchproject]
   locates: [tagged.bib, proj-undefined, project]
   kept: [proj-undefined]
-  xfail: {locates: "#26"}
 
 people.duplicate_id:
   dir: duplicate_person_id
   exit: error
   reports: [aadams]
   locates: [people.yaml]
-  xfail: {exit: "#26", reports: "#26", locates: "#26"}
 
 projects.duplicate_id:
   dir: duplicate_project_id
   exit: error
   reports: [homebot]
   locates: [projects.yaml]
-  xfail: {exit: "#26", reports: "#26", locates: "#26"}
 
+# A role is any non-empty string, so what is wrong is the absence of one:
+# missing (bbrown), empty (ccote) or not a string (ddavis).
 people.invalid_role:
   dir: invalid_person_role
   exit: any
-  reports: [wizard]
-  locates: [people.yaml, bbrown, role]
-  xfail: {reports: "#26", locates: "#26"}
+  reports: [PEOPLE-ROLE-INVALID]
+  locates: [people.yaml, bbrown, ccote, ddavis, role]
 
 people.invalid_status:
   dir: invalid_person_status
   exit: any
   reports: [retired]
   locates: [people.yaml, bbrown, status]
-  xfail: {reports: "#26", locates: "#26"}
 
 projects.invalid_status:
   dir: invalid_project_status
   exit: any
   reports: [sometimes]
   locates: [projects.yaml, sharedarm, status]
-  xfail: {reports: "#26", locates: "#26"}
 
 people.missing_name:
   dir: people_missing_name
   exit: error
   locates: [people.yaml, bbrown, name]
-  xfail: {exit: "#26", locates: "#26"}
 
 people.not_a_list:
   dir: people_not_a_list
   exit: error
   locates: [people.yaml]
-  xfail: {exit: "#26", locates: "#26"}
 
 identity.ambiguous_alias:
   dir: ambiguous_alias
@@ -172,7 +159,6 @@ identity.ambiguous_alias:
   reports: [bbrown, bbrowning, B. Brown]
   locates: [people.yaml]
   kept: [brown-initial]
-  xfail: {locates: "#26"}
 
 # --- Config -------------------------------------------------------------------
 
@@ -181,62 +167,53 @@ config.people_file.not_found:
   exit: error
   reports: [people_file]
   locates: [nobody.yaml]
-  xfail: {exit: "#26", reports: "#26", locates: "#26"}
 
 config.projects_file.not_found:
   dir: projects_file_not_found
   exit: error
   reports: [projects_file]
   locates: [noprojects.yaml]
-  xfail: {exit: "#26", reports: "#26", locates: "#26"}
 
 config.bib_files.not_found:
   dir: bib_file_not_found
   exit: error
   locates: [absent.bib]
-  xfail: {exit: "#26", locates: "#26"}
 
 config.bib_dir.missing:
   dir: config_bib_dir_missing
   exit: error
   reports: [bib_dir]
   locates: [lab.yaml]
-  xfail: {locates: "#26"}
 
 config.bib_dir.wrong_type:
   dir: config_bib_dir_type
   exit: error
   reports: [bib_dir]
   locates: [lab.yaml]
-  xfail: {exit: "#26", reports: "#26", locates: "#26"}
 
 config.bib_files.missing:
   dir: config_bib_files_missing
   exit: any
   reports: [bib_files]
   locates: [lab.yaml, bib_files]
-  xfail: {reports: "#26", locates: "#26"}
 
 config.bib_files.wrong_type:
   dir: config_bib_files_type
   exit: error
   reports: [bib_files]
   locates: [lab.yaml]
-  xfail: {reports: "#26", locates: "#26"}
 
 config.bib_files.name_missing:
   dir: config_bib_file_no_name
   exit: error
   reports: [name]
   locates: [lab.yaml, bib_files]
-  xfail: {locates: "#26"}
 
 config.bib_files.category_missing:
   dir: config_bib_file_no_category
   exit: error
   reports: [category]
   locates: [lab.yaml, bib_files]
-  xfail: {locates: "#26"}
 
 config.bib_files.name_absolute:
   dir: config_bib_file_absolute
@@ -249,41 +226,35 @@ config.pdf_base_url.wrong_type:
   exit: error
   reports: [pdf_base_url]
   locates: [lab.yaml]
-  xfail: {exit: "#26", reports: "#26", locates: "#26"}
 
 config.people_file.wrong_type:
   dir: config_people_file_type
   exit: error
   reports: [people_file]
   locates: [lab.yaml]
-  xfail: {exit: "#26", reports: "#26", locates: "#26"}
 
 config.projects_file.wrong_type:
   dir: config_projects_file_type
   exit: error
   reports: [projects_file]
   locates: [lab.yaml]
-  xfail: {exit: "#26", reports: "#26", locates: "#26"}
 
 config.lab.wrong_type:
   dir: config_lab_type
   exit: error
   reports: [lab]
   locates: [lab.yaml]
-  xfail: {exit: "#26", reports: "#26", locates: "#26"}
 
 config.unknown_key:
   dir: config_unknown_key
   exit: any
   reports: [people_fil]
   locates: [lab.yaml, people_fil]
-  xfail: {reports: "#26", locates: "#26"}
 
 config.not_a_mapping:
   dir: config_not_a_mapping
   exit: error
   locates: [lab.yaml]
-  xfail: {locates: "#26"}
 
 # --- Messages labdata prints today --------------------------------------------
 

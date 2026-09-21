@@ -1,5 +1,5 @@
 # CASE people.invalid_role
-# A role the people page has no group for.
+# A role that is missing, one that is empty, and one that is not a string.
 
 - id: "aadams"
   name: "Alice Adams"
@@ -9,5 +9,14 @@
 
 - id: "bbrown"
   name: "Bob Brown"
-  role: "wizard"
+  status: "current"
+
+- id: "ccote"
+  name: "Carol Cote"
+  role: ""
+  status: "current"
+
+- id: "ddavis"
+  name: "Dave Davis"
+  role: 7
   status: "current"

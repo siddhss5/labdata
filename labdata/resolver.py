@@ -12,11 +12,11 @@ MIT License - see LICENSE file for details.
 """
 
 import re
-import sys
 import unicodedata
 from difflib import SequenceMatcher
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
+from .diagnostics import diagnostic
 from .models import Contributor, Work, Person, Project, LabData
 
 
@@ -40,6 +40,16 @@ BY_NAME = "exact"
 # (SPEC.md section 1), and promoting them is #26's `--strict`.
 AMBIGUOUS_NAME = "RESOLVE-AMBIGUOUS-NAME"
 SUGGESTION = "RESOLVE-SUGGESTION"
+
+# One spelling declared, as a name or an alias, by more than one person in
+# `people_file`. A name written that way fits all of them and resolves to
+# none, which is why the declaration itself is reported, and not only each
+# authorship it leaves ambiguous. A warning, as those are.
+ALIAS_AMBIGUOUS = "PEOPLE-ALIAS-AMBIGUOUS"
+
+# A work tagged with a project id that `projects_file` does not define. It
+# fails `--validate`: the id is a typo in data labdata owns (SPEC.md section 1).
+PROJECT_UNKNOWN = "RESOLVE-PROJECT-UNKNOWN"
 
 # One part of a given name that is an initial rather than a name: a letter,
 # its period optional, and a hyphenated run of them -- `A.`, `A`, `G.-A.`,
@@ -155,8 +165,8 @@ def build_alias_index(people: List[Person]) -> Dict[str, str]:
     """Build a normalized name → person_id lookup from people data.
 
     Indexes both the canonical name and all explicit aliases.
-    Detects and skips ambiguous aliases (same normalized form for different people),
-    printing a warning to stderr.
+    Skips ambiguous aliases (same normalized form for different people);
+    `shared_declarations()` is what reports them.
     """
     index = {}
     # Track which aliases are ambiguous (map to multiple people)
@@ -180,10 +190,36 @@ def build_alias_index(people: List[Person]) -> Dict[str, str]:
             else:
                 index[normalized_alias] = person.id
 
-    for name, ids in ambiguous.items():
-        print(f"Warning: ambiguous alias '{name}' matches multiple people: {ids}", file=sys.stderr)
-
     return index
+
+
+def shared_declarations(people: List[Person], source: str) -> List[str]:
+    """One `ALIAS_AMBIGUOUS` warning per spelling more than one person declares.
+
+    Compared through `normalize_name()`, as matching is. Located at the
+    second person to declare the spelling, under the field that declares it
+    there, and naming every person who does.
+    """
+    declared: Dict[str, List[Tuple[str, str, str]]] = {}
+    for person in people:
+        for field_name, written in [("name", person.name)] + [
+                ("aliases", alias) for alias in person.aliases]:
+            key = normalize_name(written)
+            owners = declared.setdefault(key, [])
+            if key and person.id not in [owner for owner, _, _ in owners]:
+                owners.append((person.id, field_name, written))
+    reported = []
+    for owners in declared.values():
+        if len(owners) < 2:
+            continue
+        _, field_name, _ = owners[1]
+        spellings = sorted({repr(written) for _, _, written in owners})
+        reported.append(diagnostic(
+            ALIAS_AMBIGUOUS, source, owners[1][0], field_name,
+            f"{' / '.join(spellings)} is declared by "
+            f"{', '.join(owner for owner, _, _ in owners)}; a name written "
+            "this way fits all of them and resolves to none"))
+    return reported
 
 
 def fuzzy_match(name: str, index: Dict[str, str], threshold: float = FUZZY_THRESHOLD) -> Optional[str]:
@@ -415,10 +451,14 @@ def resolve_authors(
 def resolve_projects(
     works: List[Work],
     projects: List[Project],
+    errors: Optional[List[str]] = None,
+    bib_dir: str = ".",
 ) -> List[str]:
     """Validate project IDs in works against known projects.
 
-    Returns list of unknown project IDs found in works.
+    Returns list of unknown project IDs found in works, and reports each
+    unknown tag under `PROJECT_UNKNOWN` into ``errors``, located at the work,
+    when a list is given.
     Does NOT remove unknown project IDs from works (they're kept
     for debugging visibility).
     """
@@ -429,6 +469,11 @@ def resolve_projects(
         for pid in work.project_ids:
             if pid not in known_ids:
                 unknown.add(pid)
+                if errors is not None:
+                    errors.append(diagnostic(
+                        PROJECT_UNKNOWN, f"{bib_dir}/{work.source_file}",
+                        work.bib_id, "project",
+                        f"'{pid}' is not a project id in the projects file"))
 
     return sorted(unknown)
 

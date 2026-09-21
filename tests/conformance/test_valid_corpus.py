@@ -492,6 +492,27 @@ def test_structure(valid_output, case_id, bib_key, path, expected):
     check_work(valid_output, bib_key, path, expected)
 
 
+@covers("structure.comment_lines", "structure.comment_mentions_command")
+def test_comment_lines_raise_no_syntax_error(valid_validate, valid_export):
+    """A `%` comment line is ignored, so nothing is said about its prose.
+
+    The corpus's comments mention `@string` and `@comment{`, which the parser
+    library would otherwise read as the start of a command.
+    """
+    run, _ = valid_export
+    for output in (valid_validate.output, run.output):
+        assert "BIB-SYNTAX-ERROR" not in output, output
+
+
+@covers("names.equal_contribution", "names.equal_contribution_escaped")
+def test_documented_latex_commands_are_not_reported_unknown(valid_validate,
+                                                            valid_export):
+    """`\\textsuperscript{*}` and an escaped `\\*` have documented conversions."""
+    run, _ = valid_export
+    for output in (valid_validate.output, run.output):
+        assert "LATEX-COMMAND-UNKNOWN" not in output, output
+
+
 @covers("structure.comment_lines", "structure.comment_entry", "structure.preamble",
         "structure.comment_mentions_command")
 def test_comments_and_preamble_are_not_works(valid_output):

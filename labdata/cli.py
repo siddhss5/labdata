@@ -96,12 +96,6 @@ Examples:
             for warning in result.warnings:
                 print(f"  - {warning}")
 
-        if result.unknown_projects:
-            print(f"\nUnknown project IDs ({len(result.unknown_projects)}):")
-            for pid in sorted(result.unknown_projects):
-                print(f"  - {pid}")
-            errors += len(result.unknown_projects)
-
         reported = result.fatal_errors + result.bibliography_errors
         if reported:
             print(f"\nBibliography errors ({len(reported)}):")

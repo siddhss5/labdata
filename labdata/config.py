@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 from pathlib import Path, PureWindowsPath
 
+from .diagnostics import diagnostic
+
 
 # A configured `.bib` name reaches the document as `work.source.file`, where
 # it is promised never to be an absolute path (SPEC.md section 5): a document
@@ -24,14 +26,29 @@ from pathlib import Path, PureWindowsPath
 # accepted or rejected wherever it is compiled.
 BIB_FILE_ABSOLUTE = "CONFIG-BIB-FILE-ABSOLUTE"
 
+# A `lab.yaml` labdata cannot compile from, found while it is read. Each is
+# fatal at load, like the absolute name above: nothing is assembled from a
+# configuration whose shape is wrong, so there is no partial document either.
+NOT_A_MAPPING = "CONFIG-NOT-A-MAPPING"
+KEY_MISSING = "CONFIG-KEY-MISSING"
+TYPE_INVALID = "CONFIG-TYPE-INVALID"
+
+# Every key `lab.yaml` may hold. `site` is read by renderers, not by labdata,
+# and is accepted without being checked. Any other key is reported, because a
+# misspelt `people_fil` would otherwise be silently the same as no key at all.
+KNOWN_KEYS = ("lab", "site", "bib_dir", "bib_files", "pdf_base_url",
+              "people_file", "projects_file", "collaborators_file")
+
+# The keys whose value, when present, must be a string: a path or a URL.
+_STRING_KEYS = ("pdf_base_url", "people_file", "projects_file")
+
 
 class ConfigurationError(ValueError):
     """A configuration labdata will not compile from.
 
     Its own type, not a bare ``ValueError``, so that a caller can tell a
-    rejected configuration from the several other things that raise one --
-    a year that is not a number, most of all, which is a different failure
-    with a different owner (SPEC.md, Target #26).
+    rejected configuration from anything else that raises one. Its message
+    is one coded diagnostic line (SPEC.md, *Diagnostic codes*).
     """
 
 
@@ -117,21 +134,61 @@ class LabDataConfig:
     # so the positional order of the fields above is unchanged.
     collaborators_file: Optional[str] = None
 
+    # Keys `lab.yaml` held that labdata does not read, in file order, so the
+    # assembler can report them against `path`. Never emitted.
+    unknown_keys: List[str] = field(default_factory=list)
+
     @classmethod
     def from_yaml(cls, path: str) -> 'LabDataConfig':
         """Load configuration from a YAML file."""
         with open(path, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f)
 
+        def reject(code, key, field_name, message):
+            raise ConfigurationError(
+                diagnostic(code, str(path), key, field_name, message))
+
+        if not isinstance(data, dict):
+            reject(NOT_A_MAPPING, None, None,
+                   f"the configuration is {_kind(data)}, not a mapping of keys")
+        if data.get('bib_dir') is None:
+            reject(KEY_MISSING, 'bib_dir', None,
+                   "the required key bib_dir is missing")
+        if not isinstance(data['bib_dir'], str):
+            reject(TYPE_INVALID, 'bib_dir', None,
+                   f"bib_dir is {_kind(data['bib_dir'])}; it must be a string")
+        if data.get('lab') is not None and not isinstance(data['lab'], dict):
+            reject(TYPE_INVALID, 'lab', None,
+                   f"lab is {_kind(data['lab'])}; it must be a mapping")
+        for key in _STRING_KEYS:
+            if data.get(key) is not None and not isinstance(data[key], str):
+                reject(TYPE_INVALID, key, None,
+                       f"{key} is {_kind(data[key])}; it must be a string")
+        entries = data.get('bib_files')
+        if entries is None:
+            entries = []
+        if not isinstance(entries, list):
+            reject(TYPE_INVALID, 'bib_files', None,
+                   f"bib_files is {_kind(entries)}; it must be a list of "
+                   "{name, category} mappings")
+        # An entry that is not a mapping, or whose name or category is not a
+        # string, is not checked here: no contract row covers it yet, and it
+        # fails or passes as it always has.
+        for number, bf in enumerate(entries, start=1):
+            if not isinstance(bf, dict):
+                continue
+            for required in ('name', 'category'):
+                if bf.get(required) is None:
+                    reject(KEY_MISSING, 'bib_files', required,
+                           f"bib_files entry {number} has no {required}")
+
         # Checked here as well as in `BibFile`, because here the file the
         # user would edit is known and the diagnostic can name it.
-        for bf in data.get('bib_files', []):
+        for bf in entries:
             if isinstance(bf, dict):
                 reject_absolute_name(bf.get('name'), f"{path}:bib_files:name")
 
-        bib_files = [
-            BibFile(**bf) for bf in data.get('bib_files', [])
-        ]
+        bib_files = [BibFile(**bf) for bf in entries]
 
         return cls(
             bib_dir=data['bib_dir'],
@@ -142,4 +199,22 @@ class LabDataConfig:
             lab=data.get('lab'),
             path=str(path),
             collaborators_file=data.get('collaborators_file'),
+            unknown_keys=[key for key in data if key not in KNOWN_KEYS],
         )
+
+
+def _kind(value) -> str:
+    """What a YAML value is, in the words a diagnostic uses for it."""
+    if value is None:
+        return "empty"
+    if isinstance(value, bool):
+        return "a boolean"
+    if isinstance(value, (int, float)):
+        return "a number"
+    if isinstance(value, str):
+        return "a string"
+    if isinstance(value, list):
+        return "a list"
+    if isinstance(value, dict):
+        return "a mapping"
+    return f"a {type(value).__name__}"

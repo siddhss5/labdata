@@ -6,15 +6,88 @@ Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
 MIT License - see LICENSE file for details.
 """
 
+import sys
 import yaml
 from dataclasses import dataclass, field
-from typing import List
+from typing import Callable, Dict, List, Optional
 from pathlib import Path
 
+from .diagnostics import diagnostic
 from .models import Person, Project
 
 
-def load_people(path: str) -> List[Person]:
+# What can be wrong with a people or projects file, one code per condition
+# and file. A people file that is not a list of records, and a person with no
+# name, cannot be emitted at all, so they fail every mode; a
+# repeated id fails `--validate`, as a repeated citation key does; the rest
+# are warnings.
+PEOPLE_NOT_A_LIST = "PEOPLE-NOT-A-LIST"
+PEOPLE_FIELD_MISSING = "PEOPLE-FIELD-MISSING"
+PEOPLE_ID_DUPLICATE = "PEOPLE-ID-DUPLICATE"
+PEOPLE_ROLE_INVALID = "PEOPLE-ROLE-INVALID"
+PEOPLE_STATUS_INVALID = "PEOPLE-STATUS-INVALID"
+PROJECTS_ID_DUPLICATE = "PROJECTS-ID-DUPLICATE"
+PROJECTS_STATUS_INVALID = "PROJECTS-STATUS-INVALID"
+
+# A person's `status` is one of these. A `role` is any non-empty string, so
+# that any lab's roles fit (SPEC.md, *The people and projects files*).
+PERSON_STATUSES = ("current", "alumni")
+PROJECT_STATUSES = ("active", "completed")
+
+
+def _to(collected: Optional[List[str]]) -> Callable[[str], None]:
+    """Report into a list, or to standard error when there is none."""
+    def report(message: str) -> None:
+        if collected is None:
+            print(f"Warning: {message}", file=sys.stderr)
+        else:
+            collected.append(message)
+    return report
+
+
+def _records(path: str, errors, diagnostics) -> List[dict]:
+    """The records of one people file that can be emitted.
+
+    A missing file is not this function's to report (the assembler names the
+    configuration key instead) and reads as no records, as does an empty one.
+    A file that is not a list, and a person with no name, are reported and
+    left out; a repeated id is reported and kept, as the parser library keeps
+    a repeated citation key. A record that is not a mapping, or has no `id`,
+    raises as it always has: no contract row covers it yet.
+    """
+    fail, report = _to(errors), _to(diagnostics)
+    if not Path(path).exists():
+        return []
+
+    with open(path, 'r', encoding='utf-8') as f:
+        data = yaml.safe_load(f)
+
+    if data is None:
+        return []
+    if not isinstance(data, list):
+        fail(diagnostic(PEOPLE_NOT_A_LIST, path, None, None,
+                        "the file must be a list of records, one per entry; "
+                        f"it is a {type(data).__name__}"))
+        return []
+
+    records, seen = [], set()
+    for number, entry in enumerate(data, start=1):
+        key = entry['id']
+        if entry.get('name') is None or str(entry['name']).strip() == "":
+            fail(diagnostic(PEOPLE_FIELD_MISSING, path, key, 'name',
+                            f"entry {number} has no name"))
+            continue
+        if key in seen:
+            report(diagnostic(PEOPLE_ID_DUPLICATE, path, key, 'id',
+                              f"the id '{key}' is declared more than once"))
+        seen.add(key)
+        records.append(entry)
+    return records
+
+
+def load_people(path: str, errors: Optional[List[str]] = None,
+                diagnostics: Optional[List[str]] = None,
+                warnings: Optional[List[str]] = None) -> List[Person]:
     """Load people from a YAML file.
 
     Expected format (list of dicts):
@@ -24,24 +97,30 @@ def load_people(path: str) -> List[Person]:
           role: "pi"
           status: "current"
           ...
+
+    ``errors``, ``diagnostics`` and ``warnings`` receive what is wrong with
+    the file, in the three classes `labdata.assembler.AssemblyResult` keeps;
+    without a list, a problem is printed to standard error.
     """
-    if not Path(path).exists():
-        return []
-
-    with open(path, 'r', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
-
-    if not data or not isinstance(data, list):
-        return []
-
+    warn = _to(warnings)
     people = []
-    for entry in data:
+    for entry in _records(path, errors, diagnostics):
+        role = entry.get('role')
+        if not isinstance(role, str) or not role.strip():
+            warn(diagnostic(PEOPLE_ROLE_INVALID, path, entry['id'], 'role',
+                            "role is missing, empty or not a string; any "
+                            "non-empty string is accepted"))
+        status = entry.get('status', 'current')
+        if status not in PERSON_STATUSES:
+            warn(diagnostic(PEOPLE_STATUS_INVALID, path, entry['id'], 'status',
+                            f"'{status}' is not one of "
+                            f"{', '.join(PERSON_STATUSES)}"))
         person = Person(
             id=entry['id'],
             name=entry['name'],
             aliases=entry.get('aliases', []),
             role=entry.get('role'),
-            status=entry.get('status', 'current'),
+            status=status,
             photo=entry.get('photo'),
             website=entry.get('website'),
             email=entry.get('email'),
@@ -57,7 +136,9 @@ def load_people(path: str) -> List[Person]:
     return people
 
 
-def load_projects(path: str) -> List[Project]:
+def load_projects(path: str, errors: Optional[List[str]] = None,
+                  diagnostics: Optional[List[str]] = None,
+                  warnings: Optional[List[str]] = None) -> List[Project]:
     """Load projects from a YAML file.
 
     Expected format (list of dicts):
@@ -66,7 +147,12 @@ def load_projects(path: str) -> List[Project]:
           description: "Autonomous gardening systems"
           website: "https://gardenbot.example.org"
           status: "active"
+
+    A repeated id and an unknown status are reported as `load_people()`
+    reports them. A file that is not a list reads as no projects, and a
+    project with no id or title is not checked here.
     """
+    warn, report = _to(warnings), _to(diagnostics)
     if not Path(path).exists():
         return []
 
@@ -76,14 +162,23 @@ def load_projects(path: str) -> List[Project]:
     if not data or not isinstance(data, list):
         return []
 
-    projects = []
+    projects, seen = [], set()
     for entry in data:
+        if entry['id'] in seen:
+            report(diagnostic(PROJECTS_ID_DUPLICATE, path, entry['id'], 'id',
+                              f"the id '{entry['id']}' is declared more than once"))
+        seen.add(entry['id'])
+        status = entry.get('status', 'active')
+        if status not in PROJECT_STATUSES:
+            warn(diagnostic(PROJECTS_STATUS_INVALID, path, entry['id'],
+                            'status', f"'{status}' is not one of "
+                            f"{', '.join(PROJECT_STATUSES)}"))
         project = Project(
             id=entry['id'],
             title=entry['title'],
             description=entry.get('description'),
             website=entry.get('website'),
-            status=entry.get('status', 'active'),
+            status=status,
         )
         projects.append(project)
 
