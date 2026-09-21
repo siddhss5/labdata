@@ -144,19 +144,19 @@ a defect in data labdata does own: a project id naming no project, a
 repeated citation key, person id or project id, and the fatal conditions in
 the class table below.
 
-> **Target (#26).** Two gaps in the above are real today.
-> (a) An unhandled failure prints a Python traceback and also exits `1`, so
-> `1` does not by itself distinguish a diagnosed error from a crash. A `.bib`
-> file that does not exist and a `year` that is not a number no longer do
-> this (`CONFIG-FILE-NOT-FOUND`, `BIB-YEAR-INVALID`), but a people or
-> projects file that is not valid YAML still does, and so does a `.bib` file
-> that is not UTF-8. Verified by running both.
-> (b) Diagnostic *prose* is not stable, though every diagnostic now carries
-> a code and a location. A message the BibTeX parser raises that is neither
-> a syntax error nor an undefined macro is coded `BIB-PARSER-MESSAGE` but
-> keeps that library's wording as its prose, and so does `CONFIG-UNREADABLE`.
-> Consumers may depend on the stream, the shapes above, the codes in the
-> registry below and the JSON records, not on the wording of a message.
+> **Target (#80).** An unhandled failure prints a Python traceback and also
+> exits `1`, so `1` does not by itself distinguish a diagnosed error from a
+> crash. A `.bib` file that does not exist and a `year` that is not a number
+> no longer do this (`CONFIG-FILE-NOT-FOUND`, `BIB-YEAR-INVALID`), but a
+> people or projects file that is not valid YAML still does, and so does a
+> `.bib` file that is not UTF-8. Verified by running both.
+
+**Diagnostic *prose* is not stable**, though every diagnostic carries a code
+and a location. A message the BibTeX parser raises that is neither a syntax
+error nor an undefined macro is coded `BIB-PARSER-MESSAGE` but keeps that
+library's wording as its prose, and so does `CONFIG-UNREADABLE`. Consumers
+may depend on the stream, the shapes above, the codes in the registry below
+and the JSON records, not on the wording of a message.
 
 ### Diagnostic codes
 
@@ -259,7 +259,7 @@ Codes in use:
 Every diagnostic labdata prints carries one of these codes (#26 decision
 8). What is not a diagnostic carries none: the counts and headers of a
 report, the `Wrote …` line, the argument parser's usage errors, and a Python
-traceback, which is a crash (Target (a) above).
+traceback, which is a crash (Target (#80) above).
 
 ### Diagnostics as JSON
 
