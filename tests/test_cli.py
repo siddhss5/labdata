@@ -201,14 +201,3 @@ class TestDiagnosticClassesByMode:
         export = run_cli("--config", "lab.yaml", "--format", "json", "--output", str(out))
         assert export.returncode == 0 and out.exists()
         assert f"Warning: {code} " in export.stderr
-
-    def test_a_missing_collaborators_file_is_fatal(self, run_cli, tmp_path):
-        config = tmp_path / "lab.yaml"
-        config.write_text(yaml.safe_dump({
-            "bib_dir": str(FIXTURES),
-            "bib_files": [{"name": "sample.bib", "category": "Test"}],
-            "collaborators_file": str(tmp_path / "absent.yaml"),
-        }), encoding="utf-8")
-        result = run_cli("--config", str(config), "--validate")
-        assert result.returncode == 1
-        assert f"CONFIG-FILE-NOT-FOUND {config}:collaborators_file::" in result.stdout

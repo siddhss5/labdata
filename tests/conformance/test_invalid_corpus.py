@@ -152,3 +152,16 @@ def test_spec_is_well_formed():
         assert set(spec.get("xfail", {})) <= set(CHECKS) & set(spec), case_id
     dirs = {spec["dir"] for spec in DIAGNOSTICS.values()}
     assert dirs == {d.name for d in INVALID.iterdir() if d.is_dir()}
+
+
+@covers("identity.ambiguous_alias")
+def test_an_alias_two_people_declare_resolves_to_neither(tmp_path):
+    """The name both people declare is linked to nobody and says why."""
+    run, data = export(INVALID / DIAGNOSTICS["identity.ambiguous_alias"]["dir"],
+                       tmp_path)
+    assert run.crash is None and data is not None, run.output
+    work = next(w for w in data["works"] if w["bib_id"] == "brown-initial")
+    [author] = work["authors"]
+    assert author["person_id"] is None, author
+    assert author["resolution"]["status"] == "ambiguous", author
+    assert "PEOPLE-ALIAS-AMBIGUOUS" in run.stderr

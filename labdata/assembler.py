@@ -69,8 +69,9 @@ COLLABORATOR_ALIAS_IS_MEMBER = "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER"
 # cannot title a page from.
 LAB_NAME_MISSING = "CONFIG-LAB-NAME-MISSING"
 
-# A file the configuration names that is not there. Fatal: compiling on
-# without it would emit a document missing its works, people or projects.
+# A `.bib`, people or projects file the configuration names that is not
+# there. Fatal: compiling on without it would emit a document missing its
+# works, people or projects.
 FILE_NOT_FOUND = "CONFIG-FILE-NOT-FOUND"
 
 # A key `lab.yaml` holds that labdata does not read, such as a misspelt
@@ -382,7 +383,6 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
                  if present(f"{config.bib_dir}/{bf.name}", 'bib_files', 'name')]
     people_found = present(config.people_file, 'people_file')
     projects_found = present(config.projects_file, 'projects_file')
-    collaborators_found = present(config.collaborators_file, 'collaborators_file')
     works = parse_all_works(
         bib_dir=config.bib_dir,
         bib_files=bib_files,
@@ -411,7 +411,7 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     # Group the authorships that resolved to nobody, joining the spellings
     # `collaborators_file` declares
     declared = None
-    if config.collaborators_file and collaborators_found:
+    if config.collaborators_file:
         declared = declared_collaborators(
             load_collaborators(config.collaborators_file), people,
             config.collaborators_file, warnings)

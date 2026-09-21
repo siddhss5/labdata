@@ -71,8 +71,9 @@ STRING_UNDEFINED = "BIB-STRING-UNDEFINED"
 # entry is kept as far as it was read; outside one, the text is skipped.
 SYNTAX_ERROR = "BIB-SYNTAX-ERROR"
 
-# An entry of a type whose container BibTeX requires, without that field.
-# Its venue is null, or read from another container field it does carry.
+# An `@article` with no `journal`, or an `@inproceedings` with no
+# `booktitle`. Its venue is null, or read from another container field it
+# does carry.
 VENUE_MISSING = "BIB-VENUE-MISSING"
 
 # An entry of a type labdata does not document. It is kept, and its venue is
@@ -90,9 +91,11 @@ LATEX_COMMAND_UNKNOWN = "LATEX-COMMAND-UNKNOWN"
 # numbers, daggers — are not read.
 #
 # A star, caret or dollar written with a backslash in front of it is escaped
-# text rather than the start of a marker: `Brown\*` is a name with a star in
-# it. The accent in `C{\^o}t{\'e}$^{*}$` is escaped the same way, and the
-# marker after it is not, which is how that name keeps working.
+# text rather than the start of a marker: `Brown\*` is not marked, and the
+# ordinary LaTeX conversion then consumes the escaped star, so the name reads
+# `Brown` (tests/COVERAGE.md row `names.equal_contribution_escaped`). The
+# accent in `C{\^o}t{\'e}$^{*}$` is escaped the same way, and the marker after
+# it is not, which is how that name keeps working.
 _WRITTEN = r"\$\^\{\*\}\$|\^\{\*\}|\\textsuperscript\s*\{\*\}"
 _MARKER = rf"(?<!\\)(?:{_WRITTEN}|\*)"
 
@@ -211,17 +214,20 @@ class _Parser(PybtexParser):
     def __init__(self, *args, duplicate_keys=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.duplicate_keys = duplicate_keys if duplicate_keys is not None else []
-        # (error, entry key, field name) for every syntax error, with the
-        # tokenizer's position in the file as it was when the error was
-        # raised: by the time the file is read, it has moved on.
-        self.syntax_errors: List[Tuple[PybtexSyntaxError, Optional[str], Optional[str]]] = []
+        # (error, entry key, field name, where the command began) for every
+        # syntax error, with the tokenizer's position in the file as it was
+        # when the error was raised: by the time the file is read, it has
+        # moved on.
+        self.syntax_errors: List[Tuple[PybtexSyntaxError, Optional[str],
+                                       Optional[str], Optional[int]]] = []
 
     def handle_error(self, error):
         """Keep a syntax error with where it happened; relay anything else."""
         if isinstance(error, PybtexSyntaxError):
             tokenizer = error.parser
             self.syntax_errors.append((error, tokenizer.current_entry_key,
-                                       tokenizer.current_field_name))
+                                       tokenizer.current_field_name,
+                                       tokenizer.command_start))
             return
         super().handle_error(error)
 
@@ -271,6 +277,21 @@ def _duplicate_key_error(
     return message
 
 
+def _on_comment_line(text: str, position: Optional[int]) -> bool:
+    """True when ``position`` is on a line that is a `%` comment.
+
+    The parser library reads an `@` anywhere outside an entry as the start of
+    a command, so prose in a `%` comment that mentions `@article` fails to
+    parse. labdata ignores `%` comment lines between entries
+    (`tests/COVERAGE.md` row `structure.comment_lines`), so such a failure is
+    not reported: the text was never meant as BibTeX.
+    """
+    if position is None:
+        return False
+    line_start = text.rfind("\n", 0, position) + 1
+    return text[line_start:position].lstrip().startswith("%")
+
+
 def _syntax_diagnostic(path: str, error: PybtexSyntaxError,
                        key: Optional[str], field_name: Optional[str]) -> str:
     """One parser-library syntax error, in labdata's voice and located."""
@@ -315,7 +336,9 @@ def parse_bibtex_file(
     with pybtex.errors.capture() as errors:
         parser = _Parser(duplicate_keys=duplicate_keys)
         data = parser.parse_string(text)
-    for error, key, field_name in parser.syntax_errors:
+    for error, key, field_name, start in parser.syntax_errors:
+        if key is None and _on_comment_line(text, start):
+            continue
         message = _syntax_diagnostic(path, error, key, field_name)
         if warnings is None:
             _warn(message)
@@ -795,16 +818,15 @@ def entry_year(entry: dict, where: str, report) -> Optional[int]:
         return None
 
 
-# The container field BibTeX requires of each entry type labdata reads a
-# container for, and the entry types labdata documents (tests/COVERAGE.md,
-# *Entry types*, with `@conference` and `@proceedings`, which the venue rule
-# names). Any other type is kept and reported.
-REQUIRED_CONTAINER = {"article": "journal", "inproceedings": "booktitle",
-                      "conference": "booktitle", "incollection": "booktitle",
-                      "phdthesis": "school", "mastersthesis": "school",
-                      "techreport": "institution"}
-SUPPORTED_TYPES = frozenset(REQUIRED_CONTAINER) | {
-    "book", "inbook", "manual", "misc", "proceedings"}
+# The container field checked for an entry type, and the entry types labdata
+# documents (tests/COVERAGE.md, *Entry types*, with `@conference` and
+# `@proceedings`, which the venue rule names). Any other type is kept and
+# reported.
+REQUIRED_CONTAINER = {"article": "journal", "inproceedings": "booktitle"}
+SUPPORTED_TYPES = frozenset({
+    "article", "inproceedings", "conference", "proceedings", "incollection",
+    "inbook", "book", "phdthesis", "mastersthesis", "techreport", "manual",
+    "misc"})
 
 
 def check_entry_type(entry: dict, source: str, report) -> None:

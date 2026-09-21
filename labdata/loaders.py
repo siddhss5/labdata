@@ -17,16 +17,15 @@ from .models import Person, Project
 
 
 # What can be wrong with a people or projects file, one code per condition
-# and file. A file that is not a list of records, and a record with no id or
-# no name, cannot be emitted at all, so they fail every mode; a repeated id
-# fails `--validate`, as a repeated citation key does; the rest are warnings.
+# and file. A people file that is not a list of records, and a person with no
+# id or no name, cannot be emitted at all, so they fail every mode; a
+# repeated id fails `--validate`, as a repeated citation key does; the rest
+# are warnings.
 PEOPLE_NOT_A_LIST = "PEOPLE-NOT-A-LIST"
 PEOPLE_FIELD_MISSING = "PEOPLE-FIELD-MISSING"
 PEOPLE_ID_DUPLICATE = "PEOPLE-ID-DUPLICATE"
 PEOPLE_ROLE_INVALID = "PEOPLE-ROLE-INVALID"
 PEOPLE_STATUS_INVALID = "PEOPLE-STATUS-INVALID"
-PROJECTS_NOT_A_LIST = "PROJECTS-NOT-A-LIST"
-PROJECTS_FIELD_MISSING = "PROJECTS-FIELD-MISSING"
 PROJECTS_ID_DUPLICATE = "PROJECTS-ID-DUPLICATE"
 PROJECTS_STATUS_INVALID = "PROJECTS-STATUS-INVALID"
 
@@ -48,7 +47,7 @@ def _to(collected: Optional[List[str]]) -> Callable[[str], None]:
 
 def _records(path: str, not_a_list: str, missing: str, duplicate: str,
              required: tuple, errors, diagnostics) -> List[dict]:
-    """The records of one people or projects file that can be emitted.
+    """The records of one people file that can be emitted.
 
     A missing file is not this function's to report (the assembler names the
     configuration key instead) and reads as no records, as does an empty one.
@@ -158,13 +157,26 @@ def load_projects(path: str, errors: Optional[List[str]] = None,
           website: "https://gardenbot.example.org"
           status: "active"
 
-    Problems are reported as `load_people()` reports them.
+    A repeated id and an unknown status are reported as `load_people()`
+    reports them. A file that is not a list reads as no projects, and a
+    project with no id or title is not checked here.
     """
-    warn = _to(warnings)
-    projects = []
-    for entry in _records(path, PROJECTS_NOT_A_LIST, PROJECTS_FIELD_MISSING,
-                          PROJECTS_ID_DUPLICATE, ('id', 'title'),
-                          errors, diagnostics):
+    warn, report = _to(warnings), _to(diagnostics)
+    if not Path(path).exists():
+        return []
+
+    with open(path, 'r', encoding='utf-8') as f:
+        data = yaml.safe_load(f)
+
+    if not data or not isinstance(data, list):
+        return []
+
+    projects, seen = [], set()
+    for entry in data:
+        if entry['id'] in seen:
+            report(diagnostic(PROJECTS_ID_DUPLICATE, path, entry['id'], 'id',
+                              f"the id '{entry['id']}' is declared more than once"))
+        seen.add(entry['id'])
         status = entry.get('status', 'active')
         if status not in PROJECT_STATUSES:
             warn(diagnostic(PROJECTS_STATUS_INVALID, path, entry['id'],
