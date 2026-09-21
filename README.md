@@ -78,6 +78,8 @@ labdata --config lab.yaml --validate            # report counts and problems
 labdata --config lab.yaml --unresolved          # list unmatched author names
 labdata --config lab.yaml --output lab.yml      # write the document
 labdata --config lab.yaml --format json --output lab.json
+labdata --config lab.yaml --validate --strict   # fail on every problem
+labdata --config lab.yaml --validate --format json   # problems as JSON
 ```
 
 `--validate` exits `0` when it finds no errors and `1` when it does, or when
@@ -85,10 +87,17 @@ the run fails outright. An author who
 matched nobody is reported but is not an error — most are external
 collaborators. `--validate` does not check the output against the JSON
 Schema; it checks the configuration, the people and projects files and every
-entry, and reports nearly every problem under a stable code that
-[`SPEC.md`](SPEC.md) registers, with its class. The exit codes are part of
-the contract; [`SPEC.md` §1](SPEC.md) lists them, along with the precedence
-rule when you pass more than one mode.
+entry, and reports every problem under a stable code that
+[`SPEC.md`](SPEC.md) registers, with its class.
+
+`--strict` combines with any mode and turns every coded problem into an
+error, except the ones about authors who matched nobody and redefined
+`@string` macros; any error exits `1`, and an export then writes nothing.
+With `--validate` or `--unresolved`, `--format json` prints the problems as
+one JSON array of `{code, severity, file, key, field, message}` on standard
+output; with `--output`, `--format` is still the document's format. The exit
+codes and that JSON shape are part of the contract; [`SPEC.md` §1](SPEC.md)
+lists them, along with the precedence rule when you pass more than one mode.
 
 ## Inputs
 

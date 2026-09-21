@@ -7,11 +7,18 @@ MIT License - see LICENSE file for details.
 """
 
 import argparse
+import json
 import sys
 
-from .config import LabDataConfig
-from .assembler import assemble
+from .config import ConfigurationError, LabDataConfig
+from .assembler import assemble, unresolved_name_diagnostics
+from .diagnostics import ERROR, diagnostic, record, severity
 from .exporters import export_to_yaml, export_to_json
+
+# A configuration labdata cannot open or cannot read at all. Both are fatal
+# at load; the second keeps the reading library's words as its prose.
+CONFIG_NOT_FOUND = "CONFIG-NOT-FOUND"
+CONFIG_UNREADABLE = "CONFIG-UNREADABLE"
 
 
 def main(argv=None):
@@ -32,6 +39,9 @@ Examples:
 
   # Show unresolved author names
   labdata --config lab.yaml --unresolved
+
+  # Fail on every coded diagnostic that can be an error, as JSON records
+  labdata --config lab.yaml --validate --strict --format json
         """
     )
 
@@ -41,7 +51,9 @@ Examples:
     )
     parser.add_argument(
         '--format', choices=['yaml', 'json'], default='yaml',
-        help='Output format (default: yaml)'
+        help='Output format (default: yaml). With --output, the document; '
+             'with --validate or --unresolved, json prints the diagnostics '
+             'as one JSON array'
     )
     parser.add_argument(
         '--output',
@@ -55,6 +67,11 @@ Examples:
         '--unresolved', action='store_true',
         help='Show unresolved author names, then exit'
     )
+    parser.add_argument(
+        '--strict', action='store_true',
+        help='Treat every coded diagnostic as an error, except those about '
+             'authors who matched nobody and redefined @string macros'
+    )
 
     args = parser.parse_args(argv)
 
@@ -62,15 +79,21 @@ Examples:
     if not args.output and not args.validate and not args.unresolved:
         parser.error("One of --output, --validate, or --unresolved is required")
 
+    # With --validate or --unresolved, --format names how the diagnostics are
+    # printed; with --output alone it names the document's format.
+    as_json = args.format == 'json' and (args.validate or args.unresolved)
+
     # Load configuration
     try:
         config = LabDataConfig.from_yaml(args.config)
     except FileNotFoundError:
-        print(f"Error: Configuration file not found: {args.config}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error loading configuration: {e}", file=sys.stderr)
-        sys.exit(1)
+        stop(diagnostic(CONFIG_NOT_FOUND, args.config, None, None,
+                        "configuration file not found"), "Error: ", as_json)
+    except ConfigurationError as e:
+        stop(e.args[0], "Error loading configuration: ", as_json)
+    except Exception as e:  # noqa: BLE001 - reported, in the reader's words
+        stop(diagnostic(CONFIG_UNREADABLE, args.config, None, None, str(e)),
+             "Error loading configuration: ", as_json)
 
     # Assemble data with diagnostics. `assemble()` rejects a configuration it
     # will not compile from, but `from_yaml()` above has already rejected the
@@ -78,10 +101,27 @@ Examples:
     # check downstream is for callers who built a configuration themselves.
     result = assemble(config, diagnostics=True)
     data = result.data
+    found = result.fatal_errors + result.bibliography_errors + result.warnings
+
+    def level(line):
+        return severity(line, validating=args.validate, strict=args.strict)
+    errors = [line for line in found if level(line) == ERROR]
+    warnings = [line for line in found if level(line) != ERROR]
+
+    if as_json:
+        records = [record(line, level(line)) for line in found]
+        if args.unresolved and not args.validate:
+            records += [record(line, level(line)) for line in
+                        unresolved_name_diagnostics(data.works,
+                                                    result.unresolved_authors,
+                                                    config.bib_dir)]
+        print(json.dumps(records, indent=2, ensure_ascii=False))
+        if errors:
+            sys.exit(1)
+        return
 
     # --validate mode
     if args.validate:
-        errors = 0
         print(f"Works: {len(data.works)}")
         print(f"People: {len(data.people)}")
         print(f"Projects: {len(data.projects)}")
@@ -91,32 +131,28 @@ Examples:
             for name in sorted(result.unresolved_authors):
                 print(f"  - {name}")
 
-        if result.warnings:
-            print(f"\nWarnings ({len(result.warnings)}):")
-            for warning in result.warnings:
+        if warnings:
+            print(f"\nWarnings ({len(warnings)}):")
+            for warning in warnings:
                 print(f"  - {warning}")
 
-        reported = result.fatal_errors + result.bibliography_errors
-        if reported:
-            print(f"\nBibliography errors ({len(reported)}):")
-            for error in reported:
-                print(f"  - {error}")
-            errors += len(reported)
-
         if errors:
-            print(f"\nValidation found {errors} error(s).")
+            print(f"\nBibliography errors ({len(errors)}):")
+            for error in errors:
+                print(f"  - {error}")
+            print(f"\nValidation found {len(errors)} error(s).")
             sys.exit(1)
-        else:
-            print("\nValidation passed.")
+        print("\nValidation passed.")
         return
 
-    # Outside --validate, a fatal error still stops the run: a user must not
-    # be able to produce a document by skipping validation.
-    for error in result.fatal_errors:
+    # Outside --validate, an error still stops the run: a user must not be
+    # able to produce a document by skipping validation. Nothing is written,
+    # and a file already at --output is left as it was.
+    for error in errors:
         print(error, file=sys.stderr)
-    for message in result.bibliography_errors + result.warnings:
+    for message in warnings:
         print(f"Warning: {message}", file=sys.stderr)
-    if result.fatal_errors:
+    if errors:
         sys.exit(1)
 
     # --unresolved mode
@@ -140,6 +176,19 @@ Examples:
     print(f"  {len(data.works)} works, "
           f"{len(data.people)} people, "
           f"{len(data.projects)} projects")
+
+
+def stop(line, prefix: str, as_json: bool) -> None:
+    """Report a configuration that did not load, and exit 1.
+
+    As text, on standard error after ``prefix``; as JSON, the one record on
+    standard output, so a JSON reader always receives an array.
+    """
+    if as_json:
+        print(json.dumps([record(line, ERROR)], indent=2, ensure_ascii=False))
+    else:
+        print(f"{prefix}{line}", file=sys.stderr)
+    sys.exit(1)
 
 
 if __name__ == "__main__":
