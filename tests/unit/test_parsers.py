@@ -3,6 +3,7 @@
 import pytest
 from pathlib import Path
 
+from labdata.config import BIB_FILE_ABSOLUTE as CONFIG_BIB_FILE_ABSOLUTE
 from labdata.parsers.bibtex import (
     CROSSREF_UNSUPPORTED,
     DUPLICATE_CITATION_KEY,
@@ -19,6 +20,7 @@ from labdata.parsers.bibtex import (
     parse_all_works,
     pdf_link,
 )
+from labdata.config import ConfigurationError
 from labdata.models import Author
 
 
@@ -230,6 +232,40 @@ class TestParseAllWorks:
         assert len(warnings) == 1
         assert warnings[0].startswith(YEAR_MISSING)
         assert "y.bib:no-year:year" in warnings[0]
+
+
+class TestSourceFileIsNeverAbsolute:
+    """`parse_all_works()` takes the configured name and does not check it.
+
+    It is private, so nothing reaches it without going past
+    `LabDataConfig`; but it is the shortest path to a `Work` carrying an
+    absolute `source_file`, and what stops that reaching a document is the
+    check at the serialization boundary rather than any check here.
+    """
+
+    def parse(self, tmp_path, name):
+        (tmp_path / "journal.bib").write_text(
+            "@article{a2024,\n  title   = {A Title},\n"
+            "  author  = {Adams, Alice},\n  journal = {J},\n  year    = {2024}\n}\n",
+            encoding="utf-8")
+        # An empty bib_dir with an absolute name still resolves to the file,
+        # which is how a name that escapes bib_dir gets read at all.
+        return parse_all_works(
+            bib_dir="", warnings=[],
+            bib_files=[{"name": str(tmp_path / "journal.bib"),
+                        "category": "Journal Papers"}])
+
+    def test_the_parser_carries_the_name_it_was_given(self, tmp_path):
+        works = self.parse(tmp_path, "journal.bib")
+        assert works[0].source_file == str(tmp_path / "journal.bib")
+
+    def test_serializing_it_is_refused(self, tmp_path):
+        works = self.parse(tmp_path, "journal.bib")
+        with pytest.raises(ConfigurationError) as raised:
+            works[0].to_dict()
+        assert type(raised.value) is ConfigurationError, type(raised.value)
+        assert str(raised.value).startswith(CONFIG_BIB_FILE_ABSOLUTE)
+        assert str(tmp_path / "journal.bib") in str(raised.value)
 
 
 class TestCrossref:

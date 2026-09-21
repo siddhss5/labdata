@@ -10,7 +10,7 @@ Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
 MIT License - see LICENSE file for details.
 """
 
-from .config import LabDataConfig, BibFile
+from .config import ConfigurationError, LabDataConfig, BibFile
 from .models import (
     LabData, Work, Author, Contributor, Venue, Link, Person, Project,
     Collaborator,
@@ -22,6 +22,7 @@ __all__ = [
     # Config
     "LabDataConfig",
     "BibFile",
+    "ConfigurationError",
     # Data model
     "LabData",
     "Work",

@@ -158,6 +158,15 @@ EQUAL_CONTRIBUTION = [
     # is the ordinary LaTeX conversion's doing, and is pinned here as it is.
     case("names.equal_contribution_escaped", "name-equal-escaped",
          "authors.*.equal_contribution", [False, False, False, False, False]),
+    # Two of these resolve to nobody because the escaped marker stayed in
+    # the family name, which is no person's. The third of them --
+    # `Green\$^{*}$` -- is one of the three corpus authorships whose
+    # `person_id` would move if matching read the emitted name instead of
+    # the private form (#56 section 7), so it is pinned here as well as in
+    # `test_matching_never_reads_the_emitted_name`.
+    case("names.equal_contribution_escaped", "name-equal-escaped",
+         "authors.*.person_id",
+         ["bbrown", "ddavis", None, None, "aadams"]),
     case("names.equal_contribution_escaped", "name-equal-escaped",
          "authors.0.name", "Bob Brown"),
     case("names.equal_contribution_escaped", "name-equal-escaped",

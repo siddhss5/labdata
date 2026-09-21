@@ -1,11 +1,15 @@
 """Tests for the new LabDataConfig."""
 
+import labdata
 import pytest
 import yaml
 import tempfile
 from pathlib import Path, PureWindowsPath
 
-from labdata import BibFile, LabDataConfig, assemble
+from labdata import (
+    BibFile, ConfigurationError, LabData, LabDataConfig, Work, assemble,
+    export_to_json,
+)
 
 
 class TestLabDataConfig:
@@ -97,6 +101,21 @@ def is_absolute(name):
     return name.startswith(("/", "\\")) or PureWindowsPath(name).is_absolute()
 
 
+def test_configuration_error_is_its_own_type_under_value_error():
+    """SPEC.md section 1: a caller can tell a rejected configuration apart.
+
+    It subclasses `ValueError`, so code that caught one still catches this;
+    it is *not* `ValueError`, so code that wants only this does not also
+    catch a `year` that is not a number, which is a different failure with a
+    different owner. Asserting the exception type alone would not notice the
+    second half: aliasing the name to `ValueError` keeps every
+    `type(e) is ConfigurationError` assertion true.
+    """
+    assert issubclass(ConfigurationError, ValueError)
+    assert ConfigurationError is not ValueError
+    assert "ConfigurationError" in labdata.__all__
+
+
 class TestBibFileNameIsNeverAbsolute:
     """`bib_files[].name` is emitted as `work.source.file`, which SPEC.md
     section 5 promises is never an absolute path.
@@ -132,8 +151,9 @@ class TestBibFileNameIsNeverAbsolute:
     @pytest.mark.parametrize("name", ABSOLUTE)
     def test_an_absolute_name_is_rejected_at_load(self, tmp_path, name):
         config_path = self.write(tmp_path, name)
-        with pytest.raises(ValueError) as raised:
+        with pytest.raises(ConfigurationError) as raised:
             LabDataConfig.from_yaml(str(config_path))
+        assert type(raised.value) is ConfigurationError, type(raised.value)
         message = str(raised.value)
         assert message.startswith(self.CODE), message
         # It locates itself the way every coded diagnostic does, and names
@@ -157,8 +177,9 @@ class TestBibFileNameIsNeverAbsolute:
         only in `from_yaml()`. Without it, `assemble()` emits an absolute
         `work.source.file` and no diagnostic at all.
         """
-        with pytest.raises(ValueError) as raised:
+        with pytest.raises(ConfigurationError) as raised:
             BibFile(name=name, category="Journal Papers")
+        assert type(raised.value) is ConfigurationError, type(raised.value)
         message = str(raised.value)
         assert message.startswith(self.CODE), message
         assert "bib_files:name" in message
@@ -179,11 +200,48 @@ class TestBibFileNameIsNeverAbsolute:
         """
         bib_file = BibFile(name="journal.bib", category="Journal Papers")
         bib_file.name = name
-        with pytest.raises(ValueError) as raised:
+        with pytest.raises(ConfigurationError) as raised:
             assemble(LabDataConfig(bib_dir=str(tmp_path), bib_files=[bib_file]))
+        assert type(raised.value) is ConfigurationError, type(raised.value)
         message = str(raised.value)
         assert message.startswith(self.CODE), message
         assert name in message
+
+    @pytest.mark.parametrize("name", ABSOLUTE)
+    def test_a_work_built_by_hand_is_rejected_when_it_is_serialized(self, tmp_path,
+                                                                    name):
+        """The boundary every emitted document passes through.
+
+        `Work` is public and takes `source_file` directly, so a document can
+        be assembled without going near a configuration at all. Checking only
+        where the name was configured leaves the guarantee to whichever entry
+        point a caller happened to use; checking where the document is built
+        makes it a property of the document.
+        """
+        work = Work(bib_id="a2024", title="A Title", authors=[], year=2024,
+                    category="Journal Papers", entry_type="article",
+                    source_file=name)
+        with pytest.raises(ConfigurationError) as raised:
+            export_to_json(LabData(works=[work]), str(tmp_path / "lab.json"))
+        assert type(raised.value) is ConfigurationError, type(raised.value)
+        assert str(raised.value).startswith(self.CODE)
+        assert name in str(raised.value)
+        assert not (tmp_path / "lab.json").exists()
+
+    @pytest.mark.parametrize("name", RELATIVE)
+    def test_a_relative_source_file_serializes_unchanged(self, name):
+        """A relative directory is a name under `bib_dir`, not a path out of
+        it, so the check must not reject one."""
+        work = Work(bib_id="a2024", title="A Title", authors=[], year=2024,
+                    category="Journal Papers", entry_type="article",
+                    source_file=name)
+        assert work.to_dict()["source"] == {"file": name, "key": "a2024"}
+
+    def test_a_work_with_no_source_file_serializes(self):
+        """The dataclass default is the empty string, which is not absolute."""
+        work = Work(bib_id="a2024", title="A Title", authors=[], year=2024,
+                    category="Journal Papers", entry_type="article")
+        assert work.to_dict()["source"] == {"file": "", "key": "a2024"}
 
     def test_a_document_built_by_hand_never_carries_an_absolute_source(self, tmp_path):
         """End to end through the public API, with no YAML anywhere."""

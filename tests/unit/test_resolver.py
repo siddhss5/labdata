@@ -160,6 +160,73 @@ class TestMatchForm:
         assert author.name == "Alice Adams"
 
 
+# The three corpus authorships #56 section 7 predicts would move if the
+# resolver read `contributor.name` instead of the private matching form:
+# (given, von, family, the person the match form finds, the person the
+# emitted name would find). Two of them are rows #24 owns, so a strict xfail
+# catches those; the third shows up in no marker at all, which is why all
+# three are pinned here.
+DECOUPLING_SENSITIVE = [
+    ("Frank", None, "Fischer", None, "ffischer"),
+    ("Alan", None, "Kim", "akim", "alankim"),
+    ("Grace-Ann", None, "Green$^*$", None, "ggreen"),
+]
+
+
+class TestTheResolverNeverReadsTheEmittedName:
+    """#56 section 7: matching and emission are separate on purpose.
+
+    `contributor.name` is the parts joined in reading order; the resolver
+    matches on `match_form()`, the abbreviated form the document no longer
+    shows. Reconnecting them would move three corpus relationships, two of
+    them into xpasses on rows #24 owns -- which is to say it would hide an
+    identity change inside a schema change.
+    """
+
+    PEOPLE = [
+        Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
+        Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
+        Person(id="alankim", name="Alan Kim"),
+        Person(id="ffischer", name="Frank Fischer"),
+        Person(id="ggreen", name="Grace-Ann Green", aliases=["G.-A. Green"]),
+    ]
+
+    def resolve(self, author):
+        work = Work(bib_id="w", title="T", category="C", entry_type="article",
+                    year=2024, authors=[author])
+        resolve_authors([work], self.PEOPLE)
+        return work.authors[0].person_id
+
+    @pytest.mark.parametrize(
+        "given,von,family,on_match_form,on_emitted_name",
+        DECOUPLING_SENSITIVE,
+        ids=[row[2] for row in DECOUPLING_SENSITIVE])
+    def test_each_sensitive_authorship_resolves_on_the_match_form(
+            self, given, von, family, on_match_form, on_emitted_name):
+        author = Author(name=" ".join(p for p in (given, von, family) if p),
+                        position=1, given=given, von=von, family=family)
+        assert self.resolve(author) == on_match_form
+
+        # And the emitted name really would give a different answer, so the
+        # row above is about the separation rather than about a coincidence.
+        assert on_match_form != on_emitted_name
+        as_if_reconnected = Author(name=author.name, position=1,
+                                   given=author.name, von=None, family=None)
+        assert match_form(as_if_reconnected) != match_form(author)
+
+    def test_the_emitted_name_is_not_the_form_that_is_matched(self):
+        """Stated once, directly: the two forms differ and matching uses one.
+
+        A test of the three rows alone would keep passing if `match_form()`
+        were quietly redefined to return the emitted name.
+        """
+        author = Author(name="Alice Adams", position=1,
+                        given="Alice", family="Adams")
+        assert match_form(author) == "A. Adams"
+        assert author.name == "Alice Adams"
+        assert self.resolve(author) == "aadams"
+
+
 class TestResolveAuthors:
     def _make_work(self, authors, editors=()):
         return Work(

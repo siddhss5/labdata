@@ -12,6 +12,14 @@ MIT License - see LICENSE file for details.
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+# The one guarantee about an emitted value that the input can break: a
+# configured `.bib` name reaches the document as `work.source.file`, and is
+# promised never to be absolute. `labdata.config` owns the code and the
+# exception type because the condition is a configuration mistake; the check
+# is made here as well because this is the boundary every emitted document
+# passes through, whatever built the objects.
+from .config import reject_absolute_name
+
 
 # Version of the output format (see schema/v4/output.schema.json). Bump it when
 # a change to to_dict() output could break a consumer.
@@ -164,7 +172,9 @@ class Work:
     category: str
     entry_type: str
 
-    # The configured `bib_files[].name` the entry was read from, never a path.
+    # The configured `bib_files[].name` the entry was read from. A relative
+    # directory is fine -- `sub/journal.bib` is a name under `bib_dir` -- and
+    # an absolute path is not: see `to_dict()`.
     source_file: str = ""
 
     editors: List[Contributor] = field(default_factory=list)
@@ -201,7 +211,15 @@ class Work:
         ``source.key`` is the citation key as written, which is ``bib_id``
         again: a consumer holding only the provenance record can still find
         the entry it came from.
+
+        ``source.file`` is checked here rather than only where it was set.
+        This is the boundary every emitted document passes through — both
+        exporters and the CLI serialize through it — so a `Work` built by
+        hand, or one parsed straight from `labdata.parsers`, cannot carry a
+        compiling machine's directory layout into a document that is shared.
+        A relative directory is not absolute and passes.
         """
+        reject_absolute_name(self.source_file, "bib_files:name")
         return {
             'bib_id': self.bib_id,
             'source': {'file': self.source_file, 'key': self.bib_id},

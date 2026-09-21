@@ -220,10 +220,12 @@ uncoded diagnostic is not a stable interface.
 > occurrences and v4 has both `work_count`, deduplicated per work, and
 > `authorship_count`. The displayed `name` expands, because it is now the
 > parts joined rather than the abbreviated form: `T. Turner` becomes
-> `Trent Turner`. And the final tie-break of the order §3 promises moves from
-> `name` to `key`, because two keys can now carry the same readable name and
-> only the key makes the order total. All four follow from the key and the
-> name, and #24 tunes the policy behind them.
+> `Trent Turner`. The **order §3 promises keeps its rule** — `last_year`
+> descending, then work count descending, then `name` — with `key` appended
+> after `name`, because two keys can now carry the same readable name and the
+> name alone is no longer total. What moves in the list moves because the
+> names and the groups moved, not because the rule did. All of it follows
+> from the key and the name, and #24 tunes the policy behind them.
 
 > **Version note (#22, PR #61).** Through commit `cf9e055`, `--unresolved`
 > printed `All authors resolved.` when no `people_file` was configured, where
@@ -236,8 +238,21 @@ uncoded diagnostic is not a stable interface.
 — `assemble`, `AssemblyResult`, the models `LabData`, `Work`, `Author`,
 `Contributor`, `Venue`, `Link`, `Person`, `Project`, `Collaborator`, the
 config loader `LabDataConfig` with `BibFile`, and the exporters
-`export_to_yaml` and `export_to_json`. `Publication` was renamed to `Work` at
-package version 3.0.0, when the document's `publications` became `works`.
+`export_to_yaml` and `export_to_json`, and the exception
+`ConfigurationError`. `Publication` was renamed to `Work` at package version
+3.0.0, when the document's `publications` became `works`.
+
+**`labdata.ConfigurationError`** (defined in `labdata.config`) is a subclass
+of `ValueError`, raised for a configuration labdata will not compile from.
+It has its own type so that a caller can tell a rejected configuration from
+the other things that raise a `ValueError` — a `year` that is not a number,
+most of all, which is a different failure with a different owner (Target #26
+above). It is raised by `LabDataConfig.from_yaml()`, by `BibFile`'s
+constructor, by `assemble()` on every configured name before it compiles
+one, and by `Work.to_dict()` — which is the boundary every emitted document
+passes through, so it is the one that holds whatever built the objects. The
+only condition that raises it today is `CONFIG-BIB-FILE-ABSOLUTE`, and the
+message carries that code.
 
 Private, and free to change without a version bump: `labdata.parsers.*`,
 `labdata.loaders`, `labdata.resolver`, `labdata.cli`'s internals, and every
@@ -430,7 +445,7 @@ accident.
 | `person.work_ids` | The order of the `works` list, filtered to that person's authorships, first occurrence only (`labdata.resolver.compute_backlinks()`). Editors are not authorships and do not appear. |
 | `project.work_ids` | The order of the `works` list, filtered to that project, first occurrence only (`compute_backlinks()`). |
 | `project.people_ids` | Person id **ascending**, by Unicode code point (`compute_backlinks()` sorts the set it collects). |
-| `collaborators` | `last_year` **descending** with `null` last, then `work_count` **descending**, then `key` **ascending** by Unicode code point (the sort in `labdata.assembler.group_collaborators()`; `tests/COVERAGE.md` row `output.collaborators.order`). The key is the final tie-break rather than the name, because two keys can carry the same readable name, so only the key makes the order total. |
+| `collaborators` | `last_year` **descending** with `null` last, then `work_count` **descending**, then `name` **ascending** by Unicode code point, then `key` **ascending** by Unicode code point (the sort in `labdata.assembler.group_collaborators()`; `tests/COVERAGE.md` row `output.collaborators.order`). `key` is appended after `name` rather than replacing it: two keys can carry the same readable name — a parsed and a brace-protected spelling of one string are two keys — so the name alone is no longer total, but it is still what decides. |
 | `collaborator.authorships` | The order of the `works` list, then `position` within a work (`group_collaborators()`). |
 | `collaborator.work_ids` | The same order, first occurrence only. |
 | `collaborator.name_variants` | **Ascending** by Unicode code point. `collaborator.name` is the *first* spelling in document order, which need not be the first variant. |
@@ -452,8 +467,10 @@ accident.
   is where `year: 0` used to put it. The position is unchanged; what changed
   is that `null` is now distinguishable from a genuine year `0`, and that the
   entry is reported under `BIB-YEAR-MISSING`.
-- Two collaborators can only tie through all three keys if they share a key,
-  and a key is unique by construction, so the order is total.
+- Two collaborators can only tie through all four sort keys if they share a
+  `key`, and a `key` is unique by construction, so the order is total. Two
+  that tie through the first three are separated by the `key` alone, which is
+  why it is there.
 - Sorting by "Unicode code point" means `Z` sorts before `a`, and `Ö` sorts
   after `z`. No locale collation is applied.
 
