@@ -9,6 +9,7 @@ from labdata.parsers.bibtex import (
     DUPLICATE_CITATION_KEY,
     ENTRY_TYPE_UNSUPPORTED,
     LATEX_COMMAND_UNKNOWN,
+    STRING_REDEFINED,
     STRING_UNDEFINED,
     SYNTAX_ERROR,
     VENUE_MISSING,
@@ -678,3 +679,43 @@ class TestUnknownCommands:
             raise ValueError("unreadable")
         monkeypatch.setattr(latex, "LatexWalker", broken)
         assert unknown_commands(r"\anything") == []
+
+
+class TestRedefinedStringSummary:
+    """Every redefined @string macro of a run is reported in one line."""
+
+    def run(self, tmp_path, files):
+        for name, text in files.items():
+            (tmp_path / name).write_text(text, encoding="utf-8")
+        warnings = []
+        parse_all_works(bib_dir=str(tmp_path), warnings=warnings,
+                        bib_files=[{"name": n, "category": "C"} for n in files])
+        return [w for w in warnings if w.startswith(STRING_REDEFINED)]
+
+    def test_one_line_across_files_with_every_site(self, tmp_path):
+        [line] = self.run(tmp_path, {
+            "a.bib": "@string{b = 1}\n@string{a = 1}\n@string{B = 2}\n@string{b = 3}\n",
+            "c.bib": "@string{a = 1}\n@string{a = 2}\n@string{once = 1}\n",
+        })
+        assert line == (
+            f"{STRING_REDEFINED} ::: 2 @string macros redefined (last definition "
+            f"used): a, b [{tmp_path}/a.bib:3, {tmp_path}/a.bib:4, "
+            f"{tmp_path}/c.bib:2]")
+        assert line.file is None
+
+    def test_one_file_is_the_location_and_one_macro_is_singular(self, tmp_path):
+        [line] = self.run(tmp_path, {"a.bib": "@string{x = 1}\n\n@string{x = 2}\n"})
+        assert line == (f"{STRING_REDEFINED} {tmp_path}/a.bib::: 1 @string macro "
+                        f"redefined (last definition used): x [{tmp_path}/a.bib:3]")
+
+    def test_nothing_redefined_says_nothing(self, tmp_path):
+        assert self.run(tmp_path, {"a.bib": "@string{x = 1}\n@string{y = 1}\n"}) == []
+
+    def test_a_file_read_on_its_own_is_summarised_on_its_own(self, tmp_path, capsys):
+        path = tmp_path / "a.bib"
+        path.write_text("@string{x = 1}\n@string{x = 2}\n", encoding="utf-8")
+        warnings = []
+        parse_bibtex_file(str(path), warnings=warnings)
+        assert [w.split(" ", 1)[0] for w in warnings] == [STRING_REDEFINED]
+        parse_bibtex_file(str(path))
+        assert f"Warning: {STRING_REDEFINED} {path}::: " in capsys.readouterr().err

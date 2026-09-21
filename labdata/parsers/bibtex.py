@@ -79,6 +79,10 @@ VENUE_MISSING = "BIB-VENUE-MISSING"
 # read by the field rules alone.
 ENTRY_TYPE_UNSUPPORTED = "BIB-ENTRY-TYPE-UNSUPPORTED"
 
+# Every `@string` macro a run defines more than once, in one summary line.
+# The last definition is used, as in BibTeX. Always a warning, in every mode.
+STRING_REDEFINED = "BIB-STRING-REDEFINED"
+
 # A LaTeX command the converter does not know. It is dropped, and a braced
 # argument after it is kept as plain text.
 LATEX_COMMAND_UNKNOWN = "LATEX-COMMAND-UNKNOWN"
@@ -132,23 +136,42 @@ def _warn(message: str) -> None:
 
 # --- Reading the files -------------------------------------------------------
 
-def _redefined_macros(text: str) -> List[str]:
-    """The ``@string`` macros this text defines more than once, in source order.
+def _redefined_macros(text: str) -> List[Tuple[str, int]]:
+    """Every redefinition of an ``@string`` macro in this text, as
+    ``(name, line)``, in source order: each definition after a macro's first.
 
     pybtex takes the last definition, as BibTeX does, and says nothing about
     it. labdata reports it instead of letting a redefinition pass unnoticed.
-    Collecting every redefinition of a run into one message is #21.
     """
     seen: set = set()
-    repeated: List[str] = []
+    repeated: List[Tuple[str, int]] = []
     for match in _STRING_DEFINITION.finditer(text):
         name = match.group(1).lower()
         if name in seen:
-            if name not in repeated:
-                repeated.append(name)
+            repeated.append((name, text.count("\n", 0, match.start()) + 1))
         else:
             seen.add(name)
     return repeated
+
+
+def redefined_summary(redefinitions: List[Tuple[str, str, int]]) -> Optional[str]:
+    """One `STRING_REDEFINED` line for ``(file, name, line)`` redefinitions.
+
+    The macros are named once each, sorted, and every redefinition is listed
+    as `file:line`, by file and then by line. The location names the file when every redefinition is
+    in one, and is otherwise left empty. None when there is nothing to say.
+    """
+    if not redefinitions:
+        return None
+    names = sorted({name for _, name, _ in redefinitions})
+    files = sorted({path for path, _, _ in redefinitions})
+    where = ", ".join(f"{path}:{line}" for path, _, line in sorted(
+        redefinitions, key=lambda found: (found[0], found[2])))
+    count = f"{len(names)} @string macro{'s' if len(names) != 1 else ''}"
+    return diagnostic(
+        STRING_REDEFINED, files[0] if len(files) == 1 else None, None, None,
+        f"{count} redefined (last definition used): {', '.join(names)} "
+        f"[{where}]")
 
 
 class _CommentSkippingParser(LowLevelParser):
@@ -297,19 +320,28 @@ def parse_bibtex_file(
     path: str,
     duplicate_errors: Optional[List[str]] = None,
     warnings: Optional[List[str]] = None,
+    redefinitions: Optional[List[Tuple[str, str, int]]] = None,
 ) -> Dict[str, Entry]:
     """Parse one BibTeX file into pybtex entries, keyed by citation key.
 
     Anything the parser has to say is captured and reported by labdata, so no
     library logging reaches the user. Syntax errors and undefined macros go
     to ``warnings``, located at the entry and field they were found in, or to
-    standard error when no list is given.
+    standard error when no list is given. Redefined ``@string`` macros are
+    added to ``redefinitions``, for a caller summarising a whole run; without
+    that list, this file's are summarised on their own.
     """
     text = Path(path).read_text(encoding="utf-8-sig")
 
-    for name in _redefined_macros(text):
-        _warn(f"@string macro '{name}' is defined more than once; "
-              "the last definition is used")
+    found = [(path, name, line) for name, line in _redefined_macros(text)]
+    if redefinitions is not None:
+        redefinitions.extend(found)
+    elif found:
+        summary = redefined_summary(found)
+        if warnings is None:
+            _warn(summary)
+        else:
+            warnings.append(summary)
 
     duplicate_keys: List[str] = []
     with pybtex.errors.capture() as errors:
@@ -919,13 +951,16 @@ def parse_all_works(
     warn = to(warnings)
     fail = to(errors)
 
+    # Every file's redefined macros, summarised once when all are read.
+    redefinitions: List[Tuple[str, str, int]] = []
     for bib_file in bib_files:
         name = bib_file['name'] if isinstance(bib_file, dict) else bib_file.name
         category = bib_file['category'] if isinstance(bib_file, dict) else bib_file.category
         path = f"{bib_dir}/{name}"
         file_errors: List[str] = []
         parsed = parse_bibtex_file(path, duplicate_errors=file_errors,
-                                   warnings=warnings)
+                                   warnings=warnings,
+                                   redefinitions=redefinitions)
         for error in file_errors:
             report(error)
         for bib_id, entry in parsed.items():
@@ -946,6 +981,10 @@ def parse_all_works(
                 fail(_crossref_error(path, bib_id, str(crossref[0]).strip()))
                 continue
             read.append((path, name, bib_id, entry, category))
+
+    summary = redefined_summary(redefinitions)
+    if summary:
+        warn(summary)
 
     works = [
         entry_to_work(bib_id, entry, category, pdf_base_url, path, name, warn)

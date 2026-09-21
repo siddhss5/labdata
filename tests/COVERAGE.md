@@ -44,9 +44,8 @@ A case can also be checked by tests other than the one its row names; the
 status column reports `xfail` when any of them is xfailed.
 
 Cases that fail today are not fixed here (that is the linked issue's job):
-#20 (verifying a remote link), #21 (one `@string` summary),
-#27 (explicit link and award fields), #28 (`keywords` project
-tags). #18 is still open for
+#20 (verifying a remote link), #27 (explicit link and award fields), #28
+(`keywords` project tags). #18 is still open for
 renderers — escaping, attribute-safe escaping and the checks on rendered
 output — but every LaTeX-to-text row below passes, and the one place
 labdata generated Markdown of its own, the composed `venue`, is gone.
@@ -60,7 +59,7 @@ the second definition is the one that reaches the output.
 |---|---|---|---|---|---|
 | `strings.macro` | `booktitle = rss`, with `@string{rss = ...}` | The macro is expanded into the venue | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
 | `strings.repeat_last_wins` | `rss` defined twice | The last definition is used; the first never appears in the output | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
-| `strings.redefined_report` | Three macros redefined in one file | One summary message names all three | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_redefined_strings_reported_once` | xfail #21 |
+| `strings.redefined_report` | Three macros redefined in one file | One summary message names all three | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_redefined_strings_reported_once` | pass |
 | `strings.defined_once` | A macro defined exactly once | Expanded like any other; no message mentions it | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_macro_defined_once_is_not_reported` | pass |
 | `strings.concat` | `"Joined " # "Title"` and `"Proceedings of the " # cfx` | The parts are concatenated, macros expanded | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
 | `strings.macro_journal` | `journal = jfx # " Letters"` | The journal is the expanded macro plus the literal suffix | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
