@@ -84,7 +84,9 @@ labdata --config lab.yaml --format json --output lab.json
 the run fails outright. An author who
 matched nobody is reported but is not an error — most are external
 collaborators. `--validate` does not check the output against the JSON
-Schema; it checks counts and unknown project ids. The exit codes are part of
+Schema; it checks the configuration, the people and projects files and every
+entry, and reports nearly every problem under a stable code that
+[`SPEC.md`](SPEC.md) registers, with its class. The exit codes are part of
 the contract; [`SPEC.md` §1](SPEC.md) lists them, along with the precedence
 rule when you pass more than one mode.
 
@@ -167,6 +169,9 @@ author names to people:
   current_position: "Research Scientist, Example Robotics Inc."
 ```
 
+`id` and `name` are required. `role` is any non-empty string, so any lab's
+roles fit; `status` is `current` (the default) or `alumni`.
+
 ### External co-authors (optional, `data/collaborators.yaml`)
 
 A list of co-authors outside the lab whose spellings you want grouped
@@ -192,6 +197,9 @@ reported under `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` and left to the member.
   website: "https://example.org/projects/homebot"
   status: "active"
 ```
+
+`id` and `title` are required; `status` is `active` (the default) or
+`completed`.
 
 ## How author matching works
 

@@ -16,10 +16,15 @@ MIT License - see LICENSE file for details.
 
 import re
 
-from pylatexenc.latex2text import LatexNodes2Text
+from pylatexenc.latex2text import LatexNodes2Text, get_default_latex_context_db
+from pylatexenc.latexwalker import LatexMacroNode, LatexMathNode, LatexWalker
 
 
 _CONVERTER = LatexNodes2Text(math_mode='verbatim')
+
+# The commands the converter has a rule for. A command outside it is dropped,
+# with any braced argument after it read as a group of plain text.
+_KNOWN = get_default_latex_context_db()
 
 # pylatexenc 2.11 raises IndexError on every \href, so the link is rewritten
 # to "text (url)" before conversion. The URL itself is set aside first: it is
@@ -50,12 +55,48 @@ def latex_to_text(text: str) -> str:
         verbatim.append(value)
         return f'{_PLACEHOLDER}{len(verbatim) - 1}{_PLACEHOLDER}'
 
+    converted = _CONVERTER.latex_to_text(_prepared(text, set_aside))
+    return _PLACEHOLDER_RE.sub(lambda m: verbatim[int(m.group(1))], converted)
+
+
+def _prepared(text: str, set_aside) -> str:
+    """The value as the converter is given it: links rewritten, bare & escaped."""
     text = _HREF_URL_TEXT.sub(lambda m: f'{m.group(2)} ({set_aside(m.group(1))})', text)
     text = _HREF_URL_ONLY.sub(lambda m: set_aside(m.group(1)), text)
-    text = _BARE_AMPERSAND.sub(r'\&', text)
+    return _BARE_AMPERSAND.sub(r'\&', text)
 
-    converted = _CONVERTER.latex_to_text(text)
-    return _PLACEHOLDER_RE.sub(lambda m: verbatim[int(m.group(1))], converted)
+
+def unknown_commands(text: str) -> list:
+    """The LaTeX commands in one value the converter has no rule for, in order.
+
+    Math is not searched: it is left as TeX for the renderer. A value the
+    walker cannot read at all yields nothing here; converting it is what
+    reports that.
+    """
+    if not text:
+        return []
+    try:
+        nodes, _, _ = LatexWalker(_prepared(text, lambda _: ''),
+                                  tolerant_parsing=True).get_latex_nodes()
+    except Exception:  # noqa: BLE001 - finding nothing is the safe answer
+        return []
+    found: list = []
+
+    def walk(nodelist):
+        for node in nodelist or []:
+            if node is None or isinstance(node, LatexMathNode):
+                continue
+            if (isinstance(node, LatexMacroNode)
+                    and _KNOWN.get_macro_spec(node.macroname) is None
+                    and node.macroname not in found):
+                found.append(node.macroname)
+            walk(getattr(node, 'nodelist', None))
+            arguments = getattr(node, 'nodeargd', None)
+            if arguments is not None:
+                walk(arguments.argnlist)
+
+    walk(nodes)
+    return found
 
 
 def strip_braces(text: str) -> str:

@@ -7,6 +7,12 @@ from labdata.config import BIB_FILE_ABSOLUTE as CONFIG_BIB_FILE_ABSOLUTE
 from labdata.parsers.bibtex import (
     CROSSREF_UNSUPPORTED,
     DUPLICATE_CITATION_KEY,
+    ENTRY_TYPE_UNSUPPORTED,
+    LATEX_COMMAND_UNKNOWN,
+    STRING_UNDEFINED,
+    SYNTAX_ERROR,
+    VENUE_MISSING,
+    YEAR_INVALID,
     YEAR_MISSING,
     _Parser,
     _convert,
@@ -18,10 +24,12 @@ from labdata.parsers.bibtex import (
     is_video_url,
     parse_project_ids,
     parse_all_works,
+    parse_bibtex_file,
     pdf_link,
 )
 from labdata.config import ConfigurationError
 from labdata.models import Author
+from labdata.parsers.latex import unknown_commands
 
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
@@ -548,3 +556,125 @@ class TestEntryFiltering:
         data = self.parse(self.REJECTED + '@preamble("a preamble")\n' + self.WANTED)
         assert list(data.entries) == ["keep"]
         assert data.preamble == "a preamble"
+
+
+def located(tmp_path, source, name="hazard.bib"):
+    """The warnings one file produces, by code, and the works it yields."""
+    (tmp_path / name).write_text(source, encoding="utf-8")
+    warnings = []
+    works = parse_all_works(bib_dir=str(tmp_path),
+                            bib_files=[{"name": name, "category": "Test"}],
+                            warnings=warnings)
+    by_code = {}
+    for warning in warnings:
+        by_code.setdefault(warning.split(" ", 1)[0], []).append(warning)
+    return by_code, {work.bib_id: work for work in works}
+
+
+class TestLocatedParserDiagnostics:
+    """What the parser library finds is located at `<file>:<key>:<field>`."""
+
+    def test_an_undefined_macro_names_the_entry_field_and_macro(self, tmp_path):
+        source = ("@inproceedings{uses-macro, title = {T}, author = {Adams, Alice},"
+                  " booktitle = nosuchmacro, year = 2024}\n" + entry("after"))
+        found, works = located(tmp_path, source)
+        [line] = found[STRING_UNDEFINED]
+        assert f"{tmp_path}/hazard.bib:uses-macro:booktitle:" in line
+        assert "nosuchmacro" in line
+        assert sorted(works) == ["after", "uses-macro"]
+
+    def test_an_undefined_macro_inside_a_string_names_no_entry(self, tmp_path):
+        found, _ = located(tmp_path, "@string{alias = nosuchmacro}\n" + entry("e"))
+        [line] = found[STRING_UNDEFINED]
+        assert line.startswith(f"{STRING_UNDEFINED} {tmp_path}/hazard.bib::: ")
+
+    def test_an_error_inside_an_entry_before_any_field(self, tmp_path):
+        found, _ = located(tmp_path, "@article{early, = {x}}\n" + entry("after"))
+        [line] = found[SYNTAX_ERROR]
+        assert f"{tmp_path}/hazard.bib:early::" in line
+        assert "after the value" not in line
+
+    def test_text_outside_any_entry_is_located_at_the_file(self, tmp_path):
+        found, works = located(tmp_path, "% mentions @article in prose\n" + entry("e"))
+        [line] = found[SYNTAX_ERROR]
+        assert f"{tmp_path}/hazard.bib::: " in line and "line 1" in line
+        assert list(works) == ["e"]
+
+    def test_without_a_list_a_syntax_error_goes_to_standard_error(self, tmp_path, capsys):
+        (tmp_path / "x.bib").write_text("@article{early, = {x}}\n", encoding="utf-8")
+        parse_bibtex_file(str(tmp_path / "x.bib"))
+        assert f"Warning: {SYNTAX_ERROR} " in capsys.readouterr().err
+
+    def test_other_parser_messages_are_still_relayed(self, tmp_path, capsys):
+        """A repeated field is not a syntax error, and is not swallowed."""
+        source = "@article{twice, title = {A}, title = {B}, year = 2024}\n"
+        found, works = located(tmp_path, source)
+        assert SYNTAX_ERROR not in found
+        assert "twice" in capsys.readouterr().err
+        assert works["twice"].title == "A"
+
+    def test_a_year_that_is_not_a_number_is_null(self, tmp_path):
+        found, works = located(tmp_path, entry("e").replace("{2024}", "{in press}"))
+        [line] = found[YEAR_INVALID]
+        assert f"{tmp_path}/hazard.bib:e:year:" in line and "in press" in line
+        assert works["e"].year is None
+
+    @pytest.mark.parametrize("entry_type, field", [
+        ("article", "journal"), ("inproceedings", "booktitle"),
+        ("conference", "booktitle"), ("incollection", "booktitle"),
+        ("phdthesis", "school"), ("mastersthesis", "school"),
+        ("techreport", "institution")])
+    def test_a_missing_container_is_named(self, tmp_path, entry_type, field):
+        found, works = located(
+            tmp_path, f"@{entry_type}{{e, title = {{T}}, year = 2024}}\n")
+        [line] = found[VENUE_MISSING]
+        assert f"{tmp_path}/hazard.bib:e:{field}:" in line
+        assert works["e"].venue is None
+
+    @pytest.mark.parametrize("entry_type", ["book", "inbook", "manual", "misc",
+                                            "proceedings"])
+    def test_a_type_with_no_required_container_is_not_reported(self, tmp_path,
+                                                               entry_type):
+        found, _ = located(tmp_path, f"@{entry_type}{{e, title = {{T}}, year = 2024}}\n")
+        assert VENUE_MISSING not in found and ENTRY_TYPE_UNSUPPORTED not in found
+
+    def test_an_undocumented_type_is_kept_and_named(self, tmp_path):
+        found, works = located(tmp_path, "@booklet{e, title = {T}, year = 2024}\n")
+        [line] = found[ENTRY_TYPE_UNSUPPORTED]
+        assert f"{tmp_path}/hazard.bib:e:entry_type:" in line and "@booklet" in line
+        assert works["e"].entry_type == "booklet"
+
+    def test_an_unknown_command_is_named_once_per_field(self, tmp_path):
+        source = entry("e", title=r"\fictional{A} and \fictional{B}").replace(
+            "{Adams, Alice}", r"{Adams\strange, Alice}")
+        found, works = located(tmp_path, source)
+        lines = found[LATEX_COMMAND_UNKNOWN]
+        assert len(lines) == 2, lines
+        assert any(":e:title:" in l and "\\fictional" in l for l in lines)
+        assert any(":e:author:" in l and "\\strange" in l for l in lines)
+        assert works["e"].title == "A and B"
+
+    def test_a_citation_key_with_a_colon_keeps_its_parts(self, tmp_path):
+        found, _ = located(tmp_path, entry("smith:2024").replace(
+            "{A Fictional Title}", r"{\fictional{A}}"))
+        [line] = found[LATEX_COMMAND_UNKNOWN]
+        assert (line.file, line.key, line.field) == (
+            f"{tmp_path}/hazard.bib", "smith:2024", "title")
+
+
+class TestUnknownCommands:
+    def test_known_commands_math_and_links_are_not_reported(self):
+        value = r"\textbf{a} \'e \v c $\alpha$ \href{http://x_y}{site} 50\%"
+        assert unknown_commands(value) == []
+
+    def test_each_unknown_command_is_named_once_in_order(self):
+        assert unknown_commands(r"\zz{x} \yy \zz") == ["zz", "yy"]
+
+    def test_empty_and_unreadable_values_yield_nothing(self, monkeypatch):
+        assert unknown_commands("") == []
+        import labdata.parsers.latex as latex
+
+        def broken(*args, **kwargs):
+            raise ValueError("unreadable")
+        monkeypatch.setattr(latex, "LatexWalker", broken)
+        assert unknown_commands(r"\anything") == []

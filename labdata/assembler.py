@@ -13,9 +13,11 @@ import hashlib
 import re
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from .config import LabDataConfig, reject_absolute_name
+from .diagnostics import diagnostic
 from .models import Author, Collaborator, LabData, Person, Work
 from .parsers.bibtex import parse_all_works
 from .loaders import (
@@ -24,7 +26,7 @@ from .loaders import (
 from .resolver import (
     AMBIGUOUS, AMBIGUOUS_NAME, RESOLVED, Candidates, compute_backlinks, given_initials,
     initials_only, match, normalize_name, person_candidates,
-    resolve_authors, resolve_projects,
+    resolve_authors, resolve_projects, shared_declarations,
 )
 
 
@@ -66,6 +68,18 @@ COLLABORATOR_ALIAS_IS_MEMBER = "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER"
 # A document needs a header, and a header with no name is one a renderer
 # cannot title a page from.
 LAB_NAME_MISSING = "CONFIG-LAB-NAME-MISSING"
+
+# A file the configuration names that is not there. Fatal: compiling on
+# without it would emit a document missing its works, people or projects.
+FILE_NOT_FOUND = "CONFIG-FILE-NOT-FOUND"
+
+# A key `lab.yaml` holds that labdata does not read, such as a misspelt
+# `people_fil`. A warning: nothing is lost that was ever read.
+KEY_UNKNOWN = "CONFIG-KEY-UNKNOWN"
+
+# No `.bib` file is configured, so the document has no works. A warning,
+# because that can be meant, but it is never silently normal.
+BIB_FILES_MISSING = "CONFIG-BIB-FILES-MISSING"
 
 
 @dataclass
@@ -338,11 +352,37 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     for bib_file in config.bib_files:
         reject_absolute_name(getattr(bib_file, 'name', None), "bib_files:name")
 
-    # Parse works
-    bib_files = [{'name': bf.name, 'category': bf.category} for bf in config.bib_files]
     bibliography_errors: List[str] = []
     warnings: List[str] = []
     fatal_errors: List[str] = []
+    source = config.path or 'lab.yaml'
+
+    for key in config.unknown_keys:
+        warnings.append(diagnostic(
+            KEY_UNKNOWN, source, key, None,
+            f"'{key}' is not a key labdata reads, and is ignored"))
+    if not config.bib_files:
+        warnings.append(diagnostic(
+            BIB_FILES_MISSING, source, 'bib_files', None,
+            "no bib_files are configured, so the document has no works"))
+
+    # Every file the configuration names, checked before any is read, so a
+    # missing one is reported against the key that names it.
+    def present(path: Optional[str], key: str, field_name=None) -> bool:
+        if not path or Path(path).is_file():
+            return True
+        fatal_errors.append(diagnostic(
+            FILE_NOT_FOUND, source, key, field_name,
+            f"'{path}' does not exist"))
+        return False
+
+    # Parse works
+    bib_files = [{'name': bf.name, 'category': bf.category}
+                 for bf in config.bib_files
+                 if present(f"{config.bib_dir}/{bf.name}", 'bib_files', 'name')]
+    people_found = present(config.people_file, 'people_file')
+    projects_found = present(config.projects_file, 'projects_file')
+    collaborators_found = present(config.collaborators_file, 'collaborators_file')
     works = parse_all_works(
         bib_dir=config.bib_dir,
         bib_files=bib_files,
@@ -353,18 +393,25 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     )
 
     # Load people and projects
-    people = load_people(config.people_file) if config.people_file else []
-    projects = load_projects(config.projects_file) if config.projects_file else []
+    lists = dict(errors=fatal_errors, diagnostics=bibliography_errors,
+                 warnings=warnings)
+    people = (load_people(config.people_file, **lists)
+              if config.people_file and people_found else [])
+    projects = (load_projects(config.projects_file, **lists)
+                if config.projects_file and projects_found else [])
+    if people:
+        warnings.extend(shared_declarations(people, config.people_file))
 
     # Resolve
     unresolved_authors = resolve_authors(works, people, warnings=warnings,
                                          bib_dir=config.bib_dir)
-    unknown_projects = resolve_projects(works, projects)
+    unknown_projects = resolve_projects(works, projects, bibliography_errors,
+                                        bib_dir=config.bib_dir)
 
     # Group the authorships that resolved to nobody, joining the spellings
     # `collaborators_file` declares
     declared = None
-    if config.collaborators_file:
+    if config.collaborators_file and collaborators_found:
         declared = declared_collaborators(
             load_collaborators(config.collaborators_file), people,
             config.collaborators_file, warnings)
@@ -373,8 +420,8 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
 
     # A header a renderer cannot title a page from. A `lab` that is not a
     # mapping at all is a different condition -- the header is malformed
-    # rather than unnamed -- and reporting this one against it would be a
-    # diagnostic that named the wrong defect, so it is left to #26.
+    # rather than unnamed -- and `LabDataConfig.from_yaml()` rejects it under
+    # its own code, so this one is not reported against it.
     if config.lab is None or isinstance(config.lab, dict):
         if not (config.lab or {}).get("name"):
             warnings.append(

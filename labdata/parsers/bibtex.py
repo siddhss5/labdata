@@ -22,10 +22,13 @@ from typing import Dict, List, Optional, Tuple
 
 import pybtex.errors
 from pybtex.database import Entry, Person
-from pybtex.database.input.bibtex import LowLevelParser, Parser as PybtexParser, SkipEntry
+from pybtex.database.input.bibtex import (
+    LowLevelParser, Parser as PybtexParser, SkipEntry, UndefinedMacro,
+)
 from pybtex.scanner import PybtexSyntaxError
 
-from .latex import latex_to_text, strip_braces
+from .latex import latex_to_text, strip_braces, unknown_commands
+from ..diagnostics import diagnostic
 from ..models import Author, Contributor, Link, Venue, Work
 
 
@@ -55,6 +58,30 @@ CROSSREF_UNSUPPORTED = "BIB-CROSSREF-UNSUPPORTED"
 # claiming year 0 — a value indistinguishable from a real year 0 that also
 # put the entry somewhere meaningless in the order.
 YEAR_MISSING = "BIB-YEAR-MISSING"
+
+# A year that is present but is not a number is treated as no year, and says
+# so, rather than stopping the run: the entry is still a work.
+YEAR_INVALID = "BIB-YEAR-INVALID"
+
+# A value naming an `@string` macro that nothing defines. The parser library
+# reads it as empty, as BibTeX does; the entry is kept.
+STRING_UNDEFINED = "BIB-STRING-UNDEFINED"
+
+# Text the parser library could not read as BibTeX. Inside an entry, the
+# entry is kept as far as it was read; outside one, the text is skipped.
+SYNTAX_ERROR = "BIB-SYNTAX-ERROR"
+
+# An entry of a type whose container BibTeX requires, without that field.
+# Its venue is null, or read from another container field it does carry.
+VENUE_MISSING = "BIB-VENUE-MISSING"
+
+# An entry of a type labdata does not document. It is kept, and its venue is
+# read by the field rules alone.
+ENTRY_TYPE_UNSUPPORTED = "BIB-ENTRY-TYPE-UNSUPPORTED"
+
+# A LaTeX command the converter does not know. It is dropped, and a braced
+# argument after it is kept as plain text.
+LATEX_COMMAND_UNKNOWN = "LATEX-COMMAND-UNKNOWN"
 
 # Equal contribution is written as a star on one part of a name, in one of
 # these four forms. It is an annotation rather than part of the name, so it is
@@ -184,6 +211,19 @@ class _Parser(PybtexParser):
     def __init__(self, *args, duplicate_keys=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.duplicate_keys = duplicate_keys if duplicate_keys is not None else []
+        # (error, entry key, field name) for every syntax error, with the
+        # tokenizer's position in the file as it was when the error was
+        # raised: by the time the file is read, it has moved on.
+        self.syntax_errors: List[Tuple[PybtexSyntaxError, Optional[str], Optional[str]]] = []
+
+    def handle_error(self, error):
+        """Keep a syntax error with where it happened; relay anything else."""
+        if isinstance(error, PybtexSyntaxError):
+            tokenizer = error.parser
+            self.syntax_errors.append((error, tokenizer.current_entry_key,
+                                       tokenizer.current_field_name))
+            return
+        super().handle_error(error)
 
     def process_entry(self, entry_type, key, fields):
         """Remember duplicate keys before pybtex discards the later entry.
@@ -231,14 +271,39 @@ def _duplicate_key_error(
     return message
 
 
+def _syntax_diagnostic(path: str, error: PybtexSyntaxError,
+                       key: Optional[str], field_name: Optional[str]) -> str:
+    """One parser-library syntax error, in labdata's voice and located."""
+    if isinstance(error, UndefinedMacro):
+        macro = str(error).rsplit(": ", 1)[-1]
+        return diagnostic(
+            STRING_UNDEFINED, path, key, field_name if key else None,
+            f"the macro '{macro}' is not defined by any @string; it is read "
+            "as empty, and the entry is kept")
+    if key is None:
+        return diagnostic(
+            SYNTAX_ERROR, path, None, None,
+            f"the text at line {error.lineno} does not read as BibTeX and is "
+            "skipped")
+    after = f", after the value of '{field_name}'" if field_name else ""
+    return diagnostic(
+        SYNTAX_ERROR, path, key, field_name,
+        f"the entry stops reading as BibTeX at line {error.lineno}{after}. "
+        "It is kept as far as it was read, so that value may hold text meant "
+        "for later fields; check its braces and quotes")
+
+
 def parse_bibtex_file(
     path: str,
     duplicate_errors: Optional[List[str]] = None,
+    warnings: Optional[List[str]] = None,
 ) -> Dict[str, Entry]:
     """Parse one BibTeX file into pybtex entries, keyed by citation key.
 
     Anything the parser has to say is captured and reported by labdata, so no
-    library logging reaches the user.
+    library logging reaches the user. Syntax errors and undefined macros go
+    to ``warnings``, located at the entry and field they were found in, or to
+    standard error when no list is given.
     """
     text = Path(path).read_text(encoding="utf-8-sig")
 
@@ -248,7 +313,14 @@ def parse_bibtex_file(
 
     duplicate_keys: List[str] = []
     with pybtex.errors.capture() as errors:
-        data = _Parser(duplicate_keys=duplicate_keys).parse_string(text)
+        parser = _Parser(duplicate_keys=duplicate_keys)
+        data = parser.parse_string(text)
+    for error, key, field_name in parser.syntax_errors:
+        message = _syntax_diagnostic(path, error, key, field_name)
+        if warnings is None:
+            _warn(message)
+        else:
+            warnings.append(message)
     for key in duplicate_keys:
         message = _duplicate_key_error(path, key)
         if duplicate_errors is None:
@@ -266,14 +338,43 @@ def parse_bibtex_file(
 
 # --- pybtex objects → labdata values ----------------------------------------
 
-def _convert(value: str, where: str) -> str:
-    """Convert one field from LaTeX, keeping the raw text if that fails."""
+def _convert(value: str, where: str, on_unknown=None) -> str:
+    """Convert one field from LaTeX, keeping the raw text if that fails.
+
+    Each command the converter does not know is passed to ``on_unknown``,
+    which knows where the field is.
+    """
     try:
-        return latex_to_text(value)
+        text = latex_to_text(value)
     except Exception:  # noqa: BLE001 - never drop an entry over one field
         _warn(f"{where}: could not read the LaTeX in this field; "
               "keeping the text as written")
         return strip_braces(value)
+    if on_unknown is not None:
+        for command in unknown_commands(value):
+            on_unknown(command)
+    return text
+
+
+def _unknown_command_reporter(report, file: str, key: str):
+    """For one entry: a field name → the ``on_unknown`` for that field.
+
+    A command is reported once per field, however many times it is used.
+    """
+    reported = set()
+
+    def in_field(field_name: str):
+        def on_unknown(command: str) -> None:
+            if (field_name, command) in reported:
+                return
+            reported.add((field_name, command))
+            report(diagnostic(
+                LATEX_COMMAND_UNKNOWN, file, key, field_name,
+                f"the LaTeX command '\\{command}' is not one labdata "
+                "converts; it is dropped, and a braced argument after it is "
+                "kept as plain text"))
+        return on_unknown
+    return in_field
 
 
 def _initials(given: str) -> str:
@@ -352,7 +453,8 @@ def _is_literal(person: Person) -> bool:
             and person.last_names[0].endswith("}"))
 
 
-def person_name_parts(person: Person, where: str) -> Dict[str, Optional[str]]:
+def person_name_parts(person: Person, where: str,
+                      on_unknown=None) -> Dict[str, Optional[str]]:
     """One pybtex Person as the parts BibTeX split it into, converted to text.
 
     ``given``, ``von``, ``family`` and ``suffix`` are BibTeX's four parts; a
@@ -364,7 +466,7 @@ def person_name_parts(person: Person, where: str) -> Dict[str, Optional[str]]:
     in any part; ``marks_equal_contribution`` reports it separately.
     """
     def text(parts) -> Optional[str]:
-        joined = " ".join(_convert(_without_marker(part), where)
+        joined = " ".join(_convert(_without_marker(part), where, on_unknown)
                           for part in _with_marker_joined(parts)).strip()
         return joined or None
 
@@ -399,7 +501,8 @@ def readable_name(parts: Dict[str, Optional[str]]) -> str:
     return " ".join(part for part in ordered if part)
 
 
-def _contributors(entry: Entry, role: str, where: str) -> List[Dict]:
+def _contributors(entry: Entry, role: str, where: str,
+                  on_unknown=None) -> List[Dict]:
     """The entry's names for one role, in source order, as parts plus position.
 
     A terminal ``and others`` is BibTeX's "et al." and is dropped rather than
@@ -412,7 +515,7 @@ def _contributors(entry: Entry, role: str, where: str) -> List[Dict]:
 
     found = []
     for person in persons:
-        parts = person_name_parts(person, where)
+        parts = person_name_parts(person, where, on_unknown)
         name = readable_name(parts)
         if name:
             found.append({"name": name, "position": len(found) + 1,
@@ -420,7 +523,8 @@ def _contributors(entry: Entry, role: str, where: str) -> List[Dict]:
     return found
 
 
-def parse_author_list(entry: Entry, where: str) -> List[Author]:
+def parse_author_list(entry: Entry, where: str,
+                      on_unknown=None) -> List[Author]:
     """The entry's authors, in source order, with no contributor resolved yet.
 
     Each authorship carries the parts BibTeX split its name into, a readable
@@ -432,10 +536,11 @@ def parse_author_list(entry: Entry, where: str) -> List[Author]:
                    position=found["position"],
                    equal_contribution=marks_equal_contribution(found["person"]),
                    **found["parts"])
-            for found in _contributors(entry, "author", where)]
+            for found in _contributors(entry, "author", where, on_unknown)]
 
 
-def parse_editor_list(entry: Entry, where: str) -> List[Contributor]:
+def parse_editor_list(entry: Entry, where: str,
+                      on_unknown=None) -> List[Contributor]:
     """The entry's editors, read by the same machinery as its authors.
 
     An editor is name-parsed and resolved to a person the same way, but
@@ -445,10 +550,11 @@ def parse_editor_list(entry: Entry, where: str) -> List[Contributor]:
     """
     return [Contributor(name=found["name"], position=found["position"],
                         **found["parts"])
-            for found in _contributors(entry, "editor", where)]
+            for found in _contributors(entry, "editor", where, on_unknown)]
 
 
-def entry_fields(bib_id: str, entry: Entry, source: str) -> Dict[str, str]:
+def entry_fields(bib_id: str, entry: Entry, source: str,
+                 unknown_in=None) -> Dict[str, str]:
     """The entry's fields, with prose converted from LaTeX.
 
     ``ENTRYTYPE`` and ``ID`` are included so the rules below read one plain
@@ -457,7 +563,9 @@ def entry_fields(bib_id: str, entry: Entry, source: str) -> Dict[str, str]:
     """
     fields = {name.lower(): value for name, value in entry.fields.items()}
     read = {
-        name: _convert(value, f"{source}:{bib_id}:{name}") if name in TEXT_FIELDS else value
+        name: (_convert(value, f"{source}:{bib_id}:{name}",
+                        unknown_in(name) if unknown_in else None)
+               if name in TEXT_FIELDS else value)
         for name, value in fields.items()
     }
     read["ENTRYTYPE"] = entry.type.lower()
@@ -672,13 +780,50 @@ def entry_year(entry: dict, where: str, report) -> Optional[int]:
     """The entry's year, or None with a diagnostic when it has none.
 
     A work with no year sorts last, exactly where the old ``year: 0`` put it,
-    but a consumer can now tell "no year" from "the year zero".
+    but a consumer can now tell "no year" from "the year zero". A year that
+    is not a number is reported and read as no year.
     """
     raw = str(entry.get("year", "")).strip()
     if not raw:
         report(f"{YEAR_MISSING} {where}:year: entry has no year")
         return None
-    return int(raw)
+    try:
+        return int(raw)
+    except ValueError:
+        report(f"{YEAR_INVALID} {where}:year: '{raw}' is not a number; the "
+               "work is emitted with year: null and sorts last")
+        return None
+
+
+# The container field BibTeX requires of each entry type labdata reads a
+# container for, and the entry types labdata documents (tests/COVERAGE.md,
+# *Entry types*, with `@conference` and `@proceedings`, which the venue rule
+# names). Any other type is kept and reported.
+REQUIRED_CONTAINER = {"article": "journal", "inproceedings": "booktitle",
+                      "conference": "booktitle", "incollection": "booktitle",
+                      "phdthesis": "school", "mastersthesis": "school",
+                      "techreport": "institution"}
+SUPPORTED_TYPES = frozenset(REQUIRED_CONTAINER) | {
+    "book", "inbook", "manual", "misc", "proceedings"}
+
+
+def check_entry_type(entry: dict, source: str, report) -> None:
+    """Report an entry type labdata does not document, or a missing container."""
+    entry_type, key = entry["ENTRYTYPE"], entry["ID"]
+    if entry_type not in SUPPORTED_TYPES:
+        report(diagnostic(
+            ENTRY_TYPE_UNSUPPORTED, source, key, "entry_type",
+            f"@{entry_type} is not an entry type labdata documents; the "
+            "entry is kept, with its venue read from whichever container "
+            "field it carries"))
+        return
+    required = REQUIRED_CONTAINER.get(entry_type)
+    if required and not (entry.get(required) or "").strip():
+        report(diagnostic(
+            VENUE_MISSING, source, key, required,
+            f"@{entry_type} has no {required}; the entry is kept, and its "
+            "venue is read from any other container field it carries, or "
+            "is null"))
 
 
 def entry_to_work(
@@ -692,14 +837,18 @@ def entry_to_work(
 ) -> Work:
     """Convert one pybtex Entry to a Work dataclass."""
     report = report if report is not None else _warn
-    fields = entry_fields(bib_id, entry, source)
+    unknown_in = _unknown_command_reporter(report, source, bib_id)
+    fields = entry_fields(bib_id, entry, source, unknown_in)
     identifiers = build_identifiers(fields)
+    check_entry_type(fields, source, report)
 
     return Work(
         bib_id=bib_id,
         title=fields.get("title", ""),
-        authors=parse_author_list(entry, f"{source}:{bib_id}:author"),
-        editors=parse_editor_list(entry, f"{source}:{bib_id}:editor"),
+        authors=parse_author_list(entry, f"{source}:{bib_id}:author",
+                                  unknown_in("author")),
+        editors=parse_editor_list(entry, f"{source}:{bib_id}:editor",
+                                  unknown_in("editor")),
         year=entry_year(fields, f"{source}:{bib_id}", report),
         category=category,
         entry_type=fields["ENTRYTYPE"],
@@ -775,7 +924,8 @@ def parse_all_works(
         category = bib_file['category'] if isinstance(bib_file, dict) else bib_file.category
         path = f"{bib_dir}/{name}"
         file_errors: List[str] = []
-        parsed = parse_bibtex_file(path, duplicate_errors=file_errors)
+        parsed = parse_bibtex_file(path, duplicate_errors=file_errors,
+                                   warnings=warnings)
         for error in file_errors:
             report(error)
         for bib_id, entry in parsed.items():

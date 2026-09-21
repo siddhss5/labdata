@@ -124,3 +124,91 @@ class TestCLIUnresolved:
         result = run_cli("--config", str(config_path), "--unresolved")
         assert "All authors resolved" not in result.stdout
         assert "people_file" in result.stdout + result.stderr
+
+
+INVALID = Path(__file__).parent / "corpus" / "invalid"
+
+
+class TestDiagnosticClassesByMode:
+    """Each new code behaves as its class in SPEC.md says, in every mode."""
+
+    @pytest.mark.parametrize("folder, code", [
+        ("undefined_project", "RESOLVE-PROJECT-UNKNOWN"),
+        ("duplicate_person_id", "PEOPLE-ID-DUPLICATE"),
+        ("duplicate_project_id", "PROJECTS-ID-DUPLICATE"),
+    ])
+    def test_a_validation_error_fails_only_validate(self, run_cli, monkeypatch,
+                                                    tmp_path, folder, code):
+        monkeypatch.chdir(INVALID / folder)
+        validate = run_cli("--config", "lab.yaml", "--validate")
+        assert validate.returncode == 1 and f"  - {code} " in validate.stdout
+
+        out = tmp_path / "lab.json"
+        export = run_cli("--config", "lab.yaml", "--format", "json", "--output", str(out))
+        assert export.returncode == 0, export.stderr
+        assert f"Warning: {code} " in export.stderr
+        assert out.exists()
+
+        unresolved = run_cli("--config", "lab.yaml", "--unresolved")
+        assert unresolved.returncode == 0
+        assert f"Warning: {code} " in unresolved.stderr
+
+    @pytest.mark.parametrize("folder, code", [
+        ("people_file_not_found", "CONFIG-FILE-NOT-FOUND"),
+        ("projects_file_not_found", "CONFIG-FILE-NOT-FOUND"),
+        ("bib_file_not_found", "CONFIG-FILE-NOT-FOUND"),
+        ("people_missing_name", "PEOPLE-FIELD-MISSING"),
+        ("people_not_a_list", "PEOPLE-NOT-A-LIST"),
+    ])
+    def test_a_fatal_error_fails_every_mode_and_writes_nothing(
+            self, run_cli, monkeypatch, tmp_path, folder, code):
+        monkeypatch.chdir(INVALID / folder)
+        validate = run_cli("--config", "lab.yaml", "--validate")
+        assert validate.returncode == 1 and f"  - {code} " in validate.stdout
+
+        out = tmp_path / "lab.json"
+        export = run_cli("--config", "lab.yaml", "--format", "json", "--output", str(out))
+        assert export.returncode == 1
+        assert any(line.startswith(f"{code} ") for line in export.stderr.splitlines())
+        assert not out.exists()
+
+        unresolved = run_cli("--config", "lab.yaml", "--unresolved")
+        assert unresolved.returncode == 1
+
+    @pytest.mark.parametrize("folder, code", [
+        ("invalid_person_role", "PEOPLE-ROLE-INVALID"),
+        ("invalid_person_status", "PEOPLE-STATUS-INVALID"),
+        ("invalid_project_status", "PROJECTS-STATUS-INVALID"),
+        ("ambiguous_alias", "PEOPLE-ALIAS-AMBIGUOUS"),
+        ("config_unknown_key", "CONFIG-KEY-UNKNOWN"),
+        ("config_bib_files_missing", "CONFIG-BIB-FILES-MISSING"),
+        ("undefined_string", "BIB-STRING-UNDEFINED"),
+        ("unclosed_brace", "BIB-SYNTAX-ERROR"),
+        ("year_not_number", "BIB-YEAR-INVALID"),
+        ("missing_journal", "BIB-VENUE-MISSING"),
+        ("unsupported_entry_type", "BIB-ENTRY-TYPE-UNSUPPORTED"),
+        ("unknown_macro", "LATEX-COMMAND-UNKNOWN"),
+    ])
+    def test_a_warning_fails_nothing(self, run_cli, monkeypatch, tmp_path,
+                                     folder, code):
+        monkeypatch.chdir(INVALID / folder)
+        validate = run_cli("--config", "lab.yaml", "--validate")
+        assert validate.returncode == 0, validate.stdout
+        warnings = validate.stdout.split("\nWarnings (", 1)[1]
+        assert f"  - {code} " in warnings
+
+        out = tmp_path / "lab.json"
+        export = run_cli("--config", "lab.yaml", "--format", "json", "--output", str(out))
+        assert export.returncode == 0 and out.exists()
+        assert f"Warning: {code} " in export.stderr
+
+    def test_a_missing_collaborators_file_is_fatal(self, run_cli, tmp_path):
+        config = tmp_path / "lab.yaml"
+        config.write_text(yaml.safe_dump({
+            "bib_dir": str(FIXTURES),
+            "bib_files": [{"name": "sample.bib", "category": "Test"}],
+            "collaborators_file": str(tmp_path / "absent.yaml"),
+        }), encoding="utf-8")
+        result = run_cli("--config", str(config), "--validate")
+        assert result.returncode == 1
+        assert f"CONFIG-FILE-NOT-FOUND {config}:collaborators_file::" in result.stdout

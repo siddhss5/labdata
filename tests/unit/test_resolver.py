@@ -9,6 +9,7 @@ from labdata.resolver import (
     normalize_name,
     is_abbreviated,
     build_alias_index,
+    shared_declarations,
     fuzzy_match,
     fuzzy_matches,
     match_form,
@@ -723,3 +724,94 @@ class TestAssembleEndToEnd:
         first_work = d["works"][0]
         assert isinstance(first_work["authors"], list)
         assert "name" in first_work["authors"][0]
+
+
+
+class TestPeopleAndProjectsFiles:
+    """What is wrong with a people or projects file, in its three classes."""
+
+    def load(self, tmp_path, loader, text):
+        path = tmp_path / "records.yaml"
+        path.write_text(text, encoding="utf-8")
+        errors, diagnostics, warnings = [], [], []
+        records = loader(str(path), errors, diagnostics, warnings)
+        strip = lambda lines: [l.replace(str(path), "f.yaml") for l in lines]
+        return records, strip(errors), strip(diagnostics), strip(warnings)
+
+    def test_an_empty_file_is_no_records(self, tmp_path):
+        assert self.load(tmp_path, load_people, "") == ([], [], [], [])
+
+    def test_a_record_that_is_not_a_mapping(self, tmp_path):
+        records, errors, _, _ = self.load(
+            tmp_path, load_projects, "- just a string\n- {id: p, title: T}\n")
+        assert [r.id for r in records] == ["p"]
+        assert errors == ["PROJECTS-NOT-A-LIST f.yaml::: entry 1 is not a mapping"]
+
+    def test_a_projects_file_that_is_not_a_list(self, tmp_path):
+        records, errors, _, _ = self.load(tmp_path, load_projects, "p: {title: T}\n")
+        assert records == [] and errors[0].startswith("PROJECTS-NOT-A-LIST f.yaml::: ")
+
+    def test_missing_id_and_title(self, tmp_path):
+        records, errors, _, _ = self.load(
+            tmp_path, load_projects, "- {title: T}\n- {id: p, title: ' '}\n")
+        assert records == []
+        assert errors == ["PROJECTS-FIELD-MISSING f.yaml::id: entry 1 has no id",
+                          "PROJECTS-FIELD-MISSING f.yaml:p:title: entry 2 has no title"]
+
+    def test_duplicate_ids_are_kept_and_reported(self, tmp_path):
+        records, _, diagnostics, _ = self.load(
+            tmp_path, load_projects,
+            "- {id: p, title: A}\n- {id: p, title: B}\n")
+        assert [r.title for r in records] == ["A", "B"]
+        assert diagnostics == [
+            "PROJECTS-ID-DUPLICATE f.yaml:p:id: the id 'p' is declared more than once"]
+
+    @pytest.mark.parametrize("status, reported", [
+        ("active", False), ("completed", False), ("paused", True)])
+    def test_project_status(self, tmp_path, status, reported):
+        _, _, _, warnings = self.load(
+            tmp_path, load_projects, f"- {{id: p, title: A, status: {status}}}\n")
+        assert bool(warnings) is reported
+
+    def test_a_missing_project_status_is_active_and_not_reported(self, tmp_path):
+        records, _, _, warnings = self.load(tmp_path, load_projects,
+                                            "- {id: p, title: A}\n")
+        assert records[0].status == "active" and warnings == []
+
+    @pytest.mark.parametrize("role, reported", [
+        ("'research scientist'", False), ("visitor", False),
+        ("''", True), ("7", True), ("[a]", True), (None, True)])
+    def test_any_nonempty_role_is_accepted(self, tmp_path, role, reported):
+        entry = "- {id: p, name: P" + (f", role: {role}" if role else "") + "}\n"
+        _, _, _, warnings = self.load(tmp_path, load_people, entry)
+        assert [w.startswith("PEOPLE-ROLE-INVALID f.yaml:p:role:")
+                for w in warnings] == ([True] if reported else [])
+
+    @pytest.mark.parametrize("status, reported", [
+        ("current", False), ("alumni", False), ("retired", True)])
+    def test_person_status(self, tmp_path, status, reported):
+        _, _, _, warnings = self.load(
+            tmp_path, load_people, f"- {{id: p, name: P, role: r, status: {status}}}\n")
+        assert [w.startswith("PEOPLE-STATUS-INVALID f.yaml:p:status:")
+                for w in warnings] == ([True] if reported else [])
+
+    def test_without_lists_problems_go_to_standard_error(self, tmp_path, capsys):
+        path = tmp_path / "people.yaml"
+        path.write_text("- {id: p}\n", encoding="utf-8")
+        assert load_people(str(path)) == []
+        assert "Warning: PEOPLE-FIELD-MISSING" in capsys.readouterr().err
+
+
+class TestSharedDeclarations:
+    def test_a_name_shared_with_an_alias_is_reported_once(self):
+        people = [Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
+                  Person(id="aadamson", name="A. Adams", aliases=[]),
+                  Person(id="adup", name="A Adams", aliases=["a. adams"])]
+        [line] = shared_declarations(people, "people.yaml")
+        assert line.startswith("PEOPLE-ALIAS-AMBIGUOUS people.yaml:aadamson:name: ")
+        assert "aadams, aadamson, adup" in line
+
+    def test_a_person_repeating_their_own_spelling_is_not_reported(self):
+        people = [Person(id="aadams", name="Alice Adams",
+                         aliases=["Alice Adams", "A. Adams", "A Adams"])]
+        assert shared_declarations(people, "people.yaml") == []
