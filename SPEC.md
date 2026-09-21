@@ -615,10 +615,13 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 ### How a name is matched
 
 `labdata.resolver.match()` compares a name's structured parts against every
-person's `name` and `aliases`, all read through `normalize_name()` — case,
-accents, periods and whitespace ignored, and nothing else, so a `*` that is
-not an equal-contribution marker stays part of the name — and decides in
-this order:
+person's `name` and `aliases`, all read through `normalize_name()`. It
+lower-cases the name, drops accents (the combining marks left by Unicode NFD
+decomposition), removes periods, removes every `<sup>…</sup>` span — in any
+letter case, not crossing a line break — together with what it encloses, and
+collapses runs of whitespace to one space, trimming the ends. Nothing else is
+changed, so a `*` that is not an equal-contribution marker and not inside a
+`<sup>` span stays part of the name. The match decides in this order:
 
 1. **The full name.** The parts joined as `given von family, suffix`, equal to
    exactly one person's name or alias: resolved, `method: exact`. Equal to two
