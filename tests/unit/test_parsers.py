@@ -9,6 +9,9 @@ from labdata.parsers.bibtex import (
     DUPLICATE_CITATION_KEY,
     ENTRY_TYPE_UNSUPPORTED,
     LATEX_COMMAND_UNKNOWN,
+    LATEX_CONVERSION_FAILED,
+    PARSER_MESSAGE,
+    WRITE_BACK_FAILED,
     STRING_REDEFINED,
     STRING_UNDEFINED,
     SYNTAX_ERROR,
@@ -629,12 +632,21 @@ class TestLocatedParserDiagnostics:
         parse_bibtex_file(str(tmp_path / "x.bib"))
         assert f"Warning: {SYNTAX_ERROR} " in capsys.readouterr().err
 
-    def test_other_parser_messages_are_still_relayed(self, tmp_path, capsys):
-        """A repeated field is not a syntax error, and is not swallowed."""
-        source = "@article{twice, title = {A}, title = {B}, year = 2024}\n"
+    def test_other_parser_messages_are_coded_in_the_librarys_words(self, tmp_path,
+                                                                   capsys):
+        """A repeated field and a name list the library cannot split are not
+        syntax errors, and are not swallowed: each is located at its entry."""
+        source = ("@article{twice, title = {A}, title = {B}, year = 2024}\n"
+                  "@article{commas, title = {T}, author = {Brown, Bob, Jr, X},"
+                  " journal = {J}, year = 2024}\n")
         found, works = located(tmp_path, source)
         assert SYNTAX_ERROR not in found
-        assert "twice" in capsys.readouterr().err
+        twice, commas = found[PARSER_MESSAGE]
+        assert (twice.file, twice.key, twice.field) == (
+            f"{tmp_path}/hazard.bib", "twice", None)
+        assert twice.message == "entry with key twice has a duplicate title field"
+        assert commas.key == "commas" and "Too many commas" in commas.message
+        assert capsys.readouterr().err == ""
         assert works["twice"].title == "A"
 
     def test_a_year_that_is_not_a_number_is_null(self, tmp_path):

@@ -84,6 +84,18 @@ ENTRY_TYPE_UNSUPPORTED = "BIB-ENTRY-TYPE-UNSUPPORTED"
 # The last definition is used, as in BibTeX. Always a warning, in every mode.
 STRING_REDEFINED = "BIB-STRING-REDEFINED"
 
+# A message the parser library raised that is neither a syntax error nor an
+# undefined macro -- a field repeated in one entry, a name list it cannot
+# split -- kept in the library's own words after the code.
+PARSER_MESSAGE = "BIB-PARSER-MESSAGE"
+
+# A field whose LaTeX the converter could not read at all; its text is kept
+# as written, with the braces taken off.
+LATEX_CONVERSION_FAILED = "LATEX-CONVERSION-FAILED"
+
+# An entry that could not be written back out as BibTeX; its `bibtex` is null.
+WRITE_BACK_FAILED = "BIB-WRITE-BACK-FAILED"
+
 # A LaTeX command the converter does not know. It is dropped, and a braced
 # argument after it is kept as plain text.
 LATEX_COMMAND_UNKNOWN = "LATEX-COMMAND-UNKNOWN"
@@ -257,6 +269,9 @@ class _Parser(PybtexParser):
         # moved on.
         self.syntax_errors: List[Tuple[PybtexSyntaxError, Optional[str],
                                        Optional[str], Optional[int]]] = []
+        # The entry key each captured library message was raised while
+        # reading, by the message's identity.
+        self.message_keys: Dict[int, str] = {}
 
     def handle_error(self, error):
         """Keep a syntax error with where it happened; relay anything else."""
@@ -277,7 +292,11 @@ class _Parser(PybtexParser):
         """
         if key is not None and key in self.data.entries:
             self.duplicate_keys.append(key)
+        captured = pybtex.errors.captured_errors
+        before = len(captured) if captured is not None else 0
         super().process_entry(entry_type, key, fields)
+        for error in (captured or [])[before:]:
+            self.message_keys[id(error)] = key
 
     def parse_string(self, text: str):
         self.unnamed_entry_counter = 1
@@ -307,12 +326,11 @@ def _duplicate_key_error(
     first_key: Optional[str] = None,
 ) -> str:
     """One stable duplicate-key diagnostic, with both locations when known."""
-    location = f"{path}:{key}:citation_key"
-    message = f"{DUPLICATE_CITATION_KEY} {location}: duplicate citation key"
+    message = "duplicate citation key"
     if first_path is not None:
         first_location = f"{first_path}:{first_key or key}:citation_key"
         message += f"; first defined in {first_location}"
-    return message
+    return diagnostic(DUPLICATE_CITATION_KEY, path, key, "citation_key", message)
 
 
 def _on_comment_line(text: str, position: Optional[int]) -> bool:
@@ -403,24 +421,37 @@ def parse_bibtex_file(
         # The duplicate has already been recorded with labdata's stable code.
         if str(error).startswith("repeated bibliography entry:"):
             continue
-        _warn(str(error))
+        message = diagnostic(PARSER_MESSAGE, path,
+                             parser.message_keys.get(id(error)), None,
+                             str(error))
+        if warnings is None:
+            _warn(message)
+        else:
+            warnings.append(message)
 
     return data.entries
 
 
 # --- pybtex objects → labdata values ----------------------------------------
 
+_UNREADABLE_LATEX = ("could not read the LaTeX in this field; keeping the text "
+                     "as written")
+
+
 def _convert(value: str, where: str, on_unknown=None) -> str:
     """Convert one field from LaTeX, keeping the raw text if that fails.
 
     Each command the converter does not know is passed to ``on_unknown``,
-    which knows where the field is.
+    which knows where the field is, and so is a value it cannot read at all
+    (``on_unknown.failed()``). Without one, that is reported at ``where``.
     """
     try:
         text = latex_to_text(value)
     except Exception:  # noqa: BLE001 - never drop an entry over one field
-        _warn(f"{where}: could not read the LaTeX in this field; "
-              "keeping the text as written")
+        if on_unknown is not None:
+            on_unknown.failed()
+        else:
+            _warn(f"{LATEX_CONVERSION_FAILED} {where}: {_UNREADABLE_LATEX}")
         return strip_braces(value)
     if on_unknown is not None:
         for command in unknown_commands(value):
@@ -445,6 +476,11 @@ def _unknown_command_reporter(report, file: str, key: str):
                 f"the LaTeX command '\\{command}' is not one labdata "
                 "converts; it is dropped, and a braced argument after it is "
                 "kept as plain text"))
+
+        def failed() -> None:
+            report(diagnostic(LATEX_CONVERSION_FAILED, file, key, field_name,
+                              _UNREADABLE_LATEX))
+        on_unknown.failed = failed
         return on_unknown
     return in_field
 
@@ -645,7 +681,8 @@ def entry_fields(bib_id: str, entry: Entry, source: str,
     return read
 
 
-def format_bibtex(bib_id: str, entry: Entry) -> Optional[str]:
+def format_bibtex(bib_id: str, entry: Entry, source: Optional[str] = None,
+                  report=None) -> Optional[str]:
     """The entry written back out as BibTeX, for readers to copy.
 
     This is the entry as it was read, before LaTeX conversion, so fields
@@ -656,7 +693,9 @@ def format_bibtex(bib_id: str, entry: Entry) -> Optional[str]:
     try:
         return entry.to_string("bibtex").strip()
     except Exception:  # noqa: BLE001 - a copyable string is not worth an entry
-        _warn(f"{bib_id}: could not write this entry back out as BibTeX")
+        (report or _warn)(diagnostic(
+            WRITE_BACK_FAILED, source, bib_id, "bibtex",
+            "could not write this entry back out as BibTeX; bibtex is null"))
         return None
 
 
@@ -848,7 +887,7 @@ def parse_project_ids(entry: dict) -> List[str]:
     return [p.strip() for p in project_field.split(',') if p.strip()]
 
 
-def entry_year(entry: dict, where: str, report) -> Optional[int]:
+def entry_year(entry: dict, source: str, report) -> Optional[int]:
     """The entry's year, or None with a diagnostic when it has none.
 
     A work with no year sorts last, exactly where the old ``year: 0`` put it,
@@ -857,13 +896,15 @@ def entry_year(entry: dict, where: str, report) -> Optional[int]:
     """
     raw = str(entry.get("year", "")).strip()
     if not raw:
-        report(f"{YEAR_MISSING} {where}:year: entry has no year")
+        report(diagnostic(YEAR_MISSING, source, entry.get("ID"), "year",
+                          "entry has no year"))
         return None
     try:
         return int(raw)
     except ValueError:
-        report(f"{YEAR_INVALID} {where}:year: '{raw}' is not a number; the "
-               "work is emitted with year: null and sorts last")
+        report(diagnostic(YEAR_INVALID, source, entry.get("ID"), "year",
+                          f"'{raw}' is not a number; the work is emitted "
+                          "with year: null and sorts last"))
         return None
 
 
@@ -920,7 +961,7 @@ def entry_to_work(
                                   unknown_in("author")),
         editors=parse_editor_list(entry, f"{source}:{bib_id}:editor",
                                   unknown_in("editor")),
-        year=entry_year(fields, f"{source}:{bib_id}", report),
+        year=entry_year(fields, source, report),
         category=category,
         entry_type=fields["ENTRYTYPE"],
         source_file=source_file,
@@ -930,7 +971,7 @@ def entry_to_work(
         identifiers=identifiers,
         links=build_links(fields, bib_id, identifiers, pdf_base_url),
         project_ids=parse_project_ids(fields),
-        bibtex=format_bibtex(bib_id, entry),
+        bibtex=format_bibtex(bib_id, entry, source, report),
         **{name: fields.get(name) for name in FLAT_FIELDS},
     )
 
@@ -942,9 +983,9 @@ def _crossref_error(path: str, bib_id: str, parent: str) -> str:
     a parent whose name happens to be blank.
     """
     names = f"names the parent '{parent}'" if parent else "names no parent"
-    return (f"{CROSSREF_UNSUPPORTED} {path}:{bib_id}:crossref: "
-            f"crossref is not supported; this entry {names}. "
-            "Write the fields out on the entry itself.")
+    return diagnostic(CROSSREF_UNSUPPORTED, path, bib_id, "crossref",
+                      f"crossref is not supported; this entry {names}. "
+                      "Write the fields out on the entry itself.")
 
 
 def parse_all_works(

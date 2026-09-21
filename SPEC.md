@@ -82,10 +82,11 @@ Flags, as `labdata.cli.main()` defines them:
 | Flag | Meaning |
 |---|---|
 | `--config PATH` | Required. The `lab.yaml` to compile. |
-| `--format {yaml,json}` | Output format. Default `yaml`. |
+| `--format {yaml,json}` | Default `yaml`. It has **two meanings**. With `--output` alone it is the **document's** format, and diagnostics stay on standard error as text. With `--validate` or `--unresolved`, `json` prints the **diagnostics** as one JSON array on standard output instead of the text report (*Diagnostics as JSON* below), and `yaml` is the text report. |
 | `--output PATH` | Write the document to `PATH`. |
 | `--validate` | Report counts and problems, then exit without writing. |
 | `--unresolved` | List author names that matched no person, then exit. A name left ambiguous is one of them. |
+| `--strict` | Combines with any mode. Every coded diagnostic is an error except those the class table below marks as never an error: a redefined `@string` macro, and anything about an author who matched no lab member. Any error exits `1`, and an export writes nothing. Without it, the exit codes below are unchanged. |
 
 **At least one** of `--output`, `--validate` or `--unresolved` is required —
 not exactly one. `labdata.cli.main()` rejects only the case where all three
@@ -100,27 +101,29 @@ Exit codes, as `labdata.cli.main()` returns them:
 | Code | Meaning |
 |---|---|
 | `0` | Success. `--output` wrote the file; `--validate` found no errors; `--unresolved` reported. |
-| `1` | Error. Configuration file missing, or configuration failed to load — an absolute `bib_files[].name`, or a `lab.yaml` of the wrong shape; a file the configuration names is not there; a people file cannot be read as records; an entry carries `crossref`; or `--validate` found unknown project ids or duplicate citation keys, person ids or project ids. The *Diagnostic codes* table below gives the class of each. |
+| `1` | Error. Configuration file missing, or configuration failed to load — unreadable, an absolute `bib_files[].name`, or a `lab.yaml` of the wrong shape; a file the configuration names is not there; a people file cannot be read as records; an entry carries `crossref`; `--validate` found unknown project ids or duplicate citation keys, person ids or project ids; or, under `--strict`, any coded diagnostic that the class table does not keep as a warning. The *Diagnostic codes* table below gives the class of each. |
 | `2` | Usage error from the argument parser: a missing or unrecognised flag, or none of `--output` / `--validate` / `--unresolved`. |
 
 **Streams and message shapes.** Ordinary reporting goes to **standard
 output**: the counts and unresolved names of
 `--validate` and `--unresolved`, and, in output mode, the `Wrote …` line and
 the entity counts that follow it. **Diagnostics** go to **standard error**,
-except where `--validate` gathers them into its report on standard output.
-There are four shapes:
+except where `--validate` gathers them into its report on standard output,
+and except with `--format json` beside `--validate` or `--unresolved`, where
+standard output holds one JSON array and nothing else (*Diagnostics as JSON*
+below). **Every diagnostic carries a code**, and every line of one does: a
+message is kept to one line. As text there are three shapes:
 
 | Shape | Stream | Source |
 |---|---|---|
-| `Warning: …` | standard error | Problems with the input, from `labdata.parsers.bibtex._warn()`: the uncoded diagnostics listed under *Diagnostic codes*, in every mode. |
-| `<CODE> <file>:<key>:<field>: …` | see right | A diagnostic carrying a stable code, raised **during assembly** and described under *Diagnostic codes* below. Under `--validate` it is on standard **output**, beneath `Bibliography errors` when it fails the run and beneath `Warnings` when it does not. In the other modes it is on standard **error**: prefixed `Warning: ` when it is a warning, unprefixed when it fails the run. |
-| `Error: …` and `Error loading configuration: …` | standard error | Configuration failures, from `labdata.cli.main()`. A configuration labdata will not read or will not compile from, in **every** mode including `--validate`, because nothing is assembled and there is no report to gather it into. It **may carry a stable code**, after the prefix: `Error loading configuration: CONFIG-BIB-FILE-ABSOLUTE lab.yaml:bib_files:name: …`. That is the one place a code appears inside another shape, and it is where every fatal-at-load code appears. |
-| `usage: …` / `…: error: …` | standard error | Argument errors, in the argument parser's own format. |
+| `<CODE> <file>:<key>:<field>: …` | see right | A diagnostic raised **during assembly**, described under *Diagnostic codes* below. Under `--validate` it is on standard **output**, beneath `Bibliography errors` when it fails the run and beneath `Warnings` when it does not. In the other modes it is on standard **error**: prefixed `Warning: ` when it is a warning, unprefixed when it fails the run. |
+| `Error: <CODE> …` and `Error loading configuration: <CODE> …` | standard error | Configuration failures, from `labdata.cli.main()`: every fatal-at-load code. A configuration labdata cannot find, cannot read or will not compile from, in **every** mode including `--validate`, because nothing is assembled and there is no report to gather it into. `Error: ` precedes `CONFIG-NOT-FOUND`; `Error loading configuration: ` precedes the others, for example `Error loading configuration: CONFIG-BIB-FILE-ABSOLUTE lab.yaml:bib_files:name: …`. |
+| `usage: …` / `…: error: …` | standard error | Argument errors, in the argument parser's own format. They are not diagnostics and carry no code. |
 
-There is no single prefix across all diagnostics, and a consumer that greps
-for one will miss the other three. A consumer looking for a **code** should
-search the whole line rather than anchor at its start, because of the third
-shape.
+There is no single prefix across all diagnostics. A consumer looking for a
+**code** should search the whole line rather than anchor at its start,
+because of the second shape — or read `--format json`, which needs no
+parsing of text at all.
 
 **Where the severities live.** `labdata.assembler.AssemblyResult` carries the
 diagnostics that survive assembly in three lists: `fatal_errors` fail every
@@ -129,30 +132,31 @@ mode, `bibliography_errors` fail `--validate` and are warnings elsewhere, and
 `AssemblyResult` at all, because it stops the configuration from loading. The
 table under *Diagnostic codes* below says which class each code belongs to.
 
-**Unresolved authors are not errors.** `--validate` lists them and still
-exits `0`. This is intended, not a gap: an author who is not in `people.yaml`
-is usually an external collaborator, and #26 states the rule directly —
-"unresolved external collaborators are never errors". What fails the run is
+**Unresolved authors are not errors**, not even under `--strict`.
+`--validate` lists them and still exits `0`. This is intended, not a gap: an author who is not in `people.yaml`
+is usually an external collaborator, and #26 states the rule (decision 10):
+**an author who matched no lab member is never an error under `--strict`**,
+because labdata cannot tell an outside co-author from a possible member
+until #25 lets an author be declared external. The known cost is that a
+misspelt member's name passes `--strict`, reported only as a
+`RESOLVE-SUGGESTION` warning; #25 revisits this. What fails the run is
 a defect in data labdata does own: a project id naming no project, a
 repeated citation key, person id or project id, and the fatal conditions in
 the class table below.
 
-> **Target (#26).** Two gaps in the above are real today.
-> (a) An unhandled failure prints a Python traceback and also exits `1`, so
-> `1` does not by itself distinguish a diagnosed error from a crash. A `.bib`
-> file that does not exist and a `year` that is not a number no longer do
-> this (`CONFIG-FILE-NOT-FOUND`, `BIB-YEAR-INVALID`), but a people or
-> projects file that is not valid YAML still does, and so does a `.bib` file
-> that is not UTF-8. Verified by running both.
-> (b) Diagnostic *text* is not stable, except where a diagnostic carries a
-> code. A syntax error or an undefined macro the BibTeX parser reports is
-> coded and located (`BIB-SYNTAX-ERROR`, `BIB-STRING-UNDEFINED`), but any
-> other message the parser raises — a field repeated within one entry, for
-> one — is relayed as that library phrased it
-> (`labdata.parsers.bibtex._Parser.handle_error()`), and the diagnostics
-> listed under the code table as uncoded do not consistently name the file,
-> entry key and field. Consumers may depend on the stream, the shapes above
-> and any code in the registry below, not on the wording around them.
+> **Target (#80).** An unhandled failure prints a Python traceback and also
+> exits `1`, so `1` does not by itself distinguish a diagnosed error from a
+> crash. A `.bib` file that does not exist and a `year` that is not a number
+> no longer do this (`CONFIG-FILE-NOT-FOUND`, `BIB-YEAR-INVALID`), but a
+> people or projects file that is not valid YAML still does, and so does a
+> `.bib` file that is not UTF-8. Verified by running both.
+
+**Diagnostic *prose* is not stable**, though every diagnostic carries a code
+and a location. A message the BibTeX parser raises that is neither a syntax
+error nor an undefined macro is coded `BIB-PARSER-MESSAGE` but keeps that
+library's wording as its prose, and so does `CONFIG-UNREADABLE`. Consumers
+may depend on the stream, the shapes above, the codes in the registry below
+and the JSON records, not on the wording of a message.
 
 ### Diagnostic codes
 
@@ -173,19 +177,38 @@ without depending on English wording. Codes obey three rules:
 
    | Class | `--validate` | Every other mode | Codes |
    |---|---|---|---|
-   | **Fatal at load** | `Error loading configuration: <CODE> …` on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID` |
+   | **Fatal at load** | `Error loading configuration: <CODE> …` (`Error: <CODE> …` for `CONFIG-NOT-FOUND`) on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`, `CONFIG-NOT-FOUND`, `CONFIG-UNREADABLE` |
    | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `CONFIG-FILE-NOT-FOUND`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY`, `RESOLVE-PROJECT-UNKNOWN`, `PEOPLE-ID-DUPLICATE`, `PROJECTS-ID-DUPLICATE` |
-   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `CONFIG-BIB-FILES-MISSING`, `BIB-STRING-REDEFINED` |
+   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
 
    The same code always carries the same class. What varies with the mode is
    how the run reacts to it, which is why the class is not in the code, and
    why a consumer reads the exit code and the stream rather than the
-   spelling. #26 adds a `--strict` mode that raises the last two further,
-   with one exception already decided on #26: `BIB-STRING-REDEFINED` is a
-   warning in every mode, **including under `--strict`**. BibTeX's own
-   last-wins rule settles a redefinition (§7), so it is reported and never
-   fails a run.
+   spelling.
+
+   **Under `--strict`**, in every mode, every code is an **error** except
+   six, which stay **warnings** (`labdata.diagnostics.NEVER_AN_ERROR`). Five
+   of them follow one rule, #26 decision 10: **an author who matched no lab
+   member is never an error under `--strict`**, because labdata cannot tell
+   an outside co-author from a possible member until #25 lets an author be
+   declared external.
+
+   | Code | Why it is never an error |
+   |---|---|
+   | `BIB-STRING-REDEFINED` | Decided on #26: BibTeX's own last-wins rule settles a redefinition (§7), so it is reported and never fails a run. |
+   | `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `ID-GROUPING-AMBIGUOUS-DECLARED` | Decision 10: each is about how authors who matched no lab member are grouped. |
+   | `RESOLVE-UNRESOLVED-NAME` | Decision 10: it *is* an author who matched no lab member. |
+   | `RESOLVE-SUGGESTION` | Decision 10: it is an author who matched no lab member, whose name is close to a member's. It may be a misspelt member or an outside co-author with a similar name, and labdata cannot tell which. The known cost: a misspelt member's name passes `--strict` with this warning, until #25 revisits it. |
+
+   So a fatal code is an error in every mode with or without `--strict`; a
+   validation error is an error under `--validate`, and under `--strict` in
+   every mode; a warning is an error under `--strict` unless it is one of
+   the six. Under `--strict` an error is reported where a fatal one is — under
+   `Bibliography errors` with `--validate`, unprefixed on standard error
+   otherwise, `"severity": "error"` in JSON — the run exits `1`, and
+   `--output` writes nothing, leaving any file already at that path as it
+   was.
 3. A published code is permanent. It is never reused for a different
    condition, and retiring one is a breaking change.
 
@@ -196,10 +219,12 @@ Codes in use:
 | `BIB-DUPLICATE-KEY` | The same citation key appears twice in one `.bib` file, or in two of the configured files. A validation error. |
 | `BIB-CROSSREF-UNSUPPORTED` | An entry carries a `crossref` field. Reported on the field's **presence**, whatever its value: an empty `crossref = {}` is a field the entry carries. The diagnostic names the file, the entry key and the parent key, or says the entry names no parent when the field is empty; the entry is not emitted and the run fails, in every mode. |
 | `BIB-YEAR-MISSING` | An entry has no `year` field. The work is emitted with `year: null` and sorts last. A warning. |
-| `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. A warning: an external co-author is never an error. |
-| `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer, and two lineage suffixes that disagree ruling the pair out — so a particle, a second initial, a hyphenated family name, a suffix and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. A warning, for the same reason. |
-| `RESOLVE-AMBIGUOUS-NAME` | An author or editor name fits more than one person, so it is given no `person_id` and `resolution.status` is `ambiguous`; or an unresolved authorship fits a declared collaborator and someone else as well, so it is grouped by its own name. Located at the work — `<bib_dir>/<file>:<key>:author` or `:editor` — with the position and every id it fits in the prose. A warning in every mode: an author who resolves to nobody is never an error (#26's `--strict` may promote it). |
-| `RESOLVE-SUGGESTION` | An author or editor name matched no person but is close to one: its initials fit a person's name that declares no such alias, or it is a near miss on string similarity. Nothing is linked. Located as above, naming the position and the suggested ids. A warning, for the same reason. |
+| `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. A warning, in every mode including under `--strict`: an author who matched no lab member is never an error (#26 decision 10). |
+| `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer, and two lineage suffixes that disagree ruling the pair out — so a particle, a second initial, a hyphenated family name, a suffix and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. A warning in every mode, for the same reason. |
+| `RESOLVE-AMBIGUOUS-NAME` | An author or editor name fits more than one **lab member**, so it is given no `person_id` and `resolution.status` is `ambiguous`. Located at the work — `<bib_dir>/<file>:<key>:author` or `:editor` — with the position and every id it fits in the prose. A warning; an error under `--strict`, because it is about lab members, whom labdata does own. **Narrowed** by #26 decision 6: until then it also covered an unresolved authorship that fits a declared collaborator and someone else, which is now `ID-GROUPING-AMBIGUOUS-DECLARED`. No release carried the wider meaning. |
+| `RESOLVE-SUGGESTION` | An author or editor name matched no person but is close to one: its initials fit a person's name that declares no such alias, or it is a near miss on string similarity. Nothing is linked. Located as above, naming the position and the suggested ids. A warning in every mode, including under `--strict`: an author who matched no lab member is never an error (#26 decision 10), because labdata cannot tell an outside co-author from a possible member until #25. The known cost is that a misspelt member's name passes `--strict` with only this warning. |
+| `ID-GROUPING-AMBIGUOUS-DECLARED` | An unresolved name fits more than one `collaborators_file` entry, or one entry and one lab member it did not resolve to, so it joins none of them and is grouped by its own name (#26 decisions 6 and 10). Located like `RESOLVE-AMBIGUOUS-NAME`, naming every candidate (`collaborator:<name>`, `person:<id>`). A warning in every mode, including under `--strict`: an author who matched no lab member is never an error. Two other codes can accompany it for the same authorship. When the name fits one entry and **one** lab member — `Patel, P.` beside an entry declaring `P. Patel` and a member Paul Patel who declares no such alias — the resolver also reports `RESOLVE-SUGGESTION` for that member, before this code; both are warnings under #26 decision 10, so `--strict` passes. When it fits one entry and **more than one** lab member, it is also reported here, and `RESOLVE-AMBIGUOUS-NAME` reports the members' ambiguity first, with no `RESOLVE-SUGGESTION`; that one is an error under `--strict`. |
+| `RESOLVE-UNRESOLVED-NAME` | One author name that matched no person, as `--unresolved --format json` lists them: one record per name `--unresolved` would print, in the same order. Located at the first authorship, in document order, written that way and linked to nobody; the message is the name itself, with any line break as a space. Emitted **only** by `--unresolved --format json`; the text modes list these names as before, and `--validate --format json` carries only the other codes. A warning in every mode, including under `--strict` (#26 decision 10). |
 | `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` | A `collaborators_file` `name` or alias equal to a lab member's name or alias. The member keeps the spelling and the collaborator entry is not used for it. Located at `<collaborators_file>:<collaborator name>:name` or `:aliases`. A warning. |
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. A warning. |
 | `BIB-YEAR-INVALID` | An entry's `year` is present but is not a number (`int()` rejects it), such as `in press`. The work is emitted with `year: null` and sorts last, as one with no year does. A warning. |
@@ -224,14 +249,72 @@ Codes in use:
 | `CONFIG-KEY-UNKNOWN` | `lab.yaml` holds a key labdata does not read (`labdata.config.KNOWN_KEYS`), such as a misspelt `people_fil`. It is ignored. A warning. |
 | `CONFIG-BIB-FILES-MISSING` | No `bib_files` are configured, absent or empty, so the document has no works. A warning: that can be meant, but it is never silently normal. |
 | `CONFIG-FILE-NOT-FOUND` | A file the configuration names is not there: a `bib_files` entry under `bib_dir` (`lab.yaml:bib_files:name`), `people_file` or `projects_file`. A missing `collaborators_file` is not checked, and reads as no declared collaborators. Named with the path it looked for. Fatal: compiling on would emit a document without that file's works, people or projects. |
+| `BIB-PARSER-MESSAGE` | The BibTeX parser library raised a message that is neither a syntax error nor an undefined macro — a field repeated within one entry, or a name list it cannot split. The prose is the **library's own wording**, kept as it phrased it. Located at the file, and at the entry key when the library raised it while reading one; the field is left empty. The entry is kept as the library read it. A warning. |
+| `LATEX-CONVERSION-FAILED` | A text field or a name part whose LaTeX the converter could not read at all. Its text is kept as written, with the braces taken off, so it may still hold LaTeX (§2, *Two degraded cases*). Located at the entry and field. A warning. |
+| `BIB-WRITE-BACK-FAILED` | An entry that could not be written back out as BibTeX. Its `bibtex` is `null`. Located at `<file>:<key>:bibtex`. A warning. |
+| `CONFIG-NOT-FOUND` | The `--config` file does not exist. Located at that path alone; `Error: CONFIG-NOT-FOUND …` on standard error. Fatal at load. |
+| `CONFIG-UNREADABLE` | The `--config` file exists but cannot be loaded — not valid YAML, for one, or a `bib_files` entry the loader cannot take. Located at that path alone; the prose is the reading library's own wording, on one line. Fatal at load. |
 | `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute. Raised as a `labdata.config.ConfigurationError` — its own type, so that a crash still reaches the user as a crash — by `LabDataConfig.from_yaml()`, by `BibFile` itself, by `assemble()` on every name it is about to compile, and by `Work.to_dict()`. **The last is the one that holds**, because it is the boundary every emitted document passes through: `BibFile` is a plain, mutable dataclass, so a name can be set after it was checked, and a `Work` can be built without a configuration at all. The three earlier checks stay because they fail sooner and say more — `from_yaml()` names the file the user would edit. |
 
-A few diagnostics do not carry a code yet: the fallback when a field's LaTeX
-cannot be converted at all
-or an entry cannot be written back out as BibTeX, a parser message other than
-a syntax error or an undefined macro, `Error: Configuration file not found`,
-and a configuration that is not valid YAML. An uncoded diagnostic is not a
-stable interface.
+Every diagnostic labdata prints carries one of these codes (#26 decision
+8). What is not a diagnostic carries none: the counts and headers of a
+report, the `Wrote …` line, the argument parser's usage errors, and a Python
+traceback, which is a crash (Target (#80) above).
+
+### Diagnostics as JSON
+
+`--format json` beside `--validate` or `--unresolved` prints, on standard
+output, exactly **one JSON array** and nothing else, in every outcome —
+including a configuration that fails to load, whose one record is then the
+array. Each element is one diagnostic, and **these fields are a stable
+interface**:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `code` | string | A code from the registry above. |
+| `severity` | `"error"` or `"warning"` | How **this run** took it: by its class, the mode and `--strict`, as the class table says. |
+| `file` | string or `null` | The `<file>` part of the location, as the text form writes it. |
+| `key` | string or `null` | The `<key>` part. |
+| `field` | string or `null` | The `<field>` part. |
+| `message` | string | The prose after the location, on one line. Not stable wording. |
+
+A location part that is empty in the text form is `null` here. The records
+come in the order the text report would list them, the diagnostics of
+assembly first. The exit code is the one the run would have had as text: `1`
+when any record has `"severity": "error"`, else `0`. Standard error is empty.
+The array, as JSON Schema — `tests/test_strict_json.py` validates the output
+against this block:
+
+<!-- diagnostics-json-schema -->
+```json
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["code", "severity", "file", "key", "field", "message"],
+    "properties": {
+      "code": {"type": "string", "pattern": "^[A-Z]+(-[A-Z]+)+$"},
+      "severity": {"enum": ["error", "warning"]},
+      "file": {"type": ["string", "null"], "minLength": 1},
+      "key": {"type": ["string", "null"], "minLength": 1},
+      "field": {"type": ["string", "null"], "minLength": 1},
+      "message": {"type": "string", "pattern": "^[^\\n\\r]*$"}
+    }
+  }
+}
+```
+
+What each mode puts in the array:
+
+- `--validate --format json`: the coded diagnostics of the run and nothing
+  else. The counts are not carried, and neither are the unresolved names:
+  those appear only under `--unresolved`.
+- `--unresolved --format json`: the same diagnostics, then one
+  `RESOLVE-UNRESOLVED-NAME` record per name that matched no person. With no
+  `people_file`, nothing was resolved and no such record is emitted.
+- `--output` with `--format json` is the **document**, not this array; its
+  diagnostics stay text on standard error.
 
 > **Version note (#26, PR #64).** Duplicate citation keys were invisible
 > through commit `dd06e37`: the parser library kept the first entry, and a key
@@ -446,7 +529,8 @@ contain markup, and it applies only to the fields under heading 1.
 
 ### Two degraded cases
 
-- When a field cannot be converted, labdata warns and falls back to
+- When a field cannot be converted, labdata warns
+  (`LATEX-CONVERSION-FAILED`) and falls back to
   `labdata.parsers.latex.strip_braces()`, keeping the text as written with
   its braces removed (`labdata.parsers.bibtex._convert()`). Such a value may
   still contain LaTeX commands. This is a degraded case, not a second

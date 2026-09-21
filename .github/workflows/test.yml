@@ -46,3 +46,7 @@ jobs:
     - name: Validate demo lab
       run: |
         uv run --frozen labdata --config examples/demo/lab.yaml --validate
+
+    - name: Validate demo lab under --strict
+      run: |
+        uv run --frozen labdata --config examples/demo/lab.yaml --validate --strict

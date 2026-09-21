@@ -64,18 +64,19 @@ def is_absolute_path(name: str) -> bool:
     return name.startswith(("/", "\\")) or PureWindowsPath(name).is_absolute()
 
 
-def reject_absolute_name(name, where: str) -> None:
+def reject_absolute_name(name, file: Optional[str] = None) -> None:
     """Raise when a configured `.bib` name would reach the document absolute.
 
-    ``where`` is the `<file>:<key>:<field>` location the diagnostic carries.
-    A caller that knows which file the configuration came from says so; one
-    that does not names the key alone.
+    The diagnostic is located at `<file>:bib_files:name`. A caller that knows
+    which file the configuration came from names it; one that does not
+    leaves the file part empty.
     """
     if isinstance(name, str) and is_absolute_path(name):
-        raise ConfigurationError(
-            f"{BIB_FILE_ABSOLUTE} {where}: '{name}' is an absolute path; a "
-            "bib_files name is a name under bib_dir, and it is emitted as the "
-            "work's source.file, which is never absolute")
+        raise ConfigurationError(diagnostic(
+            BIB_FILE_ABSOLUTE, file, "bib_files", "name",
+            f"'{name}' is an absolute path; a bib_files name is a name under "
+            "bib_dir, and it is emitted as the work's source.file, which is "
+            "never absolute"))
 
 
 @dataclass
@@ -94,7 +95,7 @@ class BibFile:
     category: str
 
     def __post_init__(self):
-        reject_absolute_name(self.name, "bib_files:name")
+        reject_absolute_name(self.name)
 
 
 @dataclass
@@ -186,7 +187,7 @@ class LabDataConfig:
         # user would edit is known and the diagnostic can name it.
         for bf in entries:
             if isinstance(bf, dict):
-                reject_absolute_name(bf.get('name'), f"{path}:bib_files:name")
+                reject_absolute_name(bf.get('name'), str(path))
 
         bib_files = [BibFile(**bf) for bf in entries]
 

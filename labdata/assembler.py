@@ -24,7 +24,7 @@ from .loaders import (
     DeclaredCollaborator, load_collaborators, load_people, load_projects,
 )
 from .resolver import (
-    AMBIGUOUS, AMBIGUOUS_NAME, RESOLVED, Candidates, compute_backlinks, given_initials,
+    AMBIGUOUS, RESOLVED, Candidates, compute_backlinks, given_initials,
     initials_only, match, normalize_name, person_candidates,
     resolve_authors, resolve_projects, shared_declarations,
 )
@@ -54,10 +54,24 @@ _SLUG_LENGTH = 60
 _NOT_SLUG = re.compile(r"-+")
 
 # Two ways a grouping key can be wrong that the document would otherwise keep
-# to itself. Neither is an error: an external co-author is never an error
-# (SPEC.md section 1).
+# to itself. Neither is an error, even under `--strict`: an author who
+# matched no lab member is never an error (SPEC.md section 1).
 GROUPING_SPANS_SPELLINGS = "ID-GROUPING-SPANS-SPELLINGS"
 GROUPING_INITIALS_AMBIGUOUS = "ID-GROUPING-INITIALS-AMBIGUOUS"
+
+# An unresolved authorship that fits more than one `collaborators_file`
+# entry, or an entry and a lab member it did not resolve to, so it is grouped
+# by its own name. A warning in every mode, including under `--strict`: an
+# author who matched no lab member is never an error (#26 decisions 6 and
+# 10). Until decision 6 it was reported under `RESOLVE-AMBIGUOUS-NAME`, which
+# now means lab members only and is still reported, as an error under
+# `--strict`, when the name also fits more than one member.
+GROUPING_AMBIGUOUS_DECLARED = "ID-GROUPING-AMBIGUOUS-DECLARED"
+
+# One author name that matched no person, as `--unresolved --format json`
+# lists it. A warning in every mode, including under `--strict`: an author who
+# matched no lab member is never an error (#26 decision 10).
+UNRESOLVED_NAME = "RESOLVE-UNRESOLVED-NAME"
 
 # A `collaborators_file` name or alias that a lab member already declares.
 # Resolving to the member wins, because the collaborator file never produces
@@ -143,9 +157,10 @@ class _Grouping:
         self.authorships: List[Dict[str, object]] = []
         self.work_ids: List[str] = []
         self.last_year: Optional[int] = None
-        self.where: str = ""
+        self.where: Tuple[str, str, str] = ("", "", "")
 
-    def add(self, work: Work, author: Author, where: str) -> None:
+    def add(self, work: Work, author: Author,
+            where: Tuple[str, str, str]) -> None:
         if not self.authorships:
             self.where = where
         if author.name not in self.variants:
@@ -226,11 +241,12 @@ def declared_collaborators(declared: List[DeclaredCollaborator],
                 ("aliases", alias) for alias in collaborator.aliases]:
             owners = members.ids_for(normalize_name(name))
             if owners:
-                warnings.append(
-                    f"{COLLABORATOR_ALIAS_IS_MEMBER} {source}:"
-                    f"{collaborator.name}:{field_name}: '{name}' is also "
-                    f"declared by {', '.join(sorted(owners))}; the member keeps "
-                    "it and the collaborator entry is not used for it")
+                warnings.append(diagnostic(
+                    COLLABORATOR_ALIAS_IS_MEMBER, source, collaborator.name,
+                    field_name,
+                    f"'{name}' is also declared by {', '.join(sorted(owners))}; "
+                    "the member keeps it and the collaborator entry is not "
+                    "used for it"))
             else:
                 kept.append(name)
         entries.append((normalize_name(collaborator.name), kept))
@@ -261,7 +277,7 @@ def group_collaborators(works: List[Work], bib_dir: str,
                for p in (people or [])])
     groups: Dict[str, _Grouping] = {}
     for work in works:
-        where = f"{bib_dir}/{work.source_file}:{work.bib_id}:author"
+        where = (f"{bib_dir}/{work.source_file}", work.bib_id, "author")
         for author in work.authors:
             if author.person_id:
                 continue
@@ -276,11 +292,12 @@ def group_collaborators(works: List[Work], bib_dir: str,
                     kind, grouped_by = PERSONAL, GROUPED_BY_DECLARED
                 elif found.status == AMBIGUOUS and any(
                         i.startswith("collaborator:") for i in ids):
-                    warnings.append(
-                        f"{AMBIGUOUS_NAME} {where}: position {author.position}, "
-                        f"'{author.name}', fits more than one declared "
-                        f"collaborator or member and is grouped by its own "
-                        f"name: {', '.join(ids)}")
+                    warnings.append(diagnostic(
+                        GROUPING_AMBIGUOUS_DECLARED, *where,
+                        f"position {author.position}, '{author.name}', fits "
+                        "more than one collaborators_file entry, or an entry "
+                        "and a lab member, and is grouped by its own name: "
+                        f"{', '.join(ids)}"))
             key = collaborator_key(kind, normalized)
             author.collaborator_key = key
             group = groups.get(key)
@@ -314,18 +331,35 @@ def _grouping_warnings(groups: Dict[str, "_Grouping"]) -> List[str]:
             continue
         if len(group.variants) > 1:
             spellings = ", ".join(repr(v) for v in sorted(group.variants))
-            reported.append(
-                f"{GROUPING_SPANS_SPELLINGS} {group.where}: collaborator key "
-                f"'{group.key}' groups {len(group.variants)} spellings of one "
-                f"name: {spellings}")
+            reported.append(diagnostic(
+                GROUPING_SPANS_SPELLINGS, *group.where,
+                f"collaborator key '{group.key}' groups {len(group.variants)} "
+                f"spellings of one name: {spellings}"))
         fuller = sorted(other.key for other in groups.values()
                         if group.could_be(other))
         if fuller:
-            reported.append(
-                f"{GROUPING_INITIALS_AMBIGUOUS} {group.where}: collaborator key "
-                f"'{group.key}' is initials only and could be any of: "
-                + ", ".join(repr(k) for k in fuller))
+            reported.append(diagnostic(
+                GROUPING_INITIALS_AMBIGUOUS, *group.where,
+                f"collaborator key '{group.key}' is initials only and could "
+                "be any of: " + ", ".join(repr(k) for k in fuller)))
     return reported
+
+
+def unresolved_name_diagnostics(works: List[Work], names: List[str],
+                                bib_dir: str) -> List[str]:
+    """One `UNRESOLVED_NAME` diagnostic per name, in the order given.
+
+    Each is located at the first authorship, in document order, that is
+    written that way and linked to no person; its message is the name.
+    """
+    first: Dict[str, Tuple[str, str]] = {}
+    for work in works:
+        for author in work.authors:
+            if author.person_id is None and author.name not in first:
+                first[author.name] = (f"{bib_dir}/{work.source_file}", work.bib_id)
+    return [diagnostic(UNRESOLVED_NAME, *first.get(name, (None, None)),
+                       "author", name)
+            for name in names]
 
 
 def assemble(config: LabDataConfig, diagnostics: bool = False):
@@ -351,7 +385,7 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     # `LabDataConfig.from_yaml()` rejects the same thing first, with the file
     # the user would edit named.
     for bib_file in config.bib_files:
-        reject_absolute_name(getattr(bib_file, 'name', None), "bib_files:name")
+        reject_absolute_name(getattr(bib_file, 'name', None))
 
     bibliography_errors: List[str] = []
     warnings: List[str] = []
@@ -424,9 +458,9 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     # its own code, so this one is not reported against it.
     if config.lab is None or isinstance(config.lab, dict):
         if not (config.lab or {}).get("name"):
-            warnings.append(
-                f"{LAB_NAME_MISSING} {config.path or 'lab.yaml'}:lab:name: "
-                "the lab header declares no name")
+            warnings.append(diagnostic(
+                LAB_NAME_MISSING, config.path or 'lab.yaml', "lab", "name",
+                "the lab header declares no name"))
 
     # Assemble
     data = LabData(
