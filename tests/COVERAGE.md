@@ -125,20 +125,28 @@ Every BibTeX field labdata reads. Fields it does not read (`pages`,
 ## Fields the demo carries that reach no property
 The fields #69 required a fixture for. One row each, and each bound to an
 assertion that **passes**: the field is in the input entry, and its value is
-in no property of the work. The field-loss probe reports all of them
-together, but that test is xfailed and so cannot turn red when a fixture goes
-missing; these rows are what gives each field its own grip. Every value here
-is also preserved in the `bibtex` record, as `fields.unread` says.
+at no path in the work. The field-loss probe reports all of them together,
+but that test is xfailed and so cannot turn red when a fixture goes missing;
+these rows are what gives each field its own grip. Every value here is also
+preserved in the `bibtex` record, as `fields.unread` says.
+
+Each row reacts to its own field's **value**, wherever in the work it lands --
+a flat property, `identifiers[scheme]`, a parsed `editors` entry, a
+structured `venue` -- and to nothing else. Not to a container that merely
+exists, since `identifiers: {}` and a null flat property are what a work with
+no such field looks like; and not by substring, since `chapter = {9}` and the
+ISBN `978-1-00-000003-5` are on the same work.
+`test_field_absence_reads_the_value_not_the_container` pins both directions.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `fields.editor` | `editor = {Quinn, Quentin and Silva, Sofia}` on an `@incollection` | Read by nothing: no `editor` or `editors` property, and the names are in no property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.month` | `month = {March}` | Read by nothing: in no property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.chapter` | `chapter = {9}` on an `@inbook` | Read by nothing: in no property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.isbn` | `isbn` on a `@book` | Read by nothing: in no property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.organization` | `organization` on a `@manual` | Converted from LaTeX, then read by nothing: in no property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.issn` | `issn` on an `@article` | Read by nothing: in no property of the work | `examples/demo/bib/journal.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.howpublished` | `howpublished` on a `@misc` | Read by nothing: in no property of the work | `examples/demo/bib/other.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.editor` | `editor = {Quinn, Quentin and Silva, Sofia}` on an `@incollection` | Read by nothing: no editor's name is a value anywhere in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.month` | `month = {March}` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.chapter` | `chapter = {9}` on an `@inbook` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.isbn` | `isbn` on a `@book` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.organization` | `organization` on a `@manual` | Converted from LaTeX, then read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.issn` | `issn` on an `@article` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/journal.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.howpublished` | `howpublished` on a `@misc` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/other.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
 
 ## Name forms
 Author names as they appear in `.bib` files. `name` below is the `authors[].name`
@@ -392,6 +400,7 @@ the collaborator aliases of #24.
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
 | `probe.roundtrip_shape` | The demo document | One BibTeX entry per work, keyed and typed from the document, carrying exactly the fields the document can still supply | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_entry_is_well_formed` | pass |
+| `probe.link_origin` | A work whose only link states an `origin` of `input`, `enrichment`, `sidecar`, `derived`, `inferred`, or none at all | The round-trip probe reads the link as the entry's `url` only when the document says it came from the input | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_reads_only_a_link_the_input_supplied` | pass |
 | `probe.field_loss` | Every entry of the demo, across its four `.bib` files | Every field name in a source entry reaches a first-class property, except `project`; the failure names every field lost, by entry and overall | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_loses_no_field` | xfail #56 |
 | `probe.identity_fixtures` | The demo document: one external co-author on three works in two spellings, a second with the same first initial and family name on a fourth, and two different people under one written name on a fifth | All four scenarios are present, with the given names kept apart on the authorships and one display name across all of them | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_identity_fixtures_are_present` | pass |
 | `probe.identity_one_person` | `Patel, Priya` on two works and `Patel, P.` on a third | Exactly one contributor in the `collaborator:` namespace touches any of the three works, and it holds exactly those three | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_joins_one_co_author_written_two_ways` | xfail #24 |

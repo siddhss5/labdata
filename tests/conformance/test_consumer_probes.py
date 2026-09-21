@@ -15,11 +15,13 @@ never edited to assert its own incompleteness: it emits the best artifact it
 can from what the document gives it, and the tests here say what a correct
 artifact would have contained.
 
-**Each probe therefore has its obligations split across two tests.** What the
-probe can do today -- the CSL export validating against the published schema,
-the CV grouping by year, the graph's edges resolving to declared nodes -- is
-asserted in a test that passes. Only the assertions that name the missing
-properties sit under `xfail`. Keeping them together would neuter the first
+**Each probe's obligations are therefore split by kind, not gathered into
+one test.** What the probe can do today -- the CSL export validating against
+the published schema, the CV grouping by year, the graph's edges resolving to
+declared nodes -- is asserted in tests that pass. Only the assertions that
+name the missing properties sit under `xfail`, one marker per missing
+property rather than one per probe, so each says what it is waiting for and
+for whom. Keeping them together would neuter the first
 group: a regression in schema validity would surface as the already-expected
 `#56` xfail and CI would stay green.
 
@@ -61,8 +63,9 @@ DEMO_CONFIG = "examples/demo/lab.yaml"
 CSL_SCHEMA = REPO_ROOT / "tests" / "vendor" / "csl-data.json"
 
 # Every probe, and the tests that check what it emits: what it can produce
-# today, then what it cannot. `test_every_probe_is_exercised` fails if a probe
-# is added to the directory and left out of here.
+# today, then what it cannot, in that order and however many of each there
+# are. `test_every_probe_is_exercised` fails if a probe is added to the
+# directory and left out of here.
 PROBE_TESTS = {
     "plain_html.py": ("test_plain_html_page_is_complete",
                       "test_plain_html_escapes_hostile_text"),
@@ -76,6 +79,7 @@ PROBE_TESTS = {
                  "test_graph_separates_co_authors_sharing_an_initial",
                  "test_graph_keeps_two_authorships_written_alike_apart"),
     "bibtex_roundtrip.py": ("test_bibtex_roundtrip_entry_is_well_formed",
+                            "test_bibtex_roundtrip_reads_only_a_link_the_input_supplied",
                             "test_bibtex_roundtrip_loses_no_field",
                             "test_demo_field_is_in_the_input_and_in_no_property"),
 }
@@ -594,8 +598,10 @@ def test_graph_covers_every_co_author(probe_output, demo_document):
 # --- bibtex_roundtrip.py -----------------------------------------------------
 #
 # The field-loss probe of #69. It re-emits one BibTeX entry per work from the
-# document's first-class properties, and the two tests below ask the two
-# separate questions that artifact answers.
+# document's first-class properties, and the tests below ask the separate
+# questions that artifact answers: what it can still write, what it cannot,
+# what each individual field the demo carries for #69 does, and where it is
+# allowed to look for the answer.
 #
 # It is deliberately **not** a value round trip. LaTeX is converted to Unicode
 # on the way in and the conversion is one-way, so `C{\^o}t{\'e}` comes back as
@@ -773,6 +779,72 @@ def test_bibtex_roundtrip_loses_no_field(probe_output, demo_document):
            for key, (kind, names) in sorted(lost.items())])
 
 
+
+# --- bibtex_roundtrip.py: where a link is allowed to count -------------------
+#
+# The probe reads a link as evidence that the entry's own `url` field reached
+# the document only when the document says the link came from the input. The
+# demo cannot exercise that rule at all: it still carries flat `url` and
+# `video_url` properties, which the probe reaches first, so the branch would
+# go untested in CI and could be lost in a refactor without anything turning
+# red. The properties are therefore cleared in a copy of the document and one
+# link put in their place, one origin per work, and the **unmodified** probe
+# is run on that -- the same arrangement `hostile_page` uses above.
+
+# (link kind, the origin the record states, whether the probe may read it).
+# #56 section 3 makes `origin` an open string over `input`, `sidecar`,
+# `enrichment`, `inferred` and `derived`; only the first says the entry's own
+# field is what put the link there. A record that states no origin is not
+# read either: the question is what the document says, and silence is not an
+# answer.
+LINK_ORIGINS = (
+    ("url", "input", True),
+    ("video", "input", True),
+    ("url", "enrichment", False),
+    ("url", "sidecar", False),
+    ("url", "derived", False),
+    ("url", "inferred", False),
+    ("url", None, False),
+)
+LINK_URL = "https://links.invalid/%s/%s"
+
+
+@pytest.fixture(scope="module")
+def link_origin_entries(tmp_path_factory, demo_document):
+    """(the works used, what the probe wrote) for one origin per work."""
+    _, doc = demo_document
+    altered = copy.deepcopy(doc)
+    works = altered["publications"][:len(LINK_ORIGINS)]
+    assert len(works) == len(LINK_ORIGINS), "the demo is too small for this"
+    for pub, (kind, origin, _) in zip(works, LINK_ORIGINS):
+        pub["url"] = None
+        pub["video_url"] = None
+        record = {"url": LINK_URL % (kind, origin), "label": None,
+                  "verification": {"status": "unchecked", "checked_at": None}}
+        if origin is not None:
+            record["origin"] = origin
+        pub["links"] = {kind: [record]}
+    path = tmp_path_factory.mktemp("links") / "lab.json"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(altered, f, ensure_ascii=False)
+    return [p["bib_id"] for p in works], read_entries(
+        run_probe("bibtex_roundtrip.py", path))
+
+
+@covers("probe.link_origin")
+def test_bibtex_roundtrip_reads_only_a_link_the_input_supplied(link_origin_entries):
+    """`url` comes back from a link the document attributes to the input, and
+    from no other, whatever kind it is filed under.
+
+    Both directions in one comparison: a probe that ignored `links` entirely
+    would fail on the two that must survive, and one that ignored `origin`
+    would fail on the five that must not.
+    """
+    keys, entries = link_origin_entries
+    assert [entries[key][1].get("url") for key in keys] == [
+        LINK_URL % (kind, origin) if survives else None
+        for kind, origin, survives in LINK_ORIGINS]
+
 # --- The demo's four entry types with no venue rule --------------------------
 #
 # `format_venue()` has a rule for article, inproceedings, the two theses,
@@ -856,57 +928,166 @@ def test_entry_types_without_a_venue_rule_degrade_to_the_year(demo_document):
 # fixtures would not turn anything red there. These give each field its own
 # grip: remove the fixture and the row's own test fails.
 
-# (case, entry, source field, the property names it could sit under, the text
-# to hunt for). The text is hunted for rather than compared, because a value
-# that reaches the document may arrive inside a larger string -- a container
-# name inside a composed venue -- and because an `editor` field arrives as
-# *people*, so what has to be absent is each editor's name rather than the
-# one combined string the entry wrote.
+def value_locations(pub, values):
+    """Every path in a work whose leaf is one of ``values``.
+
+    Three properties of this search, each of them load-bearing:
+
+    **Leaves, not keys.** A container that exists but is empty -- `#56`
+    makes `identifiers` always present, so `identifiers: {}` is what a work
+    with no identifier looks like -- and a declared-but-null flat property
+    are not survivals of anything. Asking whether a key is present would call
+    both of them a recovery and turn these rows red while the field was
+    exactly as lost as before.
+
+    **Equality, not containment.** `chapter = {9}` and the ISBN
+    `978-1-00-000003-5` are on the same work, and `"9"` is a substring of
+    that ISBN; a substring search would report the chapter recovered the
+    moment the ISBN arrived. Every needle here is an atomic value, so exact
+    equality is the right relation and it is also the one that cannot
+    collide across fields.
+
+    **Any depth, and the path is the answer.** `editors` is a list of name
+    objects, `identifiers` a map from scheme to a list, a structured `venue`
+    an object: a search of the work's own string properties would miss all
+    three, which is exactly where a field goes when it stops being lost. The
+    path each hit is found at is returned rather than a bare count, so a
+    failure says *where* the field turned up. Only the re-serialized export
+    is skipped, because it holds every field read or not.
+    """
+    found = []
+
+    def walk(value, path):
+        if isinstance(value, dict):
+            for name, inner in value.items():
+                if name != "bibtex":
+                    walk(inner, path + "/" + str(name))
+        elif isinstance(value, list):
+            for index, inner in enumerate(value):
+                walk(inner, path + "/" + str(index))
+        elif isinstance(value, (str, int, float)) and not isinstance(value, bool):
+            if str(value) in values:
+                found.append("%s = %r" % (path, value))
+
+    walk(pub, "")
+    return sorted(found)
+
+
+# (case, entry, source field, the atomic values that would mean it survived).
+# For `editor` those are the editors' own name parts rather than the one
+# combined string the entry wrote, because a document that stopped losing the
+# field would carry them parsed -- `editors` is a list of name objects, and
+# `Quinn, Quentin and Silva, Sofia` appears nowhere in it.
 UNREAD_FIELDS = [
-    case("fields.editor", "adams2022survey", "editor", ("editor", "editors"),
+    case("fields.editor", "adams2022survey", "editor",
          ("Quinn", "Quentin", "Silva", "Sofia")),
-    case("fields.month", "adams2022survey", "month", ("month",), ("March",)),
-    case("fields.chapter", "hughes2021gaits", "chapter", ("chapter",), ("9",)),
-    case("fields.isbn", "adams2023handbook", "isbn", ("isbn", "identifiers"),
-         ("978-1-00-000002-8",)),
+    case("fields.month", "adams2022survey", "month", ("March",)),
+    case("fields.chapter", "hughes2021gaits", "chapter", ("9",)),
+    case("fields.isbn", "adams2023handbook", "isbn", ("978-1-00-000002-8",)),
     case("fields.organization", "ingram2019toolkit", "organization",
-         ("organization",), ("Example University Personal Robotics Laboratory",)),
-    case("fields.issn", "brown2025tidy", "issn", ("issn", "identifiers"),
-         ("2999-0001",)),
+         ("Example University Personal Robotics Laboratory",)),
+    case("fields.issn", "brown2025tidy", "issn", ("2999-0001",)),
     case("fields.howpublished", "fischer2025benchmark", "howpublished",
-         ("howpublished",), ("Dataset and evaluation protocol on the project site",)),
+         ("Dataset and evaluation protocol on the project site",)),
 ]
 
 
-@pytest.mark.parametrize("case_id,bib_id,field,properties,needles", UNREAD_FIELDS)
+@pytest.mark.parametrize("case_id,bib_id,field,values", UNREAD_FIELDS)
 def test_demo_field_is_in_the_input_and_in_no_property(probe_output, demo_document,
                                                        case_id, bib_id, field,
-                                                       properties, needles):
+                                                       values):
     """The input entry carries the field, and the work carries it nowhere.
 
-    Asked three ways, because one is not enough to mean "in no property":
+    Asked two ways, because one is not enough to mean "in no property":
 
-    1. None of the property names the field could sit under is on the work.
-    2. Its text is in no value anywhere in the work, at any depth. A search
-       of the work's own string properties would miss a structured `editors`,
-       an `identifiers` map and an object `venue`, which are exactly where
-       the field goes when it stops being lost.
-    3. The round-trip probe, which looks in every one of those places, still
-       cannot emit the field. That is the consumer-visible statement, and it
-       is the one a reader of `tests/COVERAGE.md` is actually promised.
+    1. No value anywhere in the work, at any depth, is the field's -- the
+       flat property, `identifiers[scheme]`, a parsed `editors` entry and a
+       structured `venue` are all reached by the same walk, and all four are
+       compared by value rather than by whether their container exists.
+    2. The round-trip probe, which looks in every one of those places, still
+       cannot emit the field. That is the consumer-visible statement, and the
+       one a reader of `tests/COVERAGE.md` is actually promised.
+
+    `test_field_absence_reads_the_value_not_the_container` pins both
+    directions of the first: which additions must turn this row red, and
+    which must leave it alone.
     """
     _, doc = demo_document
     source_value = source_entries()[bib_id][1][field]
     # The needles are really in the input, so the searches below looked for
     # something that exists rather than for nothing.
-    assert [one for one in needles if one not in source_value] == [], bib_id
+    assert [one for one in values if one not in source_value] == [], bib_id
 
-    pub = publication(doc, bib_id)
-    assert [name for name in properties if name in pub] == [], bib_id
-    assert [value for value in first_class_values(pub)
-            if any(one in value for one in needles)] == [], bib_id
+    assert value_locations(publication(doc, bib_id), values) == [], bib_id
     emitted = read_entries(probe_output["bibtex_roundtrip.py"])[bib_id][1]
     assert field not in emitted, bib_id
+
+
+# What each row must and must not react to. The left column is a change made
+# to one work of a copy of the demo document; the right is the set of rows
+# above that must then find the field. A row that reacts to the wrong change
+# would send #56 after a loss that is still exactly as lost, or tell it a
+# loss had been closed when it had not.
+EDITORS = [{"given": "Quentin", "von": None, "family": "Quinn", "suffix": None,
+            "literal": None, "person_id": None},
+           {"given": "Sofia", "von": None, "family": "Silva", "suffix": None,
+            "literal": None, "person_id": None}]
+ABSENCE_PROBES = [
+    # A container that exists is not a field that survived.
+    ("an empty identifiers map", "adams2023handbook", {"identifiers": {}}, ()),
+    ("a declared but null chapter", "hughes2021gaits", {"chapter": None}, ()),
+    ("an empty editors list", "adams2022survey", {"editors": []}, ()),
+    # Nor is a different field's value, even one the other is a substring of.
+    ("the isbn of the work that carries the chapter", "hughes2021gaits",
+     {"identifiers": {"isbn": ["978-1-00-000003-5"]}}, ()),
+    # The field's own value, in the place #56 puts it, is.
+    ("the isbn, as an identifier", "adams2023handbook",
+     {"identifiers": {"isbn": ["978-1-00-000002-8"]}}, ("fields.isbn",)),
+    ("the issn, as an identifier", "brown2025tidy",
+     {"identifiers": {"issn": ["2999-0001"]}}, ("fields.issn",)),
+    ("parsed editors", "adams2022survey", {"editors": EDITORS},
+     ("fields.editor",)),
+    ("the organization, as a structured venue", "ingram2019toolkit",
+     {"venue": {"kind": "institution",
+                "name": "Example University Personal Robotics Laboratory"}},
+     ("fields.organization",)),
+    ("a flat chapter", "hughes2021gaits", {"chapter": "9"}, ("fields.chapter",)),
+    ("a flat chapter, as a number", "hughes2021gaits", {"chapter": 9},
+     ("fields.chapter",)),
+    ("a flat month", "adams2022survey", {"month": "March"}, ("fields.month",)),
+    ("flat howpublished", "fischer2025benchmark",
+     {"howpublished": "Dataset and evaluation protocol on the project site"},
+     ("fields.howpublished",)),
+]
+
+
+@pytest.mark.parametrize("label,bib_id,change,flips",
+                         [pytest.param(*p, id=p[0]) for p in ABSENCE_PROBES])
+def test_field_absence_reads_the_value_not_the_container(demo_document, label,
+                                                         bib_id, change, flips):
+    """Every row above reacts to its own field's value and to nothing else.
+
+    Run over *all* the rows for each change, not just the one expected to
+    move, so a row that reacted to a neighbour's value would be caught here
+    rather than after #56 had acted on it.
+    """
+    _, doc = demo_document
+    altered = copy.deepcopy(doc)
+    for pub in altered["publications"]:
+        if pub["bib_id"] == bib_id:
+            pub.update(change)
+
+    found = set()
+    for row in UNREAD_FIELDS:
+        case_id, row_id, _, values = row.values
+        if value_locations(publication(altered, row_id), values):
+            found.add(case_id)
+    assert found == set(flips), label
+    # The unaltered document finds nothing, so the answer above is the
+    # change's doing and not the document's.
+    assert {row.values[0] for row in UNREAD_FIELDS
+            if value_locations(publication(doc, row.values[1]),
+                               row.values[3])} == set()
 
 
 # --- graph.py: who the co-authors are ----------------------------------------

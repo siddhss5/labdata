@@ -38,7 +38,9 @@ python examples/consumers/bibtex_roundtrip.py lab.json > works.bib
 `tests/conformance/test_consumer_probes.py` runs all five against the demo
 output in CI, the same way: as a subprocess handed a path.
 
-Each **failing** probe's obligations are split across two tests. The assertions
+Each **failing** probe's obligations are split by kind rather than gathered
+into one test, and there is one marker per missing property rather than one
+per probe. The assertions
 naming the missing properties carry `xfail(strict=True)` against the issue that owns
 the missing property -- #56 for all but one, which is #24's, for the reason
 the identity paragraph under `graph.py` gives -- and
@@ -258,8 +260,9 @@ Drop it in this directory and add it to `PROBE_TESTS` in
 `tests/conformance/test_consumer_probes.py`, mapped to the tests that check
 what it emits. `test_every_probe_is_exercised` fails if you do the first
 without the second, so a probe cannot sit here and never run — and it also
-fails if none of the tests you named so much as mentions the probe's file
-name, which is how `probe_output` is keyed, so a probe cannot be listed
+fails unless one of the tests you named actually subscripts
+`probe_output["<your probe>.py"]` — parsed, so a mention in a comment or a
+docstring does not count — so a probe cannot be listed
 against tests that never read what it wrote.
 
 If your probe cannot be written, that is the finding. Leave the probe emitting
