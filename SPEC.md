@@ -615,13 +615,29 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 ### How a name is matched
 
 `labdata.resolver.match()` compares a name's structured parts against every
-person's `name` and `aliases`, all read through `normalize_name()`. It
-lower-cases the name, drops accents (the combining marks left by Unicode NFD
-decomposition), removes periods, removes every `<sup>…</sup>` span — in any
-letter case, not crossing a line break — together with what it encloses, and
-collapses runs of whitespace to one space, trimming the ends. Nothing else is
-changed, so a `*` that is not an equal-contribution marker and not inside a
-`<sup>` span stays part of the name. The match decides in this order:
+person's `name` and `aliases`, all read through `normalize_name()`. That
+function does exactly this, in this order:
+
+1. Lower-cases the string and strips whitespace from both ends.
+2. Decomposes it to Unicode NFD and deletes every character of category `Mn`
+   (nonspacing mark). That removes combining accents, so `José` becomes
+   `jose`, but also any other `Mn` character, such as the emoji variation
+   selector U+FE0F and the Devanagari virama. Marks of category `Mc` and `Me`
+   are kept, and the result stays decomposed: `각` comes out as three jamo.
+3. Deletes every ASCII full stop (U+002E). Other full stops, such as the
+   fullwidth `．`, stay.
+4. Deletes each non-overlapping match of the regular expression
+   `<sup>.*?</sup>`. Because it runs after lower-casing, it matches the tags
+   in any letter case. The `.` matches any character except a line feed, so
+   a span containing `\n` is not removed but one containing `\r` is. The
+   match is non-greedy and ends at the first `</sup>`, so nested tags are
+   not handled: `<sup>outer<sup>inner</sup>tail</sup>X` becomes
+   `tail</sup>x`.
+5. Replaces each run of whitespace with one space and strips both ends.
+
+Nothing else is changed. A `*` that is not an equal-contribution marker
+stays part of the name unless step 4 removed it with a `<sup>` span. The
+match decides in this order:
 
 1. **The full name.** The parts joined as `given von family, suffix`, equal to
    exactly one person's name or alias: resolved, `method: exact`. Equal to two
