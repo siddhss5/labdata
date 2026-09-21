@@ -285,13 +285,13 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
         diagnostics: If True, return AssemblyResult with diagnostics.
                      If False (default), return LabData directly.
     """
-    # Every configured name, checked here rather than only where it was
-    # built. `BibFile` is a public, mutable dataclass, so a name can be set
-    # after construction, and `work.source.file` is promised never to be
-    # absolute however the configuration was assembled (SPEC.md section 5).
-    # The CLI never reaches this: `LabDataConfig.from_yaml()` rejects the
-    # same thing first, with the file the user would edit named. This is for
-    # a caller who built the configuration in Python, who gets the exception.
+    # Every configured name, checked before anything is parsed, so a
+    # configuration labdata will not compile from fails here rather than
+    # after the work of reading every file. This is not the check that holds
+    # -- `Work.to_dict()` is, at the boundary every emitted document passes
+    # through -- it is the one that fails soonest. The CLI never reaches it:
+    # `LabDataConfig.from_yaml()` rejects the same thing first, with the file
+    # the user would edit named.
     for bib_file in config.bib_files:
         reject_absolute_name(getattr(bib_file, 'name', None), "bib_files:name")
 

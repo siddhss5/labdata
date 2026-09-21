@@ -68,9 +68,10 @@ class BibFile:
     ``name`` is a name under ``bib_dir``, not a path of its own: it is
     emitted as ``work.source.file`` and must never be absolute. The
     constructor checks it, so the mistake is caught where it is made -- but
-    this class is a plain, mutable dataclass, which is public API, so the
-    check that *holds* is the one `labdata.assembler.assemble()` makes on
-    every name it is about to compile.
+    this class is a plain, mutable dataclass, which is public API, so a name
+    can be set after it was checked. The check that *holds* is the one
+    `labdata.models.Work.to_dict()` makes, at the boundary every emitted
+    document passes through.
     """
     name: str
     category: str

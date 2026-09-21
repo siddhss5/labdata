@@ -6,8 +6,8 @@ import pytest
 from pathlib import Path
 
 from labdata import (
-    Author, LabData, Person, Project, Venue, Work, export_to_json,
-    export_to_yaml,
+    Author, ConfigurationError, LabData, Person, Project, Venue, Work,
+    export_to_json, export_to_yaml,
 )
 
 
@@ -130,3 +130,60 @@ class TestExportToJson:
             "lab": {}, "works": [], "people": [], "projects": [],
             "collaborators": [],
         }
+
+
+class TestARefusedDocumentLeavesTheOutputAlone:
+    """A document labdata will not emit must not destroy the last one.
+
+    The exporters build the whole document before opening the file. Opening
+    first truncates it, so a run that then refuses to serialize -- a `Work`
+    whose `source_file` is absolute is the case that exists today, and any
+    later invariant would behave the same -- would leave the user with an
+    empty file where a good document had been.
+    """
+
+    SENTINEL = "# the document from the last good run\n"
+
+    @pytest.fixture
+    def refused(self):
+        work = Work(bib_id="a2024", title="A Title", authors=[], year=2024,
+                    category="Journal Papers", entry_type="article",
+                    source_file="/private/source.bib")
+        return LabData(works=[work])
+
+    @pytest.mark.parametrize("export, name",
+                             [(export_to_json, "lab.json"),
+                              (export_to_yaml, "lab.yml")],
+                             ids=["json", "yaml"])
+    def test_an_existing_file_is_not_truncated(self, tmp_path, refused, export,
+                                               name):
+        out = tmp_path / name
+        out.write_text(self.SENTINEL, encoding="utf-8")
+        with pytest.raises(ConfigurationError):
+            export(refused, str(out))
+        assert out.read_text(encoding="utf-8") == self.SENTINEL
+
+    @pytest.mark.parametrize("export, name",
+                             [(export_to_json, "lab.json"),
+                              (export_to_yaml, "lab.yml")],
+                             ids=["json", "yaml"])
+    def test_no_file_is_created_where_there_was_none(self, tmp_path, refused,
+                                                     export, name):
+        out = tmp_path / "nested" / name
+        with pytest.raises(ConfigurationError):
+            export(refused, str(out))
+        assert not out.exists()
+
+    @pytest.mark.parametrize("export, name",
+                             [(export_to_json, "lab.json"),
+                              (export_to_yaml, "lab.yml")],
+                             ids=["json", "yaml"])
+    def test_a_document_it_will_emit_still_replaces_the_old_one(self, tmp_path,
+                                                                sample_data,
+                                                                export, name):
+        """The guard above must not be a refusal to write at all."""
+        out = tmp_path / name
+        out.write_text(self.SENTINEL, encoding="utf-8")
+        export(sample_data, str(out))
+        assert out.read_text(encoding="utf-8") != self.SENTINEL
+        assert "adams2024robot" in out.read_text(encoding="utf-8")
