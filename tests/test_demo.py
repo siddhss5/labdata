@@ -47,7 +47,8 @@ class TestDemoLab:
         for project in demo_result.data.projects:
             assert project.work_ids, project.id
 
-    def test_covers_template_roles(self, demo_result):
+    def test_covers_role_and_status_combinations(self, demo_result):
+        """The demo exercises each of these role and status pairs."""
         roles = {(p.role, p.status) for p in demo_result.data.people}
         assert ("professor", "current") in roles
         assert ("phd_student", "current") in roles
@@ -111,4 +112,3 @@ class TestDemoLab:
         assert demo_result.unresolved_authors == [
             "Lin Lee", "Olivia Ortiz", "P. Park", "P. Patel", "Pradeep Patel",
             "Priya Patel", "R. Reed", "Sybil Stone", "Trent Turner"]
-

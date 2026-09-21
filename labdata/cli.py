@@ -22,7 +22,7 @@ def main(argv=None):
         epilog="""
 Examples:
   # Generate YAML output
-  labdata --config lab.yaml --output _data/lab.yml
+  labdata --config lab.yaml --output lab.yml
 
   # Generate JSON output
   labdata --config lab.yaml --format json --output lab.json

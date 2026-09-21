@@ -189,7 +189,7 @@ def test_cli_format_invalid(tmp_path):
 
 @covers("cli.output", "diag.wrote")
 def test_cli_output_creates_parent_dirs(tmp_path, valid_output):
-    out = tmp_path / "site" / "_data" / "lab.yml"
+    out = tmp_path / "out" / "nested" / "lab.yml"
     run = run_labdata(["--config", "lab.yaml", "--output", out], VALID)
     assert run.code == 0 and run.crash is None, run.output
     assert out.exists()

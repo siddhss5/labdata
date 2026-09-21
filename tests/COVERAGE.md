@@ -312,7 +312,7 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 | `cli.config` | `labdata` with no `--config` | Usage error naming `--config` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_config_required` | pass |
 | `cli.config_not_found` | `--config` naming a file that is not there | Error naming the file; exits non-zero | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_config_not_found` | pass |
 | `cli.mode.required` | `--config` alone, with no mode flag | Usage error naming `--output`, `--validate` and `--unresolved` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_mode_required` | pass |
-| `cli.output` | `--output site/_data/lab.yml` | Writes the file, creating parent directories | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_output_creates_parent_dirs` | pass |
+| `cli.output` | `--output out/nested/lab.yml` | Writes the file, creating parent directories | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_output_creates_parent_dirs` | pass |
 | `cli.format.yaml` | `--format yaml`, and the default with no `--format` | YAML holding the same data as `--format json` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format` | pass |
 | `cli.format.json` | `--format json` | JSON holding the same data as the YAML export | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format` | pass |
 | `cli.format.invalid` | `--format xml` | Usage error naming the bad value; no file is written | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format_invalid` | pass |
