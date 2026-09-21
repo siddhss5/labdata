@@ -781,12 +781,19 @@ removes their full stops, so `J.-P.` equals `J-P`, but it is not equal to
   what is left once the compared name's particles, family name and suffix
   are taken off its end.
 - Comparing two declarations with each other (`PEOPLE-ALIAS-AMBIGUOUS`, and
-  `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`): the given name is the words
-  BibTeX's own name parsing reads as first and middle names. BibTeX reads a
-  comma as `Family, Given`, so in a declaration written `Given Family,
-  Suffix` it takes the suffix for the given name, and run-together initials
-  there are not spaced for these two checks; matching an author is not
-  affected.
+  `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`): a declaration is read as
+  `Given von Family, Suffix`, the form `full_form()` joins a name in, so
+  only the text before its first comma is read with BibTeX's own name
+  parsing, and the given name is the leading words it reads as first and
+  middle names. Particles, the family name and everything after the comma
+  are never spaced, so `S.S. Ivers, Jr.` equals `S. S. Ivers, Jr.`, while
+  `S.S. S.S.` equals `S. S. S.S.` but not `S. S. S. S.`, and
+  `Alice Ivers, S.S.` does not equal `Alice Ivers, S. S.` labdata has no
+  way to tell a suffix from a given name after a comma, so a declaration
+  written `Family, Given` is not spaced at all: `Ivers, S.S.` and
+  `Ivers, S. S.` stay two spellings, as on `main`. Where the parse does not
+  line up with the words, the declaration is compared through
+  `normalize_name()` alone.
 - Grouping an unresolved author into a collaborator: the grouping key is
   built from the readable name with its structured given name spaced, so
   `S.S. Quinn` and `S. S. Quinn` are one key (a key spanning two spellings,

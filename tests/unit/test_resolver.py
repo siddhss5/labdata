@@ -733,6 +733,19 @@ class TestDeclaredCollaboratorGrouping:
             "'S.S. Ivers' is also declared by sivers; the member keeps it and "
             "the collaborator entry is not used for it"]
 
+    def test_declared_collaborators_differing_in_the_family_name_stay_apart(self):
+        """`S.S. S.S.` spaces its given name only, so it is not `S. S. S. S.`,
+        and the authorships of the two are not merged."""
+        from labdata.loaders import DeclaredCollaborator
+        _, collaborators, warnings = self.assemble(
+            [], [DeclaredCollaborator("S.S. S.S."), DeclaredCollaborator("S. S. S. S.")],
+            [Author(name="S.S. S.S.", position=1, given="S.S.", family="S.S.")],
+            [Author(name="S. S. S. S.", position=1, given="S. S. S.", family="S.")])
+        assert sorted((c.grouped_by, c.work_ids) for c in collaborators) == [
+            ("declared", ["w0"]), ("declared", ["w1"])]
+        assert len({c.key for c in collaborators}) == 2
+        assert warnings == []
+
     def test_undeclared_run_together_and_spaced_initials_group_together(self):
         _, collaborators, _ = self.assemble(
             [], [],
@@ -948,7 +961,20 @@ class TestSharedDeclarations:
         assert "sivers, sivory" in line
 
     @pytest.mark.parametrize("first, second", [
+        ("S.S. Ivers, Jr.", "S. S. Ivers, Jr."),   # before a suffix
+        ("S.S. S.S.", "S. S. S.S."),               # the given name, by position
+    ])
+    def test_spellings_equal_once_the_given_name_is_spaced(self, first, second):
+        people = [Person(id="p1", name="One", aliases=[first]),
+                  Person(id="p2", name="Two", aliases=[second])]
+        [line] = shared_declarations(people, "people.yaml")
+        assert "p1, p2" in line
+
+    @pytest.mark.parametrize("first, second", [
         ("Ada S.S.", "Ada S. S."),      # a family name is not split
+        ("S.S. S.S.", "S. S. S. S."),   # nor one written like the given name
+        ("Alice Ivers, S.S.", "Alice Ivers, S. S."),   # nor what follows a comma
+        ("Ivers, S.S.", "Ivers, S. S."),   # `Family, Given` is left as written
         ("S.S. Ivers", "SS Ivers"),     # a part with no period inside is a name
         ("J.-P. Wren", "J. P. Wren"),   # hyphenated initials are left as written
     ])

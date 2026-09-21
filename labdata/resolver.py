@@ -120,15 +120,24 @@ def normalize_name(name: str) -> str:
 def declared_form(name: str) -> str:
     """How a declared name or alias compares with another declaration.
 
-    `normalize_name()`, with run-together initials spaced in the words BibTeX
-    reads as the given name: `S.S. Ivers` and `S. S. Ivers` are one form.
-    Where there is none to space, it is `normalize_name()` exactly.
+    `normalize_name()`, with run-together initials spaced in the given name
+    only: `S.S. Ivers` and `S. S. Ivers` are one form. A declaration is
+    written `Given von Family, Suffix`, as `full_form()` joins a name, so
+    only the text before the first comma is read with BibTeX's name parsing,
+    and its given name is the words it reads as first and middle names, by
+    position: the leading words. Particles, the family name and anything
+    after the comma are never spaced. Where there is nothing to space, or
+    the parse does not line up with the words, it is `normalize_name()`
+    exactly.
     """
-    given = {word for word in given_words(name) if _split_initials(word) != [word]}
-    if not given:
+    before = name.split(",", 1)[0]
+    words = before.split()
+    given = given_words(before)
+    if words[:len(given)] != given or all(
+            _split_initials(word) == [word] for word in given):
         return normalize_name(name)
-    return normalize_name(' '.join(_spaced_initials(word) if word in given else word
-                                   for word in name.split()))
+    spaced = [_spaced_initials(word) for word in given] + words[len(given):]
+    return normalize_name(" ".join(spaced) + name[len(before):])
 
 
 def written_form(contributor: Contributor) -> str:
