@@ -37,12 +37,22 @@ def test_strings(valid_output, case_id, bib_key, path, expected):
     check_work(valid_output, bib_key, path, expected)
 
 
-@covers("strings.redefined_report", xfail="#21", owns=())
+@covers("strings.redefined_report")
 def test_redefined_strings_reported_once(valid_validate):
-    """The three redefined macros are reported together by labdata, not one by one."""
+    """The three redefined macros are reported together by labdata, not one by one.
+
+    One warning line names the code, the file, the macros and the line of
+    each redefinition in strings.bib.
+    """
     lines = valid_validate.output.splitlines()
     summary = [line for line in lines if all(m in line for m in ("rss", "cfx", "jfx"))]
     assert len(summary) == 1, valid_validate.output
+    assert summary[0] == (
+        "  - BIB-STRING-REDEFINED ./strings.bib::: 3 @string macros redefined "
+        "(last definition used): cfx, jfx, rss "
+        "[./strings.bib:15, ./strings.bib:16, ./strings.bib:17]")
+    warnings = valid_validate.stdout.split("\nWarnings (", 1)[1]
+    assert summary[0] in warnings
 
 
 @covers("strings.defined_once")

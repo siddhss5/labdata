@@ -176,12 +176,16 @@ without depending on English wording. Codes obey three rules:
    | **Fatal at load** | `Error loading configuration: <CODE> …` on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID` |
    | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `CONFIG-FILE-NOT-FOUND`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY`, `RESOLVE-PROJECT-UNKNOWN`, `PEOPLE-ID-DUPLICATE`, `PROJECTS-ID-DUPLICATE` |
-   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `CONFIG-BIB-FILES-MISSING` |
+   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `CONFIG-BIB-FILES-MISSING`, `BIB-STRING-REDEFINED` |
 
    The same code always carries the same class. What varies with the mode is
    how the run reacts to it, which is why the class is not in the code, and
    why a consumer reads the exit code and the stream rather than the
-   spelling. #26 adds a `--strict` mode that raises the last two further.
+   spelling. #26 adds a `--strict` mode that raises the last two further,
+   with one exception already decided on #26: `BIB-STRING-REDEFINED` is a
+   warning in every mode, **including under `--strict`**. BibTeX's own
+   last-wins rule settles a redefinition (§7), so it is reported and never
+   fails a run.
 3. A published code is permanent. It is never reused for a different
    condition, and retiring one is a breaking change.
 
@@ -200,6 +204,7 @@ Codes in use:
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. A warning. |
 | `BIB-YEAR-INVALID` | An entry's `year` is present but is not a number (`int()` rejects it), such as `in press`. The work is emitted with `year: null` and sorts last, as one with no year does. A warning. |
 | `BIB-STRING-UNDEFINED` | A field value names an `@string` macro that nothing defined earlier in the same file. Located at the entry and field that use it, and naming the macro. It is read as empty, as BibTeX reads it, and the entry and its neighbours are kept. A macro used inside another `@string` definition is located at the file alone. A warning. |
+| `BIB-STRING-REDEFINED` | One or more `@string` macros are defined more than once. One line per run, however many files and macros: the count, the macros and every redefinition as `file:line` (§7). Only definitions the parser reads count, so one inside an `@comment` group does not, while a well-formed `@string{…}` on a `%` line does: the parser reads it, as it does on `main`, and it changes the macro's value. Whether it should be read is #78. The last definition is used, as in BibTeX. A warning in every mode, including under `--strict`. |
 | `BIB-SYNTAX-ERROR` | Text the BibTeX parser cannot read. Inside an entry, located at that entry and at the field the parser was reading or had just read, which is where an unclosed brace or quote leaves it, or with the field left empty when the error comes before any field; the entry is kept as far as it was read, so that value may hold text meant for later fields. Outside any entry — an `@` that begins no well-formed command — located at the file alone and skipped. A syntax error the parser library raises on a `%` line outside any entry — prose that mentions `@article`, say, which the library reads as the start of a command — is not reported (`labdata.parsers.bibtex._on_comment_line()`), so the prose `tests/COVERAGE.md` rows `structure.comment_lines` and `structure.comment_mentions_command` describe says nothing. A **well-formed** command on such a line is read, as it is on `main` and in classic BibTeX, which has no `%` comment outside an entry: `% @article{hidden, …}` is an entry. Whether it should be is #78. The prose gives the line. A warning. |
 | `BIB-VENUE-MISSING` | An `@article` has no `journal`, or an `@inproceedings` has no `booktitle` (`labdata.parsers.bibtex.REQUIRED_CONTAINER`). No other entry type is checked. A field present but empty counts as missing. The entry is kept, and its venue is read by the usual rule from any other container field it carries, or is `null`. A warning. |
 | `BIB-ENTRY-TYPE-UNSUPPORTED` | An entry's type is not one labdata documents. Those are `@article`, `@inproceedings`, `@conference`, `@proceedings`, `@incollection`, `@inbook`, `@book`, `@phdthesis`, `@mastersthesis`, `@techreport`, `@manual` and `@misc` (`labdata.parsers.bibtex.SUPPORTED_TYPES`); `@unpublished` and `@booklet`, for two, are not. Located at `<file>:<key>:entry_type`. The entry is kept, and its venue is read by the field rules alone. A warning. |
@@ -221,8 +226,8 @@ Codes in use:
 | `CONFIG-FILE-NOT-FOUND` | A file the configuration names is not there: a `bib_files` entry under `bib_dir` (`lab.yaml:bib_files:name`), `people_file` or `projects_file`. A missing `collaborators_file` is not checked, and reads as no declared collaborators. Named with the path it looked for. Fatal: compiling on would emit a document without that file's works, people or projects. |
 | `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute. Raised as a `labdata.config.ConfigurationError` — its own type, so that a crash still reaches the user as a crash — by `LabDataConfig.from_yaml()`, by `BibFile` itself, by `assemble()` on every name it is about to compile, and by `Work.to_dict()`. **The last is the one that holds**, because it is the boundary every emitted document passes through: `BibFile` is a plain, mutable dataclass, so a name can be set after it was checked, and a `Work` can be built without a configuration at all. The three earlier checks stay because they fail sooner and say more — `from_yaml()` names the file the user would edit. |
 
-A few diagnostics do not carry a code yet: the one line per redefined
-`@string` macro, the fallback when a field's LaTeX cannot be converted at all
+A few diagnostics do not carry a code yet: the fallback when a field's LaTeX
+cannot be converted at all
 or an entry cannot be written back out as BibTeX, a parser message other than
 a syntax error or an undefined macro, `Error: Configuration file not found`,
 and a configuration that is not valid YAML. An uncoded diagnostic is not a
@@ -972,20 +977,24 @@ same macro; `tests/corpus/valid/strings.bib` defines all three macros before
 any entry uses them, so the corpus does not distinguish the two readings.
 
 A redefinition is never silent. `labdata.parsers.bibtex._redefined_macros()`
-finds them and `parse_bibtex_file()` reports each on standard error:
+finds every definition of a macro after its first — among the definitions
+the parser itself reads, so an `@string` inside an `@comment` group is not
+counted, and a line number counts lines as the parser does, after a byte
+order mark and with CRLF read as one line end — and `parse_all_works()`
+reports all of a run's in **one line**, under `BIB-STRING-REDEFINED`
+(`redefined_summary()`; `tests/COVERAGE.md` row `strings.redefined_report`):
 
 ```
-Warning: @string macro 'rss' is defined more than once; the last definition is used
+BIB-STRING-REDEFINED ./strings.bib::: 3 @string macros redefined (last definition used): cfx, jfx, rss [./strings.bib:15, ./strings.bib:16, ./strings.bib:17]
 ```
 
-Two things about that message. It is **globally worded** where the rule is
-positional — "the last definition is used" is true of every use after the last
-definition, which is the ordinary case, but not of an entry written between
-two definitions. The rule above, not the message, is the contract. And it is
-currently **one line per redefined macro per file**; collapsing a run's
-redefinitions into a single summary line is tracked as `xfail #21` in
-`tests/COVERAGE.md` row `strings.redefined_report`. Changing either is a code
-change.
+The macros are named once each, in sorted order, and every redefinition is
+listed as `file:line`, by file and then by line. The location names the file
+when every redefinition is in one, and is left empty (`:::`) when they span
+several. The message is **globally worded** where the rule is positional —
+"last definition used" is true of every use after the last definition, which
+is the ordinary case, but not of an entry written between two definitions.
+The rule above, not the message, is the contract.
 
 **Macros are scoped to the file that defines them.** Each `.bib` file is
 parsed with its own parser instance in `parse_bibtex_file()`, so a macro
