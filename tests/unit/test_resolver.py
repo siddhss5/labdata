@@ -98,12 +98,13 @@ class TestBuildAliasIndex:
             Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
             Person(id="alankim", name="Alan Kim", aliases=[]),
         ]
-        pub = Publication(
-            bib_id="kim2024", title="Test", authors=[Author(name="A. Kim")],
-            year=2024, venue="Test", category="Test", entry_type="article",
+        work = Work(
+            bib_id="kim2024", title="Test", category="Test",
+            entry_type="article", year=2024,
+            authors=[Author(name="A. Kim", position=1, given="A.", family="Kim")],
         )
-        unresolved = resolve_authors([pub], people)
-        assert pub.authors[0].person_id is None
+        unresolved = resolve_authors([work], people)
+        assert work.authors[0].person_id is None
         assert "A. Kim" in unresolved
 
 

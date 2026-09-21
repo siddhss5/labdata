@@ -61,6 +61,11 @@ people_file: "data/people.yaml"       # optional
 projects_file: "data/projects.yaml"   # optional
 ```
 
+Each `bib_files` entry's `name` is a name under `bib_dir`, and must not be an
+absolute path: it is emitted as the work's `source.file`, so an absolute one
+would put your directory layout in a document you share. labdata rejects it
+rather than rewriting it.
+
 Paths are relative to the directory you run `labdata` from.
 [`examples/demo/lab.yaml`](examples/demo/lab.yaml) is a complete example,
 built from the fictional Example Lab in [`examples/demo/`](examples/demo/).
@@ -98,7 +103,7 @@ nothing else:
 | `year` | `year`, and the sort order of the works list. `null`, with a diagnostic, when the entry has none |
 | `journal` / `booktitle` / `school` / `institution` | `venue`, as `{kind, name}` — the one place labdata normalises across entry types. `null` when the entry names no container |
 | `volume`, `number`, `pages`, `series`, `edition`, `publisher`, `address`, `organization`, `chapter`, `month`, `howpublished`, `type` | Properties of the work, under BibTeX's own names and with BibTeX's own meanings |
-| `doi`, `isbn`, `issn`, `eprint` + `archivePrefix` | `identifiers`, an open map from scheme to a list of identifiers, plus the links built from them |
+| `doi`, `isbn`, `issn`, `eprint` + `archivePrefix` | `identifiers`, an open map from scheme to a list of identifiers, plus the links built from them. An `eprint`'s scheme is the repository `archivePrefix` named, lower-cased, so that field needs no property of its own — and an `eprint` in a repository other than arXiv gets no arXiv link |
 | `abstract` | `abstract` |
 | `note` | `note` |
 | `url` | A link of kind `video` when it points at YouTube or Vimeo, otherwise of kind `url` |

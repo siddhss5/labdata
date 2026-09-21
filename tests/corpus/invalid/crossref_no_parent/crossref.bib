@@ -1,0 +1,19 @@
+% A crossref field with no parent key in it, written empty and written as
+% whitespace. The field is rejected on its presence, not on its value: an
+% entry that carries it is an error whatever is inside it, or the silent
+% path #65 removed would come back under a different spelling.
+% CASE structure.crossref_no_parent
+
+@inproceedings{empty-crossref,
+  title    = {A Child With an Empty Crossref},
+  author   = {Adams, Alice},
+  year     = {2024},
+  crossref = {}
+}
+
+@inproceedings{blank-crossref,
+  title    = {A Child With a Whitespace Crossref},
+  author   = {Adams, Alice},
+  year     = {2024},
+  crossref = {   }
+}

@@ -56,6 +56,14 @@ structure.crossref_undefined_parent:
   reports: [BIB-CROSSREF-UNSUPPORTED, no-such-parent]
   locates: [crossref.bib, orphan-child, crossref]
 
+# The field is rejected on its presence, not on its value, so an empty one
+# and a whitespace-only one are the same error as any other.
+structure.crossref_no_parent:
+  dir: crossref_no_parent
+  exit: error
+  reports: [BIB-CROSSREF-UNSUPPORTED]
+  locates: [crossref.bib, empty-crossref, blank-crossref, crossref]
+
 structure.year_not_number:
   dir: year_not_number
   exit: any
@@ -229,6 +237,12 @@ config.bib_files.category_missing:
   reports: [category]
   locates: [lab.yaml, bib_files]
   xfail: {locates: "#26"}
+
+config.bib_files.name_absolute:
+  dir: config_bib_file_absolute
+  exit: error
+  reports: [CONFIG-BIB-FILE-ABSOLUTE, /etc/ok.bib]
+  locates: [lab.yaml, bib_files, name]
 
 config.pdf_base_url.wrong_type:
   dir: config_pdf_base_url_type

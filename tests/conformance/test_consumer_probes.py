@@ -712,12 +712,22 @@ FLAT_FIELDS = ("volume", "number", "pages", "series", "edition", "publisher",
                "address", "organization", "chapter", "month", "howpublished",
                "type")
 
-# The identifier scheme each identifier field sits under, and the prefix an
-# arXiv identifier's scheme implies -- `archivePrefix` names the repository,
-# which is exactly what the scheme says, so it needs no property of its own.
-IDENTIFIER_SCHEME = {"doi": "doi", "eprint": "arxiv", "isbn": "isbn",
-                     "issn": "issn"}
-ARXIV_PREFIX = "arXiv"
+# The identifier scheme each identifier field sits under. `eprint` is not
+# here: it sits under the repository's own scheme, which is also what
+# `archivePrefix` said, so that field needs no property of its own. Both are
+# read from the scheme the document carries rather than reconstructed, so an
+# entry in a repository other than arXiv is answered from what the document
+# says and not from a constant.
+IDENTIFIER_SCHEME = {"doi": "doi", "isbn": "isbn", "issn": "issn"}
+NOT_A_REPOSITORY = frozenset(IDENTIFIER_SCHEME.values())
+
+
+def expected_repository_scheme(pub):
+    """The scheme an `eprint` sits under, or None when the work has none."""
+    for scheme in pub["identifiers"]:
+        if scheme not in NOT_A_REPOSITORY:
+            return scheme
+    return None
 
 # Only a link the document attributes to the input is evidence that the
 # entry's own `url` field reached the document.
@@ -751,7 +761,9 @@ def expected_entry_fields(pub):
         "abstract": pub["abstract"],
         "note": pub["note"],
         "url": expected_input_link(pub),
-        "archiveprefix": ARXIV_PREFIX if identifiers.get("arxiv") else None,
+        "archiveprefix": expected_repository_scheme(pub),
+        "eprint": ", ".join(
+            identifiers.get(expected_repository_scheme(pub) or "", [])),
     }
     values[CONTAINER_FIELD.get(pub["entry_type"], "")] = venue.get("name")
     values.pop("", None)
@@ -887,6 +899,53 @@ def test_bibtex_roundtrip_reads_only_a_link_the_input_supplied(link_origin_entri
         LINK_URL % (kind, origin) if survives else None
         for kind, origin, survives in LINK_ORIGINS]
 
+# --- bibtex_roundtrip.py: an eprint in a repository other than arXiv ---------
+#
+# `archivePrefix` reaches the document as the *scheme* of the eprint
+# identifier, and the probe writes both fields back from that scheme. Every
+# eprint in the demo is an arXiv one, so a probe that reconstructed the
+# constant `arXiv` instead of reading the scheme would be indistinguishable
+# from one that read it -- and the field-loss test could not tell either,
+# because it compares field names and the name would still be there. One
+# work of a copy of the document is therefore given its eprint under another
+# repository's scheme, beside the bibliographic identifiers it already has,
+# and the **unmodified** probe is run on that: the same arrangement
+# `hostile_page` and `link_origin_entries` use above.
+
+OTHER_REPOSITORY, OTHER_EPRINT = "hal", "hal-04001234"
+
+
+@pytest.fixture(scope="module")
+def other_repository_entry(tmp_path_factory, demo_document):
+    """(the work used, what the probe wrote) for a non-arXiv eprint."""
+    _, doc = demo_document
+    altered = copy.deepcopy(doc)
+    work_ = next(w for w in altered["works"] if "arxiv" in w["identifiers"])
+    work_["identifiers"] = {scheme: values
+                            for scheme, values in work_["identifiers"].items()
+                            if scheme in NOT_A_REPOSITORY}
+    work_["identifiers"][OTHER_REPOSITORY] = [OTHER_EPRINT]
+    path = tmp_path_factory.mktemp("repository") / "lab.json"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(altered, f, ensure_ascii=False)
+    return work_["bib_id"], read_entries(run_probe("bibtex_roundtrip.py", path))
+
+
+@covers("probe.eprint_repository")
+def test_bibtex_roundtrip_reads_the_repository_from_the_scheme(other_repository_entry):
+    """`eprint` and `archiveprefix` come from the scheme the document carries.
+
+    Both directions in one fixture: a probe that reconstructed a constant
+    `arXiv` writes the wrong prefix here, and one that looked the eprint up
+    under a fixed `arxiv` scheme writes no eprint at all. The work keeps its
+    other identifiers, so finding the repository is a real search rather than
+    reading the only key there is.
+    """
+    bib_id, entries = other_repository_entry
+    assert entries[bib_id][1].get("eprint") == OTHER_EPRINT
+    assert entries[bib_id][1].get("archiveprefix") == OTHER_REPOSITORY
+
+
 # --- The demo's four book and chapter entry types ----------------------------
 #
 # Under `schema_version` 3 these four were the types `format_venue()` had no
@@ -999,6 +1058,14 @@ CARRIED_FIELDS = [
     case("fields.issn", "brown2025tidy", "issn", ("2999-0001",)),
     case("fields.howpublished", "fischer2025benchmark", "howpublished",
          ("Dataset and evaluation protocol on the project site",)),
+    # The three the corpus has no entry for. Without a row each, a compiler
+    # that emitted the property with the wrong value would keep the field
+    # name and so keep the field-loss probe green, which is the one shape
+    # that probe cannot see.
+    case("fields.address", "adams2022survey", "address", ("Exampleton",)),
+    case("fields.series", "adams2022survey", "series",
+         ("Studies in Applied Robotics",)),
+    case("fields.edition", "adams2023handbook", "edition", ("Second",)),
 ]
 
 
@@ -1057,6 +1124,12 @@ PRESENCE_PROBES = [
      ("fields.howpublished",)),
     ("the organization nulled", "ingram2019toolkit", {"organization": None},
      ("fields.organization",)),
+    ("the address nulled", "adams2022survey", {"address": None},
+     ("fields.address",)),
+    ("the series nulled", "adams2022survey", {"series": None},
+     ("fields.series",)),
+    ("the edition nulled", "adams2023handbook", {"edition": None},
+     ("fields.edition",)),
     # And a neighbour's value is not this field's. `adams2022survey` carries
     # a chapter of its own, and the `fields.chapter` row is about the one on
     # `hughes2021gaits`; the two must not answer for each other.

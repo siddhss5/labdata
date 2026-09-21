@@ -12,12 +12,38 @@ MIT License - see LICENSE file for details.
 import yaml
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
+
+
+# A configured `.bib` name reaches the document as `work.source.file`, where
+# it is promised never to be an absolute path (SPEC.md section 5): a document
+# is shared, and one carrying a compiling machine's directory layout leaks it
+# to every consumer. Rejecting the input is what makes the promise true;
+# rewriting the name would quietly discard a relative directory the user
+# meant. Both path flavours are checked, so the same configuration is
+# accepted or rejected wherever it is compiled.
+BIB_FILE_ABSOLUTE = "CONFIG-BIB-FILE-ABSOLUTE"
+
+
+def is_absolute_path(name: str) -> bool:
+    """True when ``name`` is rooted rather than relative to ``bib_dir``.
+
+    Both path flavours, and a leading separator on its own: ``/x.bib`` is
+    absolute on POSIX, ``C:\\x.bib`` and ``\\\\server\\share\\x.bib`` are absolute
+    on Windows, and ``\\x.bib`` is rooted on Windows even though Python does
+    not call it absolute without a drive. All four escape ``bib_dir``, which
+    is the thing being ruled out.
+    """
+    return name.startswith(("/", "\\")) or PureWindowsPath(name).is_absolute()
 
 
 @dataclass
 class BibFile:
-    """A single BibTeX file and its category label."""
+    """A single BibTeX file and its category label.
+
+    ``name`` is a name under ``bib_dir``, not a path of its own: it is
+    emitted as ``work.source.file`` and must never be absolute.
+    """
     name: str
     category: str
 
@@ -59,6 +85,15 @@ class LabDataConfig:
         """Load configuration from a YAML file."""
         with open(path, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f)
+
+        for bf in data.get('bib_files', []):
+            name = bf.get('name') if isinstance(bf, dict) else None
+            if isinstance(name, str) and is_absolute_path(name):
+                raise ValueError(
+                    f"{BIB_FILE_ABSOLUTE} {path}:bib_files:name: '{name}' is an "
+                    "absolute path; a bib_files name is a name under bib_dir, "
+                    "and it is emitted as the work's source.file, which is "
+                    "never absolute")
 
         bib_files = [
             BibFile(**bf) for bf in data.get('bib_files', [])

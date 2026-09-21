@@ -31,6 +31,20 @@
   year          = {2023}
 }
 
+% An eprint in a repository that is not arXiv. The scheme is whatever
+% archivePrefix named, so a compiler that defaulted to arXiv would lose which
+% repository the identifier belongs to -- and would also build an arXiv URL
+% for an identifier that is not an arXiv one.
+% CASE fields.archiveprefix
+% CASE links.arxiv_other_repository
+@misc{link-eprint-hal,
+  title         = {A Preprint in Another Repository},
+  author        = {Adams, Alice},
+  eprint        = {hal-04001234},
+  archivePrefix = {HAL},
+  year          = {2023}
+}
+
 % CASE links.arxiv_unprefixed
 @misc{link-arxiv-bare,
   title  = {arXiv without archivePrefix},

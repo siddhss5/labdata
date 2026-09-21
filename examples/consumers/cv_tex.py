@@ -5,7 +5,7 @@
 
 Standard library only. Reads the document named on the command line and
 nothing else. See README.md in this directory for the rule this probe exists
-to test, and for why this probe cannot produce a correct CV entry today.
+to test, and for the rule it exists to test.
 """
 
 import json
@@ -26,11 +26,12 @@ def tex(text):
 def name_from_parts(author):
     """An author's name, assembled from the parts the document splits it into.
 
-    `name` is the document's display form and abbreviates the given name
-    unconditionally, so it is lossy as a source. The parts preserve whatever
-    the input supplied: `Bob Brown` where the entry wrote `Brown, Bob`, and
-    `A. Adams` where it wrote `Adams, A.`. Neither is a gap -- this returns
-    the name the author's files gave, which is what a consumer should show.
+    The parts are read rather than `name`, which is the parts joined in
+    reading order and so cannot be split back into them. They preserve
+    whatever the input supplied: `Bob Brown` where the entry wrote
+    `Brown, Bob`, and `A. Adams` where it wrote `Adams, A.`. Neither is a gap
+    -- this returns the name the author's files gave, which is what a
+    consumer should show.
     """
     if author.get("literal"):
         return author["literal"]

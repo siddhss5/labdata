@@ -13,6 +13,7 @@ import pytest
 
 import labdata
 
+from ..conftest import is_setup_failure
 from .coverage_check import read_table, validate
 from .support import CORPUS, EXPECTED, REPO_ROOT, TESTS_DIR
 
@@ -75,6 +76,23 @@ def test_unsupported_input_is_never_silently_ignored():
 
 
 # --- Test-suite hygiene (acceptance criteria of #43) ------------------------
+
+def test_a_strict_xfail_that_breaks_before_its_assertion_is_not_expected():
+    """The guard in tests/conftest.py tells the two kinds of failure apart.
+
+    A strict xfail whose test raises a NameError never ran its assertion, so
+    it is a broken test wearing a finding's clothes. One that raises an
+    AssertionError is the finding. The wiring is exercised by the whole suite
+    every run; this pins the judgement the wiring applies.
+    """
+    assert is_setup_failure(NameError("Publication"))
+    assert is_setup_failure(AttributeError("publications"))
+    assert is_setup_failure(KeyError("works"))
+    assert is_setup_failure(ImportError("labdata.models"))
+    assert not is_setup_failure(AssertionError("the claim the marker names"))
+
+
+
 
 PUBLIC = set(labdata.__all__) | {"main"}
 

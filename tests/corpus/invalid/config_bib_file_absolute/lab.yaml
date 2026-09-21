@@ -1,0 +1,11 @@
+# A bib_files name that is an absolute path. It is emitted as the work's
+# source.file, which is promised never to be absolute, so the configuration
+# is rejected rather than the name rewritten -- rewriting would quietly drop
+# a relative directory the user meant.
+# CASE config.bib_files.name_absolute
+bib_dir: "."
+bib_files:
+  - name: "/etc/ok.bib"
+    category: "Papers"
+people_file: "people.yaml"
+projects_file: "projects.yaml"

@@ -5,8 +5,7 @@
 
 Standard library only. Reads the document named on the command line and
 nothing else. See README.md in this directory for the rule this probe exists
-to test, and for why this probe cannot produce a correct journal-article
-record today.
+to test, and for the rule it exists to test.
 """
 
 import json
@@ -37,10 +36,11 @@ CSL_TYPES = {
 def csl_name(author):
     """One CSL name object, from the parts the document splits a name into.
 
-    `name` is the document's display form and abbreviates the given name
-    unconditionally, so it is lossy as a source. The parts preserve whatever
-    the input supplied, which may itself be an initial: `given: "A."` where
-    the entry wrote `Adams, A.` is correct CSL and not a missing property.
+    The parts are read rather than `name`, which is the parts joined in
+    reading order and so cannot be split back into them. They preserve
+    whatever the input supplied, which may itself be an initial:
+    `given: "A."` where the entry wrote `Adams, A.` is correct CSL and not a
+    missing property.
     """
     if author.get("literal"):
         return {"literal": author["literal"]}

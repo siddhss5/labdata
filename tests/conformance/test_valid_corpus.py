@@ -327,6 +327,11 @@ LINKS = [
          "https://arxiv.org/abs/2401.00001"),
     case("links.arxiv_unprefixed", "link-arxiv-bare", "links.arxiv.0.url",
          "https://arxiv.org/abs/2401.00002"),
+    # An eprint in another repository gets no arXiv URL: the link is built
+    # from the arXiv identifier, and this is not one.
+    case("links.arxiv_other_repository", "link-eprint-hal", "links.arxiv", None),
+    case("links.arxiv_other_repository", "link-eprint-hal", "identifiers.hal",
+         ["hal-04001234"]),
     case("links.youtube", "link-youtube", "links.video.0.url",
          "https://www.youtube.com/watch?v=corpus00001"),
     case("links.youtube", "link-youtube", "links.url", None),
@@ -425,9 +430,17 @@ STRUCTURE = [
     case("fields.type", "type-techreport", "type", "Technical Report"),
     case("fields.eprint", "type-misc-arxiv", "identifiers.arxiv", ["2401.00007"]),
     # The prefix is the scheme: naming the repository is all it did, and the
-    # scheme says it, so it needs no property of its own.
+    # scheme says it, so it needs no property of its own. Which means the
+    # prefix has to *determine* the scheme rather than be assumed -- a
+    # compiler that defaulted to arXiv would pass the row below and lose the
+    # field, so the entry that names another repository is what pins it.
     case("fields.archiveprefix", "link-arxiv-prefix", "identifiers.arxiv",
          ["2401.00001"]),
+    case("fields.archiveprefix", "link-eprint-hal", "identifiers.hal",
+         ["hal-04001234"]),
+    case("fields.archiveprefix", "link-eprint-hal", "identifiers.arxiv", None),
+    case("fields.archiveprefix", "link-eprint-hal", "venue",
+         {"kind": "repository", "name": "HAL"}),
     case("fields.doi", "link-doi-bare", "identifiers.doi", ["10.5555/corpus.0001"]),
     # A DOI written as a resolver URL is recorded as the identifier it is.
     case("fields.doi", "link-doi-url", "identifiers.doi", ["10.5555/corpus.0002"]),

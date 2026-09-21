@@ -5,7 +5,7 @@
 
 Standard library only. Reads the document named on the command line and
 nothing else. See README.md in this directory for the rule this probe exists
-to test, and for why this probe cannot produce a complete graph today.
+to test, and for the one identity question it still cannot answer.
 
 Output is tab separated, one record per line:
 
@@ -29,9 +29,10 @@ each of their works, two different people who write their names alike are two
 authorships of one work that must stay apart, and two people who merely share
 an initial and a surname are two nodes. The tests in
 tests/conformance/test_consumer_probes.py put those cases to this probe. It
-answers none of them today, and it does not guess: the only thing the
-document offers to key a co-author on is the display name, and keying on that
-is exactly the merge the document itself warns against.
+It answers two of them from what the document declares, and it does not
+guess at the third: joining two spellings of one external person needs a
+grouping the document does not yet make, and keying a node on a name would be
+exactly the merge the document itself warns against.
 
 Two namespaces, never one. `people` is a list of humans; `collaborators` is a
 *grouping over unresolved authorships*, which is not the same kind of thing

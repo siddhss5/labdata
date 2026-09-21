@@ -716,10 +716,15 @@ def entry_to_work(
 
 
 def _crossref_error(path: str, bib_id: str, parent: str) -> str:
-    """The one diagnostic for an entry that cross-refers to another."""
+    """The one diagnostic for an entry that carries a ``crossref`` field.
+
+    A field that is there but empty is reported as what it is rather than as
+    a parent whose name happens to be blank.
+    """
+    names = f"names the parent '{parent}'" if parent else "names no parent"
     return (f"{CROSSREF_UNSUPPORTED} {path}:{bib_id}:crossref: "
-            f"crossref is not supported; this entry names the parent "
-            f"'{parent}'. Write the fields out on the entry itself.")
+            f"crossref is not supported; this entry {names}. "
+            "Write the fields out on the entry itself.")
 
 
 def parse_all_works(
@@ -780,14 +785,15 @@ def parse_all_works(
                 report(_duplicate_key_error(path, bib_id, previous_path, previous_key))
             else:
                 first_source[normalized] = (path, bib_id)
-            crossref = next(
-                (value for field_name, value in entry.fields.items()
-                 if field_name.lower() == "crossref" and str(value).strip()), None)
+            # Rejected on presence, not on value, and not emitted: a child
+            # that inherited part of a parent lost every author of its own
+            # and said nothing about it. An empty `crossref = {}` is a field
+            # the entry carries, so it is an error too -- letting it through
+            # would put the silent path back under a different spelling.
+            crossref = [value for field_name, value in entry.fields.items()
+                        if field_name.lower() == "crossref"]
             if crossref:
-                # Rejected, not resolved, and not emitted: a child that
-                # inherited part of a parent lost every author of its own and
-                # said nothing about it.
-                fail(_crossref_error(path, bib_id, str(crossref).strip()))
+                fail(_crossref_error(path, bib_id, str(crossref[0]).strip()))
                 continue
             read.append((path, name, bib_id, entry, category))
 

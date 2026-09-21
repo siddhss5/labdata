@@ -169,11 +169,12 @@ Codes in use:
 | Code | Condition |
 |---|---|
 | `BIB-DUPLICATE-KEY` | The same citation key appears twice in one `.bib` file, or in two of the configured files. |
-| `BIB-CROSSREF-UNSUPPORTED` | An entry carries a `crossref` field. The diagnostic names the file, the entry key and the parent key; the entry is not emitted and the run fails, in every mode. |
+| `BIB-CROSSREF-UNSUPPORTED` | An entry carries a `crossref` field. Reported on the field's **presence**, whatever its value: an empty `crossref = {}` is a field the entry carries. The diagnostic names the file, the entry key and the parent key, or says the entry names no parent when the field is empty; the entry is not emitted and the run fails, in every mode. |
 | `BIB-YEAR-MISSING` | An entry has no `year` field. The work is emitted with `year: null` and sorts last. |
 | `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. |
 | `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key built from an initials-only name shares its initial and family name with at least one fuller key, so it could be any of them. Reported against the first authorship the key grouped. |
 | `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. |
+| `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. The configuration fails to load, because the name is emitted as `work.source.file`, which is promised never to be absolute. |
 
 Most diagnostics do not carry a code yet. #26 adds them incrementally, and an
 uncoded diagnostic is not a stable interface.
@@ -210,7 +211,7 @@ uncoded diagnostic is not a stable interface.
 `Contributor`, `Venue`, `Link`, `Person`, `Project`, `Collaborator`, the
 config loader `LabDataConfig` with `BibFile`, and the exporters
 `export_to_yaml` and `export_to_json`. `Publication` was renamed to `Work` at
-package version 3.0.0, with the document's `publications`.
+package version 3.0.0, when the document's `publications` became `works`.
 
 Private, and free to change without a version bump: `labdata.parsers.*`,
 `labdata.loaders`, `labdata.resolver`, `labdata.cli`'s internals, and every
@@ -308,18 +309,18 @@ rule does not apply to the input itself — only to whatever it produces.
 |---|---|
 | `doi` | Becomes `identifiers.doi`, with a resolver prefix taken off if it was written as a URL, and a link of kind `doi` built from it (`bare_doi()`, `build_identifiers()`, `build_links()`). |
 | `eprint` | Becomes an identifier under the scheme `archivePrefix` names, and a link of kind `arxiv` when that scheme is arXiv (`build_identifiers()`, `build_links()`). |
-| `archivePrefix` (or `archiveprefix`) | Becomes the **scheme** of the `eprint` identifier, and the `venue.name` of a preprint (`_archive_prefix()`). It has no property of its own, because naming the repository is what a scheme does. |
+| `archivePrefix` (or `archiveprefix`) | Becomes the **scheme** of the `eprint` identifier, **lower-cased**, and the `venue.name` of a preprint, as written (`_archive_prefix()`). It has no property of its own, because naming the repository is what a scheme does. An entry that names no prefix is read as an arXiv one, which is the only case the default covers; an entry that names `HAL` is filed under `hal` and gets no arXiv link. |
 | `isbn`, `issn` | Become `identifiers.isbn` and `identifiers.issn` (`build_identifiers()`). |
 | `project` | Parsed into the list `project_ids` (`parse_project_ids()`). |
 | `url` | Becomes a link of kind `video` when it names youtube.com, youtu.be or vimeo.com, and of kind `url` otherwise, with `origin: input` (`is_video_url()`, `build_links()`). |
 | `author` | Parsed into the `authors` list (`parse_author_list()`); the name parts are converted under heading 1. |
 | `editor` | Parsed into the `editors` list (`parse_editor_list()`), resolved by the same machinery, and excluded from `work_count`, from `person.work_ids`, from a project's people and from `collaborators`. |
 | `year` | Emitted as the integer `year` — not a string — or `null` with a `BIB-YEAR-MISSING` diagnostic when the entry supplied none. It drives the works order (§3). |
-| `crossref` | **Rejected.** An entry carrying it is an error under `BIB-CROSSREF-UNSUPPORTED` that names the file, the entry key and the parent key; the entry is not emitted and the run fails in every mode (`parse_all_works()`). No field of any entry is filled in from any other entry. |
+| `crossref` | **Rejected, on presence rather than on value.** An entry carrying the field is an error under `BIB-CROSSREF-UNSUPPORTED`, whatever is inside it: an empty `crossref = {}` is a field the entry carries, and letting it through would put the silent path back under a different spelling. The entry is not emitted and the run fails in every mode (`parse_all_works()`). No field of any entry is filled in from any other entry. |
 | `journal`, `booktitle`, `school`, `institution` | Converted under heading 1, then consumed by `build_venue()` into `venue.name`, with the `venue.kind` each implies. |
 | The citation key and the entry type | Become `bib_id` (and `source.key`) and `entry_type` (`entry_fields()`); see heading 4. |
 | `person.aliases` | Read for matching by `labdata.resolver.build_alias_index()`, never emitted — `Person.to_dict()` has no `aliases` key. |
-| `bib_dir`, `people_file`, `projects_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed PDF link. `bib_files[].name` is emitted, as `work.source.file`. |
+| `bib_dir`, `people_file`, `projects_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed PDF link. `bib_files[].name` **is** emitted, as `work.source.file`, and is therefore checked: an absolute one is rejected at load (`labdata.config.is_absolute_path()`). |
 | Any BibTeX field named nowhere in this table or heading 1 — `keywords`, `annote`, `language` and the rest | Not interpreted by labdata outside the `bibtex` record. `entry_fields()` copies it and `format_bibtex()` serializes it, but nothing reads its value, so it affects no other property (§5). |
 
 The fields named in that table and in heading 1 are the complete set labdata
@@ -537,14 +538,14 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 | `generator` | Derived — the compiler's name, its package version and the schema version (`LabData.to_dict()`). No timestamp. |
 | `lab` | Input — the `lab` section of `lab.yaml`, copied unchanged (`LabDataConfig.from_yaml()`), and always emitted. |
 | `work.bib_id`, `work.source.key` | Input — the BibTeX citation key, **as written**. `labdata.parsers.bibtex.entry_fields()` preserves its case. |
-| `work.source.file` | Input — the `name` of the `bib_files` entry the file was listed under, never a path (`parse_all_works()`). |
+| `work.source.file` | Input — the `name` of the `bib_files` entry the file was listed under, **never an absolute path**. The guarantee is kept by rejecting the input rather than by rewriting it: `LabDataConfig.from_yaml()` fails under `CONFIG-BIB-FILE-ABSOLUTE` for a name that is absolute under POSIX or Windows rules, so a document never carries the compiling machine's directory layout, and a name with a relative directory in it is passed through as the user wrote it. |
 | `work.entry_type` | Input — the BibTeX entry type, **lowercased** by `entry_fields()`. Of it and `bib_id`, it is the only one that is case-folded. |
 | `work.title`, `abstract`, `note` | Input — BibTeX fields, converted from LaTeX to text (§2). `note` additionally has trailing `.` and whitespace trimmed (`labdata.parsers.bibtex.extract_note()`). |
 | `work.year` | Input — the BibTeX `year`, as an integer; `null` when the entry supplied none, with a diagnostic (`entry_year()`). |
 | `work.category` | Input — the `category` of the `bib_files` entry the file was listed under, not anything in the `.bib` file (`labdata.config.BibFile`, read by `parse_all_works()`). |
 | `work.venue` | **Derived** — the first of `journal`, `booktitle`, `school` and `institution` the entry wrote, as `name`, with the `kind` that field and the entry type imply; a preprint's repository when the entry has only an `eprint`; `null` when it names no container (`labdata.parsers.bibtex.build_venue()`). See below. |
 | `work.volume`, `number`, `pages`, `series`, `edition`, `publisher`, `address`, `organization`, `chapter`, `month`, `howpublished`, `type` | Input — the BibTeX fields of those names, under BibTeX's names and with BibTeX's meanings (`FLAT_FIELDS`, read in `entry_to_work()`). Those in `TEXT_FIELDS` are converted from LaTeX (§2); the rest are emitted as written. |
-| `work.identifiers` | **Derived** — a map from scheme to identifiers, built from `doi`, `eprint` with `archivePrefix`, `isbn` and `issn` (`build_identifiers()`). A `doi` written as a resolver URL has that prefix taken off. |
+| `work.identifiers` | **Derived** — a map from scheme to identifiers, built from `doi`, `eprint` with `archivePrefix`, `isbn` and `issn` (`build_identifiers()`). A `doi` written as a resolver URL has that prefix taken off. An `eprint`'s scheme is the repository `archivePrefix` named, **lower-cased**, as `entry_type` is: the scheme is a vocabulary token rather than display text, so a round trip recovers the repository and not the spelling the entry used. |
 | `work.links` | **Derived** — a map from kind to link records, built from the entry's `url`, from `pdf_base_url` and from the identifiers above (`build_links()`). See below. |
 | `work.project_ids` | Input — the `project` field, split on commas (`parse_project_ids()`). |
 | `work.bibtex` | **Derived** — the entry re-serialized as BibTeX, or `null` when that failed (`format_bibtex()`). See below. |

@@ -30,22 +30,24 @@ mechanism:
   into the field that names the container for that entry type -- `journal`
   for an article, `booktitle` for a paper in a proceedings or a collection,
   `school` for a thesis, `institution` for a report, `organization` for a
-  manual. When the document gives a pre-composed display string instead, as
-  it does today, nothing is taken out of it: a probe renders markup it was
-  handed, it does not parse fields back out of a string the compiler
-  composed.
-- The identifiers. A DOI and an arXiv id reach the document only as the links
-  built from them, and those links are not invertible: a `doi` written as a
-  URL in the input is passed through unchanged, so there is no prefix a
-  consumer can reliably strip, and the arXiv link drops the prefix field that
-  said which repository the id belongs to. So `doi`, `eprint`, `isbn` and
-  `issn` are looked up as identifiers and never reconstructed from a link.
-  An identifier can also sit in a map from scheme to identifiers rather than
-  in a property of its own, which is where a repeatable one has to live --
-  print and electronic ISSNs are two values of one field -- so both places
-  are consulted. `archivePrefix` is not an identifier at all: it names the
-  repository `eprint` belongs to, which is exactly what the scheme of an
-  arXiv identifier says, so it is recovered from the scheme.
+  manual. When a document gives a pre-composed display string instead,
+  nothing is taken out of it: a probe renders markup it was handed, it does
+  not parse fields back out of a string the compiler composed.
+- The identifiers. They are read from the map of scheme to identifiers and
+  **never reconstructed from a link**, because a link built from an
+  identifier is not invertible: a `doi` written as a URL in the input is
+  passed through as the link unchanged, so there is no prefix a consumer can
+  reliably strip. The map is also where a repeatable identifier has to live
+  -- print and electronic ISSNs are two values of one field -- so a flat
+  property is consulted as well, for a document that carries one.
+  `archivePrefix` is not an identifier at all: it names the repository
+  `eprint` belongs to, which is exactly what a scheme says, so both come
+  from the one scheme that is not a bibliographic identifier. That recovers
+  the scheme rather than the spelling the entry used: the document
+  normalises the scheme to lower case, as it does the entry type, so an
+  entry that wrote `arXiv` comes back as `arxiv`. This is a field-loss
+  detector and not a value round trip, so a normalised value is the right
+  answer here for the same reason a LaTeX-converted one is.
 - The editors. They are people, not a string, so the document may carry them
   either as a parsed list beside the authors or as the raw field. Both are
   consulted, and a parsed list is written back out in BibTeX's own name order
@@ -84,11 +86,15 @@ FIELDS = (
 )
 
 # The scheme under which each identifier field would sit in a map from
-# scheme to identifiers, and the prefix an arXiv identifier's scheme implies.
-IDENTIFIER_SCHEME = {"doi": "doi", "eprint": "arxiv", "isbn": "isbn",
-                     "issn": "issn"}
-ARXIV_SCHEME = "arxiv"
-ARXIV_PREFIX = "arXiv"
+# scheme to identifiers. `eprint` is not here: its scheme is whichever
+# repository the entry named, so it is found rather than looked up.
+IDENTIFIER_SCHEME = {"doi": "doi", "isbn": "isbn", "issn": "issn"}
+
+# The schemes that identify a work rather than name a repository it sits in.
+# An `eprint` is filed under the repository's own scheme, so the scheme that
+# is none of these is the preprint's -- and it is also what `archivePrefix`
+# said, which is why that field needs no property of its own.
+NOT_A_REPOSITORY = frozenset(IDENTIFIER_SCHEME.values())
 
 # The link kinds the BibTeX `url` field could have become, and the one origin
 # that makes a link evidence that the input field reached the document.
@@ -119,10 +125,10 @@ def author_name(author):
     """One name in BibTeX's own order, from the parts the document splits it
     into.
 
-    `name` is the document's display form and abbreviates the given name
-    unconditionally, so it is lossy as a source. The parts preserve whatever
-    the input supplied -- an initial where the entry wrote one -- which is
-    exactly what belongs back in the field.
+    The parts are read rather than `name`, which is the parts joined in
+    reading order and so cannot be split back into them. They preserve
+    whatever the input supplied -- an initial where the entry wrote one --
+    which is exactly what belongs back in the field.
     """
     if author.get("literal"):
         return "{%s}" % author["literal"]
@@ -143,6 +149,20 @@ def scheme_map(publication):
     return found if isinstance(found, dict) else {}
 
 
+def repository_scheme(publication):
+    """The scheme an `eprint` sits under, or None when the work has none.
+
+    Found rather than looked up, because the scheme *is* the repository: an
+    arXiv preprint is under `arxiv` and one in any other repository is under
+    that repository's own scheme. Reconstructing a fixed `arXiv` here would
+    make this probe answer for a field it had not read.
+    """
+    for scheme in scheme_map(publication):
+        if scheme not in NOT_A_REPOSITORY:
+            return scheme
+    return None
+
+
 def identifier_value(publication, field):
     """One identifier field, from the scheme map. A scheme may hold several.
 
@@ -150,7 +170,9 @@ def identifier_value(publication, field):
     identifiers and says nothing about where each came from. So there is no
     provenance to check here, and none is invented.
     """
-    found = scheme_map(publication).get(IDENTIFIER_SCHEME.get(field))
+    scheme = (repository_scheme(publication) if field == "eprint"
+              else IDENTIFIER_SCHEME.get(field))
+    found = scheme_map(publication).get(scheme)
     if isinstance(found, str):
         found = [found]
     return ", ".join(str(one) for one in found) if found else None
@@ -192,8 +214,8 @@ def field_value(publication, field):
     if field == "url":
         return (publication.get("url") or publication.get("video_url")
                 or link_value(publication, URL_KINDS))
-    if field == "archiveprefix" and scheme_map(publication).get(ARXIV_SCHEME):
-        return ARXIV_PREFIX
+    if field == "archiveprefix":
+        return repository_scheme(publication)
     if field == CONTAINER_FIELD.get(publication["entry_type"]):
         name = (venue_parts(publication) or {}).get("name")
         if name:

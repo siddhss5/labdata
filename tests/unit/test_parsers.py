@@ -275,6 +275,46 @@ class TestCrossref:
         assert errors[0].startswith(CROSSREF_UNSUPPORTED)
         assert "no-such-parent" in errors[0]
 
+    EMPTY = ("@inproceedings{empty-child,\n"
+             "  title    = {A Child With an Empty Crossref},\n"
+             "  author   = {Adams, Alice},\n"
+             "  year     = {2024},\n"
+             "  crossref = {}\n"
+             "}\n")
+
+    @pytest.mark.parametrize("field", ["crossref = {}", "crossref = {   }",
+                                       "CROSSREF = {}"])
+    def test_the_field_is_rejected_on_its_presence_not_on_its_value(self, tmp_path,
+                                                                    field):
+        """An empty crossref is a field the entry carries, so it is an error.
+
+        pybtex keeps `crossref = {}` as a present field whose value is the
+        empty string. Rejecting on the value would let it through and put the
+        silent path back under a different spelling.
+        """
+        errors = []
+        works = self.parse(tmp_path, self.EMPTY.replace("crossref = {}", field),
+                           errors)
+        assert works == []
+        assert len(errors) == 1, errors
+        assert errors[0].startswith(CROSSREF_UNSUPPORTED)
+        assert "child.bib:empty-child:crossref" in errors[0]
+
+    def test_an_empty_crossref_is_not_reported_as_a_blank_parent(self, tmp_path):
+        """The diagnostic says the entry names no parent rather than quoting one.
+
+        Asserted on shape rather than on wording: a pair of empty quotes is a
+        diagnostic that reads as though it had found a parent called "".
+        """
+        errors = []
+        self.parse(tmp_path, self.EMPTY, errors)
+        assert "''" not in errors[0] and '""' not in errors[0], errors[0]
+        # A named parent is still quoted, so the check above is about the
+        # empty case and not about quoting in general.
+        named = []
+        self.parse(tmp_path, self.CHILD, named)
+        assert "'a-parent'" in named[0], named[0]
+
     def test_no_work_can_be_emitted_with_an_empty_author_list(self, tmp_path):
         """The failure crossref caused: a child with no author of its own.
 
