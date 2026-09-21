@@ -627,12 +627,18 @@ class TestDeclaredCollaboratorGrouping:
         assert [(c.name, c.grouped_by) for c in collaborators] == [
             ("P. Patel", "normalized_name")]
         assert warnings == [
-            "RESOLVE-AMBIGUOUS-NAME bib/w.bib:w0:author: position 2, 'P. Patel', "
-            "fits more than one declared collaborator or member and is grouped "
-            "by its own name: collaborator:pradeep patel, collaborator:priya patel"]
+            "ID-GROUPING-AMBIGUOUS-DECLARED bib/w.bib:w0:author: position 2, "
+            "'P. Patel', fits more than one declared collaborator, or one and a "
+            "lab member, and is grouped by its own name: "
+            "collaborator:pradeep patel, collaborator:priya patel"]
 
     def test_a_member_competes_with_a_declared_collaborator(self):
-        """`P. Patel` could be the member as well, so it joins neither."""
+        """`P. Patel` could be the member as well, so it joins neither.
+
+        It fits one lab member, not more than one, so it is not
+        `RESOLVE-AMBIGUOUS-NAME` (#26 decision 6): it is reported with the
+        other grouping ambiguity, as an unresolved outside co-author may be.
+        """
         from labdata.loaders import DeclaredCollaborator
         people = [Person(id="ppatel", name="Paul Patel")]
         works, collaborators, warnings = self.assemble(
@@ -640,8 +646,9 @@ class TestDeclaredCollaboratorGrouping:
             [Author(name="P. Patel", position=1, given="P.", family="Patel")])
         assert works[0].authors[0].person_id is None
         assert [c.grouped_by for c in collaborators] == ["normalized_name"]
-        assert any(w.startswith("RESOLVE-AMBIGUOUS-NAME") and "person:ppatel" in w
-                   for w in warnings)
+        assert any(w.startswith("ID-GROUPING-AMBIGUOUS-DECLARED")
+                   and "person:ppatel" in w for w in warnings)
+        assert not any(w.startswith("RESOLVE-AMBIGUOUS-NAME") for w in warnings)
 
     def test_a_declared_name_that_is_a_member_is_left_to_the_member(self):
         from labdata.loaders import DeclaredCollaborator

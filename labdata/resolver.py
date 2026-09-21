@@ -36,8 +36,9 @@ RESOLVED, UNRESOLVED, AMBIGUOUS = "resolved", "unresolved", "ambiguous"
 BY_NAME = "exact"
 
 # Two things the resolver declines to decide, reported rather than guessed.
-# Both are warnings: an author who resolves to nobody is never an error
-# (SPEC.md section 1), and promoting them is #26's `--strict`.
+# Both are warnings. `AMBIGUOUS_NAME` means a name fits more than one lab
+# member, and `--strict` makes it an error; `SUGGESTION` is about an author
+# who matched nobody, and an unresolved outside co-author is never an error.
 AMBIGUOUS_NAME = "RESOLVE-AMBIGUOUS-NAME"
 SUGGESTION = "RESOLVE-SUGGESTION"
 
@@ -376,8 +377,12 @@ def person_candidates(people: Sequence[Person]) -> Candidates:
 
 def _resolve(contributors: Sequence[Contributor], candidates: Candidates,
              index: Dict[str, str], fuzzy_threshold: float,
-             where: str, report: Optional[List[str]]) -> List[str]:
-    """Resolve one list of contributors in place; return the names left over."""
+             where: Tuple[str, str, str],
+             report: Optional[List[str]]) -> List[str]:
+    """Resolve one list of contributors in place; return the names left over.
+
+    ``where`` is the ``(file, key, field)`` a diagnostic is located at.
+    """
     unresolved: List[str] = []
     for contributor in contributors:
         found = match(contributor, candidates)
@@ -392,19 +397,20 @@ def _resolve(contributors: Sequence[Contributor], candidates: Candidates,
         if report is None:
             continue
         if found.status == AMBIGUOUS:
-            report.append(
-                f"{AMBIGUOUS_NAME} {where}: position {contributor.position}, "
-                f"'{contributor.name}', fits more than one person and is left "
-                f"unresolved: {', '.join(found.ids)}")
+            report.append(diagnostic(
+                AMBIGUOUS_NAME, *where,
+                f"position {contributor.position}, '{contributor.name}', fits "
+                f"more than one person and is left unresolved: "
+                f"{', '.join(found.ids)}"))
             continue
         suggested = set(found.ids) | set(
             fuzzy_matches(full_form(contributor), index, fuzzy_threshold))
         if suggested:
-            report.append(
-                f"{SUGGESTION} {where}: position {contributor.position}, "
-                f"'{contributor.name}', matched no person but may be "
-                f"{', '.join(sorted(suggested))}; not linked, declare an "
-                "alias if it is")
+            report.append(diagnostic(
+                SUGGESTION, *where,
+                f"position {contributor.position}, '{contributor.name}', "
+                f"matched no person but may be {', '.join(sorted(suggested))}; "
+                "not linked, declare an alias if it is"))
     return unresolved
 
 
@@ -439,11 +445,12 @@ def resolve_authors(
     unresolved: Set[str] = set()
 
     for work in works:
-        where = f"{bib_dir}/{work.source_file}:{work.bib_id}"
+        file = f"{bib_dir}/{work.source_file}"
         unresolved |= set(_resolve(work.authors, candidates, index,
-                                   fuzzy_threshold, f"{where}:author", warnings))
+                                   fuzzy_threshold,
+                                   (file, work.bib_id, "author"), warnings))
         _resolve(work.editors, candidates, index, fuzzy_threshold,
-                 f"{where}:editor", warnings)
+                 (file, work.bib_id, "editor"), warnings)
 
     return sorted(unresolved)
 

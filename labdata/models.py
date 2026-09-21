@@ -219,7 +219,7 @@ class Work:
         compiling machine's directory layout into a document that is shared.
         A relative directory is not absolute and passes.
         """
-        reject_absolute_name(self.source_file, "bib_files:name")
+        reject_absolute_name(self.source_file)
         return {
             'bib_id': self.bib_id,
             'source': {'file': self.source_file, 'key': self.bib_id},

@@ -10,7 +10,7 @@ Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
 MIT License - see LICENSE file for details.
 """
 
-from typing import Optional
+from typing import Dict, Optional
 
 
 class Diagnostic(str):
@@ -31,9 +31,115 @@ class Diagnostic(str):
 
 def diagnostic(code: str, file: Optional[str], key: Optional[str],
                field: Optional[str], message: str) -> Diagnostic:
-    """Build one coded diagnostic line; ``None`` parts are left empty."""
+    """Build one coded diagnostic line; ``None`` parts are left empty.
+
+    A line break in the message -- a library's multi-line wording, or a name
+    written across two lines -- becomes a space, so a diagnostic is always one
+    line and every line of it carries its code.
+    """
+    message = " ".join(message.splitlines())
     line = Diagnostic(
         f"{code} {file or ''}:{key or ''}:{field or ''}: {message}")
     line.code, line.file, line.key, line.field, line.message = (
         code, file, key, field, message)
     return line
+
+
+# The four classes a code can belong to (SPEC.md, *Diagnostic codes*).
+FATAL_AT_LOAD = "fatal at load"
+FATAL = "fatal"
+VALIDATION_ERROR = "validation error"
+WARNING = "warning"
+
+# Every code in use, with its class. SPEC.md's registry lists the same codes;
+# a test holds the two together.
+CLASSES: Dict[str, str] = {
+    "CONFIG-BIB-FILE-ABSOLUTE": FATAL_AT_LOAD,
+    "CONFIG-NOT-A-MAPPING": FATAL_AT_LOAD,
+    "CONFIG-KEY-MISSING": FATAL_AT_LOAD,
+    "CONFIG-TYPE-INVALID": FATAL_AT_LOAD,
+    "CONFIG-NOT-FOUND": FATAL_AT_LOAD,
+    "CONFIG-UNREADABLE": FATAL_AT_LOAD,
+    "BIB-CROSSREF-UNSUPPORTED": FATAL,
+    "CONFIG-FILE-NOT-FOUND": FATAL,
+    "PEOPLE-NOT-A-LIST": FATAL,
+    "PEOPLE-FIELD-MISSING": FATAL,
+    "BIB-DUPLICATE-KEY": VALIDATION_ERROR,
+    "RESOLVE-PROJECT-UNKNOWN": VALIDATION_ERROR,
+    "PEOPLE-ID-DUPLICATE": VALIDATION_ERROR,
+    "PROJECTS-ID-DUPLICATE": VALIDATION_ERROR,
+    "BIB-YEAR-MISSING": WARNING,
+    "BIB-YEAR-INVALID": WARNING,
+    "BIB-STRING-UNDEFINED": WARNING,
+    "BIB-STRING-REDEFINED": WARNING,
+    "BIB-SYNTAX-ERROR": WARNING,
+    "BIB-VENUE-MISSING": WARNING,
+    "BIB-ENTRY-TYPE-UNSUPPORTED": WARNING,
+    "BIB-PARSER-MESSAGE": WARNING,
+    "BIB-WRITE-BACK-FAILED": WARNING,
+    "LATEX-COMMAND-UNKNOWN": WARNING,
+    "LATEX-CONVERSION-FAILED": WARNING,
+    "ID-GROUPING-SPANS-SPELLINGS": WARNING,
+    "ID-GROUPING-INITIALS-AMBIGUOUS": WARNING,
+    "ID-GROUPING-AMBIGUOUS-DECLARED": WARNING,
+    "RESOLVE-AMBIGUOUS-NAME": WARNING,
+    "RESOLVE-SUGGESTION": WARNING,
+    "RESOLVE-UNRESOLVED-NAME": WARNING,
+    "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER": WARNING,
+    "PEOPLE-ALIAS-AMBIGUOUS": WARNING,
+    "PEOPLE-ROLE-INVALID": WARNING,
+    "PEOPLE-STATUS-INVALID": WARNING,
+    "PROJECTS-STATUS-INVALID": WARNING,
+    "CONFIG-LAB-NAME-MISSING": WARNING,
+    "CONFIG-KEY-UNKNOWN": WARNING,
+    "CONFIG-BIB-FILES-MISSING": WARNING,
+}
+
+# The codes `--strict` leaves as warnings. `BIB-STRING-REDEFINED` is decided
+# on #26; every other one is about an author who matched no lab member, and an
+# unresolved outside co-author is never an error. `RESOLVE-SUGGESTION` fires
+# only on such an author: labdata cannot tell a near miss on a member's name
+# from an outside co-author with a similar one.
+NEVER_AN_ERROR = frozenset({
+    "BIB-STRING-REDEFINED",
+    "ID-GROUPING-SPANS-SPELLINGS",
+    "ID-GROUPING-INITIALS-AMBIGUOUS",
+    "ID-GROUPING-AMBIGUOUS-DECLARED",
+    "RESOLVE-UNRESOLVED-NAME",
+    "RESOLVE-SUGGESTION",
+})
+
+# Severities as a run reports them.
+ERROR, WARN = "error", "warning"
+
+
+def code_of(line: str) -> str:
+    """The code a diagnostic line carries: its attribute, or its first word."""
+    return getattr(line, "code", None) or line.split(" ", 1)[0]
+
+
+def severity(line: str, validating: bool, strict: bool) -> str:
+    """`ERROR` or `WARN` for one diagnostic in one run.
+
+    Fatal codes are errors in every mode. A validation error is an error under
+    ``--validate``. Under ``--strict`` every code is an error except those in
+    `NEVER_AN_ERROR`.
+    """
+    code = code_of(line)
+    kind = CLASSES[code]
+    if kind in (FATAL_AT_LOAD, FATAL):
+        return ERROR
+    if kind == VALIDATION_ERROR and validating:
+        return ERROR
+    if strict and code not in NEVER_AN_ERROR:
+        return ERROR
+    return WARN
+
+
+def record(line: str, level: str) -> Dict[str, Optional[str]]:
+    """One diagnostic as the JSON record SPEC.md specifies."""
+    return {"code": code_of(line), "severity": level,
+            "file": getattr(line, "file", None) or None,
+            "key": getattr(line, "key", None) or None,
+            "field": getattr(line, "field", None) or None,
+            "message": getattr(line, "message", line)}
