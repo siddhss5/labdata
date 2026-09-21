@@ -37,15 +37,36 @@ def is_absolute_path(name: str) -> bool:
     return name.startswith(("/", "\\")) or PureWindowsPath(name).is_absolute()
 
 
+def reject_absolute_name(name, where: str) -> None:
+    """Raise when a configured `.bib` name would reach the document absolute.
+
+    ``where`` is the `<file>:<key>:<field>` location the diagnostic carries.
+    A caller that knows which file the configuration came from says so; one
+    that does not names the key alone.
+    """
+    if isinstance(name, str) and is_absolute_path(name):
+        raise ValueError(
+            f"{BIB_FILE_ABSOLUTE} {where}: '{name}' is an absolute path; a "
+            "bib_files name is a name under bib_dir, and it is emitted as the "
+            "work's source.file, which is never absolute")
+
+
 @dataclass
 class BibFile:
     """A single BibTeX file and its category label.
 
     ``name`` is a name under ``bib_dir``, not a path of its own: it is
-    emitted as ``work.source.file`` and must never be absolute.
+    emitted as ``work.source.file`` and must never be absolute. The check is
+    here, in the constructor, rather than only where a configuration is read
+    from YAML: `BibFile` and `LabDataConfig` are public, so a caller can
+    assemble one by hand, and a guarantee about the emitted document has to
+    hold however the configuration was built.
     """
     name: str
     category: str
+
+    def __post_init__(self):
+        reject_absolute_name(self.name, "bib_files:name")
 
 
 @dataclass
@@ -86,14 +107,11 @@ class LabDataConfig:
         with open(path, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f)
 
+        # Checked here as well as in `BibFile`, because here the file the
+        # user would edit is known and the diagnostic can name it.
         for bf in data.get('bib_files', []):
-            name = bf.get('name') if isinstance(bf, dict) else None
-            if isinstance(name, str) and is_absolute_path(name):
-                raise ValueError(
-                    f"{BIB_FILE_ABSOLUTE} {path}:bib_files:name: '{name}' is an "
-                    "absolute path; a bib_files name is a name under bib_dir, "
-                    "and it is emitted as the work's source.file, which is "
-                    "never absolute")
+            if isinstance(bf, dict):
+                reject_absolute_name(bf.get('name'), f"{path}:bib_files:name")
 
         bib_files = [
             BibFile(**bf) for bf in data.get('bib_files', [])

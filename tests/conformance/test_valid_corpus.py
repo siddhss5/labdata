@@ -671,7 +671,7 @@ def test_collaborators_order(valid_output):
             for c in valid_output["collaborators"]]
     assert rows == sorted(rows)
     assert valid_output["collaborators"][0]["name"] == "Quentin Quinn"
-    assert valid_output["collaborators"][-1]["key"] == "gabriel-nolan-45b44742"
+    assert valid_output["collaborators"][-1]["key"] == "victor-vance-jr-59a346c1"
 
 
 @covers("identity.alike_authorships")
@@ -714,6 +714,8 @@ INITIALS_SHADOWS = [
     ("a name outside ASCII", "\u00c7. A. \u00d6zt\u00fcrk",
      "\u00c7i\u011fdem Ay\u015fe \u00d6zt\u00fcrk"),
     ("one initial and one family name", "Q. Quinn", "Quentin Quinn"),
+    ("a lineage suffix that agrees", "T. Tate Jr.", "Tobias Tate Jr."),
+    ("a lineage suffix on one side only", "V. Vance", "Victor Vance Jr."),
 ]
 
 
@@ -729,6 +731,8 @@ INITIALS_PAIRS = {
     "B. Smith-Jones": ["Bella Smith-Jones"],
     "\u00c7. A. \u00d6zt\u00fcrk": ["\u00c7i\u011fdem Ay\u015fe \u00d6zt\u00fcrk"],
     "Q. Quinn": ["Quentin Quinn"],
+    "T. Tate Jr.": ["Tobias Tate Jr."],
+    "V. Vance": ["Victor Vance Jr."],
 }
 
 
@@ -750,7 +754,8 @@ def reported_initials_pairs(output, valid_output):
     return pairs
 
 
-@covers("identity.grouping_initials", "identity.grouping_distinct")
+@covers("identity.grouping_initials", "identity.grouping_distinct",
+        "identity.grouping_suffix")
 def test_the_initials_warnings_are_exactly_these_pairs(valid_validate, valid_output):
     """Both directions at once, over the whole corpus.
 
@@ -765,7 +770,7 @@ def test_the_initials_warnings_are_exactly_these_pairs(valid_validate, valid_out
 
 @pytest.mark.parametrize("label,initials,fuller",
                          [pytest.param(*row, id=row[0]) for row in INITIALS_SHADOWS])
-@covers("identity.grouping_initials")
+@covers("identity.grouping_initials", "identity.grouping_suffix")
 def test_an_initials_only_key_that_could_be_a_fuller_one_is_reported(
         valid_validate, valid_output, label, initials, fuller):
     """Each shape a check over the normalised key would miss.

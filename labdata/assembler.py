@@ -136,6 +136,7 @@ class _Grouping:
         # nothing else: they decide nothing about grouping or matching.
         self.family = normalize_name(author.family or "")
         self.von = normalize_name(author.von or "")
+        self.suffix = normalize_name(author.suffix or "")
         self.initials = given_initials(author.given)
         self.initials_only = initials_only(author.given)
         self.variants: List[str] = []
@@ -164,6 +165,12 @@ class _Grouping:
         `Alice Smith` or `Alice Jane Smith`, and `A. J. Smith` could be
         either as well. A name written as one brace-protected unit has no
         parts to compare and takes part in neither side.
+
+        Two lineage suffixes that disagree are two people: `J. Smith, Jr.` is
+        not `John Smith, Sr.`, and saying so would be a warning about a
+        merge that cannot happen. One suffix against none is not a
+        disagreement -- an entry that omits it has said nothing -- so those
+        still pair.
         """
         if other.key == self.key or not self.initials_only:
             return False
@@ -174,6 +181,8 @@ class _Grouping:
         if not self.family or self.family != other.family:
             return False
         if self.von != other.von:
+            return False
+        if self.suffix and other.suffix and self.suffix != other.suffix:
             return False
         shorter, longer = sorted((self.initials, other.initials), key=len)
         return longer[:len(shorter)] == shorter

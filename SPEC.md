@@ -99,7 +99,7 @@ Exit codes, as `labdata.cli.main()` returns them:
 | Code | Meaning |
 |---|---|
 | `0` | Success. `--output` wrote the file; `--validate` found no errors; `--unresolved` reported. |
-| `1` | Error. Configuration file missing, configuration failed to load, an entry carries `crossref`, or `--validate` found unknown project ids or duplicate citation keys. |
+| `1` | Error. Configuration file missing, configuration failed to load — which now includes an absolute `bib_files[].name` — an entry carries `crossref`, or `--validate` found unknown project ids or duplicate citation keys. |
 | `2` | Usage error from the argument parser: a missing or unrecognised flag, or none of `--output` / `--validate` / `--unresolved`. |
 
 **Streams and message shapes.** Ordinary reporting goes to **standard
@@ -118,13 +118,12 @@ in one of three shapes:
 There is no single prefix across all diagnostics, and a consumer that greps
 for one will miss the other two.
 
-**Three severities, and the code says none of them.**
-`labdata.assembler.AssemblyResult` carries the diagnostics in three lists,
-because the run rather than the code decides how badly each is taken:
-`fatal_errors` fail every mode, `bibliography_errors` fail `--validate` and
-are warnings elsewhere, and `warnings` never fail anything. A `crossref`
-field is fatal; a duplicate citation key fails validation; a missing year, a
-risky grouping key and an unnamed lab header are warnings.
+**Where the severities live.** `labdata.assembler.AssemblyResult` carries the
+diagnostics that survive assembly in three lists: `fatal_errors` fail every
+mode, `bibliography_errors` fail `--validate` and are warnings elsewhere, and
+`warnings` never fail anything. A fourth class never reaches an
+`AssemblyResult` at all, because it stops the configuration from loading. The
+table under *Diagnostic codes* below says which class each code belongs to.
 
 **Unresolved authors are not errors.** `--validate` lists them and still
 exits `0`. This is intended, not a gap: an author who is not in `people.yaml`
@@ -156,11 +155,21 @@ without depending on English wording. Codes obey three rules:
 1. The form is `<COMPONENT>-<CONDITION>` in upper case, for example
    `BIB-DUPLICATE-KEY`, followed by a space, then `<file>:<key>:<field>`, then
    a colon and prose.
-2. **Severity is not part of the code.** The same condition is already
-   reported as an error by `--validate` and as a warning by the other modes,
-   and #26 adds a `--strict` mode that raises severity further. A code says
-   *what was found*, never how badly the run took it; severity is carried by
-   the stream and the `Warning: ` prefix.
+2. **Severity is not part of the code.** A code says *what was found*, never
+   how badly the run took it. Severity belongs to the condition and the mode
+   together, and four classes are in use:
+
+   | Class | `--validate` | Every other mode | Codes |
+   |---|---|---|---|
+   | **Fatal at load** | Exits `1` before anything is compiled. | The same. | `CONFIG-BIB-FILE-ABSOLUTE` |
+   | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED` |
+   | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY` |
+   | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `CONFIG-LAB-NAME-MISSING` |
+
+   The same code always carries the same class. What varies with the mode is
+   how the run reacts to it, which is why the class is not in the code, and
+   why a consumer reads the exit code and the stream rather than the
+   spelling. #26 adds a `--strict` mode that raises the last two further.
 3. A published code is permanent. It is never reused for a different
    condition, and retiring one is a breaking change.
 
@@ -168,13 +177,13 @@ Codes in use:
 
 | Code | Condition |
 |---|---|
-| `BIB-DUPLICATE-KEY` | The same citation key appears twice in one `.bib` file, or in two of the configured files. |
+| `BIB-DUPLICATE-KEY` | The same citation key appears twice in one `.bib` file, or in two of the configured files. A validation error. |
 | `BIB-CROSSREF-UNSUPPORTED` | An entry carries a `crossref` field. Reported on the field's **presence**, whatever its value: an empty `crossref = {}` is a field the entry carries. The diagnostic names the file, the entry key and the parent key, or says the entry names no parent when the field is empty; the entry is not emitted and the run fails, in every mode. |
-| `BIB-YEAR-MISSING` | An entry has no `year` field. The work is emitted with `year: null` and sorts last. |
-| `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. |
-| `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer — so a particle, a second initial, a hyphenated family name and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. |
-| `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. |
-| `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. The configuration fails to load, because the name is emitted as `work.source.file`, which is promised never to be absolute. |
+| `BIB-YEAR-MISSING` | An entry has no `year` field. The work is emitted with `year: null` and sorts last. A warning. |
+| `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. A warning: an external co-author is never an error. |
+| `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer, and two lineage suffixes that disagree ruling the pair out — so a particle, a second initial, a hyphenated family name, a suffix and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. A warning, for the same reason. |
+| `CONFIG-LAB-NAME-MISSING` | The `lab` header declares no `name`. A `lab` that is not a mapping at all is a different condition and is not reported under this code. A warning. |
+| `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute. Raised by `BibFile` itself, so it holds for a configuration built through the Python API as well as one read from YAML. |
 
 Most diagnostics do not carry a code yet. #26 adds them incrementally, and an
 uncoded diagnostic is not a stable interface.
@@ -198,6 +207,20 @@ uncoded diagnostic is not a stable interface.
 > authorships, and `crossref` is rejected under `BIB-CROSSREF-UNSUPPORTED`.
 > The package version is 3.0.0; a consumer that needs the old document pins
 > `schema_version` 3 and the schema at `schema/v3/output.schema.json`.
+>
+> **`collaborators` changes in four ways at once**, because the key changed:
+> v3 grouped on the abbreviated display name, v4 on the normalised full name
+> (§5). Which authorships land together changes, and so does how many entries
+> there are — the demo goes from 7 to 9, one `P. Patel` group of four
+> occurrences becoming `Priya Patel`, `Pradeep Patel` and `P. Patel`. The
+> counts change meaning as well as value: v3's `publication_count` counted
+> occurrences and v4 has both `work_count`, deduplicated per work, and
+> `authorship_count`. The displayed `name` expands, because it is now the
+> parts joined rather than the abbreviated form: `T. Turner` becomes
+> `Trent Turner`. And the final tie-break of the order §3 promises moves from
+> `name` to `key`, because two keys can now carry the same readable name and
+> only the key makes the order total. All four follow from the key and the
+> name, and #24 tunes the policy behind them.
 
 > **Version note (#22, PR #61).** Through commit `cf9e055`, `--unresolved`
 > printed `All authors resolved.` when no `people_file` was configured, where

@@ -314,11 +314,28 @@
 %   Smithson, Anna Beth     the same first initial, a different second
 %   Nolan, G.-A. / Gabriel  a hyphenated given name keeps both initials, so
 %                           `G.-A.` is not an abbreviation of `Gabriel`
+%   Tate, Sr., Tobias       a lineage suffix that disagrees with the one on
+%                           `T. Tate, Jr.` below: two suffixes that disagree
+%                           are two people
 % CASE identity.grouping_distinct
 @article{id-grouping-distinct,
   title   = {Initials That Could Not Be Somebody Else},
   author  = {Adams, Alice and Meer, Anna and van der Waals, Anna and
-             Smithson, Anna Beth and Nolan, G.-A. and Nolan, Gabriel},
+             Smithson, Anna Beth and Nolan, G.-A. and Nolan, Gabriel and
+             Tate, Sr., Tobias},
   journal = {Journal of Fictional Robots},
   year    = {2016}
+}
+
+% A lineage suffix that agrees, beside the one above that does not, and a
+% pair where only one side writes a suffix at all. An entry that omits it has
+% said nothing rather than said "none", so the two suffixes are compared only
+% when both are there and `V. Vance` could still be `Victor Vance Jr.`
+% CASE identity.grouping_suffix
+@article{id-grouping-suffix,
+  title   = {A Suffix That Agrees and One That Does Not},
+  author  = {Adams, Alice and Tate, Jr., T. and Tate, Jr., Tobias and
+             Vance, V. and Vance, Jr., Victor},
+  journal = {Journal of Fictional Robots},
+  year    = {2015}
 }

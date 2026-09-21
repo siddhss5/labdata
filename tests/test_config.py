@@ -3,9 +3,9 @@
 import pytest
 import yaml
 import tempfile
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
-from labdata.config import LabDataConfig, BibFile
+from labdata import BibFile, LabDataConfig, assemble
 
 
 class TestLabDataConfig:
@@ -91,6 +91,12 @@ class TestLabDataConfig:
         assert bf.category == "Test"
 
 
+def is_absolute(name):
+    """Rooted under either flavour. Restated rather than imported: outside
+    tests/unit/ the suite uses only labdata's public names."""
+    return name.startswith(("/", "\\")) or PureWindowsPath(name).is_absolute()
+
+
 class TestBibFileNameIsNeverAbsolute:
     """`bib_files[].name` is emitted as `work.source.file`, which SPEC.md
     section 5 promises is never an absolute path.
@@ -140,3 +146,37 @@ class TestBibFileNameIsNeverAbsolute:
         config = LabDataConfig.from_yaml(str(self.write(tmp_path, name)))
         # Passed through as written: the relative directory is the user's.
         assert config.bib_files[0].name == name
+
+    @pytest.mark.parametrize("name", ABSOLUTE)
+    def test_an_absolute_name_is_rejected_when_built_by_hand(self, name):
+        """`BibFile` and `LabDataConfig` are public, so a caller can assemble
+        a configuration without going near YAML.
+
+        A guarantee about the emitted document has to hold however the
+        configuration was built, so the check is in the constructor and not
+        only in `from_yaml()`. Without it, `assemble()` emits an absolute
+        `work.source.file` and no diagnostic at all.
+        """
+        with pytest.raises(ValueError) as raised:
+            BibFile(name=name, category="Journal Papers")
+        message = str(raised.value)
+        assert message.startswith(self.CODE), message
+        assert "bib_files:name" in message
+        assert name in message
+
+    @pytest.mark.parametrize("name", RELATIVE)
+    def test_a_relative_name_is_built_by_hand_unchanged(self, name):
+        assert BibFile(name=name, category="Journal Papers").name == name
+
+    def test_a_document_built_by_hand_never_carries_an_absolute_source(self, tmp_path):
+        """End to end through the public API, with no YAML anywhere."""
+        (tmp_path / "journal.bib").write_text(
+            "@article{a2024,\n  title   = {A Title},\n"
+            "  author  = {Adams, Alice},\n  journal = {J},\n  year    = {2024}\n}\n",
+            encoding="utf-8")
+        config = LabDataConfig(
+            bib_dir=str(tmp_path),
+            bib_files=[BibFile(name="journal.bib", category="Journal Papers")])
+        document = assemble(config).to_dict()
+        assert document["works"][0]["source"]["file"] == "journal.bib"
+        assert not is_absolute(document["works"][0]["source"]["file"])
