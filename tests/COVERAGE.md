@@ -186,7 +186,7 @@ field of the output.
 | `names.initials_run_together_three` | `Moss, U.A.K.`, whose person declares the alias `U. A. K. Moss` | Resolves to `umoss` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.initials_run_together_unmatched` | `Ivers, S.T.`, which no one declares, and `Quill, E.D.` beside the member `Ed Quill` | Neither resolves: `S. T. Ivers` is not `S. S. Ivers` or `Stella Sky Ivers`, and `E.D.` is the two initials `E. D.`, not the given name `Ed` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.initials_multiletter_whole` | `Nash, Jo` beside the alias `J. O. Nash`, and `Lark, TR` beside the alias `T.R. Lark` | Neither resolves: a part with no period inside it is a name and is never split into initials | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
-| `names.initials_hyphenated` | `Wren, J.-P.` and `Wren, J.P.`, whose person declares the alias `J.-P. Wren` | `J.-P.` resolves to `jwren`; `J.P.` does not. Hyphenated initials are left as written and are equal only to themselves | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.initials_hyphenated` | `Wren, J.-P.` and `Wren, J.P.`, whose person declares the alias `J.-P. Wren` | `J.-P.` resolves to `jwren`; `J.P.` does not. Hyphenated initials are left as written: periods are still removed, so `J.-P.` equals `J-P`, but not `J.P.`, `J. P.` or `JP` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 
 ## Identity resolution
 Every way an author name can be matched to a person, and what happens when it

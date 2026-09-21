@@ -453,6 +453,18 @@ class TestRunTogetherInitials:
         assert _resolved(people, given="S. S.", family="Ivers") is None
         assert _resolved(people, given="SS", family="Ivers") == "sivers"
 
+    @pytest.mark.parametrize("written", ["\u0160.S.", "S\u030c.S."])
+    @pytest.mark.parametrize("declared", ["\u0160. S.", "S\u030c. S."])
+    def test_accented_initials_precomposed_or_decomposed(self, written, declared):
+        """`Š.S.` with the caron precomposed (U+0160) or decomposed (S and
+        U+030C), on either side."""
+        people = [Person(id="sivers", name="Stella Sky Ivers",
+                         aliases=[f"{declared} Ivers"])]
+        assert _resolved(people, given=written, family="Ivers") == "sivers"
+        people = [Person(id="sivers", name="Stella Sky Ivers",
+                         aliases=[f"{written} Ivers"])]
+        assert _resolved(people, given=declared, family="Ivers") == "sivers"
+
     @pytest.mark.parametrize("given, found", [
         ("J.-P.", "jwren"), ("J-P", "jwren"),
         ("J.P.", None), ("J. P.", None), ("JP", None)])
@@ -701,6 +713,39 @@ class TestDeclaredCollaboratorGrouping:
             ("Priya Sun Patel", "declared", ["w0", "w1"])]
         assert warnings == []
 
+    def test_spaced_initials_match_a_run_together_declared_alias(self):
+        from labdata.loaders import DeclaredCollaborator
+        _, collaborators, warnings = self.assemble(
+            [], [DeclaredCollaborator("Priya Sun Patel", ["P.S. Patel"])],
+            [Author(name="P. S. Patel", position=1, given="P. S.", family="Patel")])
+        assert [(c.name, c.grouped_by) for c in collaborators] == [
+            ("P. S. Patel", "declared")]
+        assert warnings == []
+
+    def test_a_run_together_alias_a_member_declares_spaced_is_reported(self):
+        from labdata.loaders import DeclaredCollaborator
+        people = [Person(id="sivers", name="Stella Sky Ivers",
+                         aliases=["S. S. Ivers"])]
+        _, _, warnings = self.assemble(
+            people, [DeclaredCollaborator("Sam Sol Ivers", ["S.S. Ivers"])])
+        assert warnings == [
+            "RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER c.yaml:Sam Sol Ivers:aliases: "
+            "'S.S. Ivers' is also declared by sivers; the member keeps it and "
+            "the collaborator entry is not used for it"]
+
+    def test_undeclared_run_together_and_spaced_initials_group_together(self):
+        _, collaborators, _ = self.assemble(
+            [], [],
+            [Author(name="S.S. Quinn", position=1, given="S.S.", family="Quinn")],
+            [Author(name="S. S. Quinn", position=1, given="S. S.", family="Quinn")],
+            [Author(name="S.S. Quinn", position=1, literal="S.S. Quinn")])
+        [grouped] = [c for c in collaborators if c.name_kind == "personal"]
+        assert grouped.key.startswith("s-s-quinn-")
+        assert (grouped.name_variants, grouped.work_ids) == (
+            ["S. S. Quinn", "S.S. Quinn"], ["w0", "w1"])
+        [literal] = [c for c in collaborators if c.name_kind == "literal"]
+        assert literal.key.startswith("ss-quinn-")
+
     def test_a_name_fitting_two_declared_collaborators_is_reported(self):
         from labdata.loaders import DeclaredCollaborator
         _, collaborators, warnings = self.assemble(
@@ -894,6 +939,29 @@ class TestSharedDeclarations:
         [line] = shared_declarations(people, "people.yaml")
         assert line.startswith("PEOPLE-ALIAS-AMBIGUOUS people.yaml:aadamson:name: ")
         assert "aadams, aadamson, adup" in line
+
+    def test_run_together_and_spaced_initials_are_one_spelling(self):
+        people = [Person(id="sivers", name="Stella Sky Ivers", aliases=["S. S. Ivers"]),
+                  Person(id="sivory", name="Sam Sol Ivers", aliases=["S.S. Ivers"])]
+        [line] = shared_declarations(people, "people.yaml")
+        assert line.startswith("PEOPLE-ALIAS-AMBIGUOUS people.yaml:sivory:aliases: ")
+        assert "sivers, sivory" in line
+
+    @pytest.mark.parametrize("first, second", [
+        ("Ada S.S.", "Ada S. S."),      # a family name is not split
+        ("S.S. Ivers", "SS Ivers"),     # a part with no period inside is a name
+        ("J.-P. Wren", "J. P. Wren"),   # hyphenated initials are left as written
+    ])
+    def test_other_spellings_stay_apart(self, first, second):
+        people = [Person(id="p1", name="One", aliases=[first]),
+                  Person(id="p2", name="Two", aliases=[second])]
+        assert shared_declarations(people, "people.yaml") == []
+
+    def test_a_declaration_bibtex_cannot_read_is_compared_as_normalised(self):
+        people = [Person(id="p1", name="One", aliases=["A, B, C, D"]),
+                  Person(id="p2", name="Two", aliases=["a, b, c, d"])]
+        [line] = shared_declarations(people, "people.yaml")
+        assert "p1, p2" in line
 
     def test_a_person_repeating_their_own_spelling_is_not_reported(self):
         people = [Person(id="aadams", name="Alice Adams",

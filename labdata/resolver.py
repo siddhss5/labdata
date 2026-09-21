@@ -18,6 +18,7 @@ from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from .diagnostics import diagnostic
 from .models import Contributor, Work, Person, Project, LabData
+from .parsers.bibtex import given_words
 
 
 # Default fuzzy match threshold (0.0 to 1.0). A fuzzy match is only ever a
@@ -66,14 +67,32 @@ _INITIAL = re.compile(r"^[^\W\d_]\.?(?:-[^\W\d_]\.?)*$", re.UNICODE)
 # so `S.S.` matches as `S. S.` does. A part with no period inside it (`SS`,
 # `Al.`) is a name, and a hyphenated one (`J.-P.`) is left as written. Never
 # applied to a family name, a particle, a suffix or a brace-protected name.
-_RUN_TOGETHER = re.compile(r"(?<!\S)[^\W\d_](?:\.[^\W\d_])+\.?(?!\S)",
-                           re.UNICODE)
+# Tested once combining marks are off, so `Š.S.` is read alike whether the
+# accent is precomposed or decomposed.
+_RUN_TOGETHER = re.compile(r"^[^\W\d_](?:\.[^\W\d_])+\.?$", re.UNICODE)
+
+
+def _is_mark(c: str) -> bool:
+    return unicodedata.category(c) == 'Mn'
+
+
+def _split_initials(word: str) -> List[str]:
+    """``S.S.`` → ``["S.", "S."]``; any other word is returned whole."""
+    decomposed = unicodedata.normalize('NFD', word)
+    if not _RUN_TOGETHER.match(''.join(c for c in decomposed if not _is_mark(c))):
+        return [word]
+    letters: List[str] = []
+    for c in decomposed:
+        if _is_mark(c) and letters:
+            letters[-1] += c
+        elif c != '.':
+            letters.append(c)
+    return [unicodedata.normalize('NFC', letter) + '.' for letter in letters]
 
 
 def _spaced_initials(text: str) -> str:
     """``S.S. Adams`` → ``S. S. Adams``: run-together initials, one per part."""
-    return _RUN_TOGETHER.sub(
-        lambda m: " ".join(f"{c}." for c in m.group(0) if c != "."), text)
+    return ' '.join(part for word in text.split() for part in _split_initials(word))
 
 
 def normalize_name(name: str) -> str:
@@ -96,6 +115,33 @@ def normalize_name(name: str) -> str:
     # Collapse whitespace
     name = re.sub(r'\s+', ' ', name).strip()
     return name
+
+
+def declared_form(name: str) -> str:
+    """How a declared name or alias compares with another declaration.
+
+    `normalize_name()`, with run-together initials spaced in the words BibTeX
+    reads as the given name: `S.S. Ivers` and `S. S. Ivers` are one form.
+    Where there is none to space, it is `normalize_name()` exactly.
+    """
+    given = {word for word in given_words(name) if _split_initials(word) != [word]}
+    if not given:
+        return normalize_name(name)
+    return normalize_name(' '.join(_spaced_initials(word) if word in given else word
+                                   for word in name.split()))
+
+
+def written_form(contributor: Contributor) -> str:
+    """How an unresolved name is grouped: `normalize_name()` of the readable
+    name, with run-together initials spaced in its structured given name, so
+    `S.S. Quinn` and `S. S. Quinn` are one grouping. A brace-protected name,
+    or one with nothing to space, is `normalize_name()` of the name exactly.
+    """
+    given = contributor.given or ""
+    if (contributor.literal or not contributor.name.startswith(given)
+            or _spaced_initials(given) == " ".join(given.split())):
+        return normalize_name(contributor.name)
+    return normalize_name(_spaced_initials(given) + contributor.name[len(given):])
 
 
 def _given_parts(given: Optional[str]) -> List[str]:
@@ -212,7 +258,8 @@ def build_alias_index(people: List[Person]) -> Dict[str, str]:
 def shared_declarations(people: List[Person], source: str) -> List[str]:
     """One `ALIAS_AMBIGUOUS` warning per spelling more than one person declares.
 
-    Compared through `normalize_name()`, as matching is. Located at the
+    Compared through `declared_form()`, so `S.S. Ivers` and `S. S. Ivers`
+    are one spelling. Located at the
     second person to declare the spelling, under the field that declares it
     there, and naming every person who does.
     """
@@ -220,7 +267,7 @@ def shared_declarations(people: List[Person], source: str) -> List[str]:
     for person in people:
         for field_name, written in [("name", person.name)] + [
                 ("aliases", alias) for alias in person.aliases]:
-            key = normalize_name(written)
+            key = declared_form(written)
             owners = declared.setdefault(key, [])
             if key and person.id not in [owner for owner, _, _ in owners]:
                 owners.append((person.id, field_name, written))

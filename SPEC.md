@@ -764,23 +764,38 @@ stays part of the name unless step 4 removed it with a `<sup>` span.
 **Run-together initials in a given name.** A given-name part written as two
 or more letters, each but the last followed by a full stop and the last
 one's optional, is read as one initial per letter before it is normalised:
-`S.S.` and `S.S` are `S. S.`, and `T.A.K.` is `T. A. K.` So a given name
-written `S.S.`, `S.S`, `S S` or `S. S.` matches any of the others. On the
-`.bib` side this applies to the structured given name only, never to the
-family name, a particle, a suffix or a brace-protected name. A declared name
-or alias in `people_file` or `collaborators_file` is not parsed into parts:
-its given name is what is left once the compared name's particles, family
-name and suffix are taken off its end, and the rule applies there only. A
-part with no full stop between its letters is a name and is never split:
-`SS`, `Ed`, `Jo`, `Al.` and `Ng` stay whole, so `E.D. Quill` is not
-`Ed Quill`. Hyphenated initials are left as written and go through the
-steps above like any other part: step 3 still removes their full stops, so
-`J.-P.` equals `J-P`, but it is not equal to `J.P.`, `J. P.` or `JP`. The
-emitted `name` and name parts keep what the entry wrote, and
-`normalize_name()` itself is unchanged, so a collaborator key is too.
-Comparisons between two declarations, such as `PEOPLE-ALIAS-AMBIGUOUS`,
-have no compared name to take a given name from and read each declaration
-through `normalize_name()` alone.
+`S.S.` and `S.S` are `S. S.`, and `T.A.K.` is `T. A. K.` The test is made
+once combining marks are removed, so `Š.S.` is read alike whether its accent
+is precomposed or decomposed. So a given name written `S.S.`, `S.S`, `S S`
+or `S. S.` matches any of the others. A part with no full stop between its
+letters is a name and is never split: `SS`, `Ed`, `Jo`, `Al.` and `Ng` stay
+whole, so `E.D. Quill` is not `Ed Quill`. Hyphenated initials are left as
+written and go through the steps above like any other part: step 3 still
+removes their full stops, so `J.-P.` equals `J-P`, but it is not equal to
+`J.P.`, `J. P.` or `JP`. The rule applies only to a given name:
+
+- On the `.bib` side, to the structured given name, never to the family
+  name, a particle, a suffix or a brace-protected name.
+- Matching a `.bib` name against a declared name or alias in `people_file`
+  or `collaborators_file`: the declaration is not parsed; its given name is
+  what is left once the compared name's particles, family name and suffix
+  are taken off its end.
+- Comparing two declarations with each other (`PEOPLE-ALIAS-AMBIGUOUS`, and
+  `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`): the given name is the words
+  BibTeX's own name parsing reads as first and middle names. BibTeX reads a
+  comma as `Family, Given`, so in a declaration written `Given Family,
+  Suffix` it takes the suffix for the given name, and run-together initials
+  there are not spaced for these two checks; matching an author is not
+  affected.
+- Grouping an unresolved author into a collaborator: the grouping key is
+  built from the readable name with its structured given name spaced, so
+  `S.S. Quinn` and `S. S. Quinn` are one key (a key spanning two spellings,
+  reported as such), and a `collaborators_file` entry's key from its name
+  spaced the same way as between declarations. A name with nothing to space
+  keeps the key it had.
+
+The emitted `name` and name parts keep what the entry wrote, and
+`normalize_name()` itself is unchanged.
 
 The match decides in this order:
 
