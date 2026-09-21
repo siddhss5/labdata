@@ -611,6 +611,19 @@ class TestLocatedParserDiagnostics:
         assert found == {}
         assert list(works) == ["e"]
 
+    def test_a_well_formed_command_on_a_percent_line_is_read(self, tmp_path):
+        """Records the behaviour on main, not an endorsement of it (#78).
+
+        The parser library has no `%` comment outside an entry, as classic
+        BibTeX has none, so a well-formed entry on a `%` line is an entry.
+        Only a syntax error on such a line goes unreported.
+        """
+        source = ("% @article{hidden, title = {H}, journal = {J}, year = 2024}\n"
+                  + entry("visible"))
+        found, works = located(tmp_path, source)
+        assert found == {}
+        assert sorted(works) == ["hidden", "visible"]
+
     def test_without_a_list_a_syntax_error_goes_to_standard_error(self, tmp_path, capsys):
         (tmp_path / "x.bib").write_text("@article{early, = {x}}\n", encoding="utf-8")
         parse_bibtex_file(str(tmp_path / "x.bib"))

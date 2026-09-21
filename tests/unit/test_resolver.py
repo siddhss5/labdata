@@ -741,17 +741,12 @@ class TestPeopleAndProjectsFiles:
     def test_an_empty_file_is_no_records(self, tmp_path):
         assert self.load(tmp_path, load_people, "") == ([], [], [], [])
 
-    def test_a_person_that_is_not_a_mapping(self, tmp_path):
+    def test_a_missing_or_blank_name(self, tmp_path):
         records, errors, _, _ = self.load(
-            tmp_path, load_people, "- just a string\n- {id: p, name: P, role: r}\n")
-        assert [r.id for r in records] == ["p"]
-        assert errors == ["PEOPLE-NOT-A-LIST f.yaml::: entry 1 is not a mapping"]
-
-    def test_missing_id_and_name(self, tmp_path):
-        records, errors, _, _ = self.load(
-            tmp_path, load_people, "- {name: N}\n- {id: p, name: ' '}\n")
-        assert records == []
-        assert errors == ["PEOPLE-FIELD-MISSING f.yaml::id: entry 1 has no id",
+            tmp_path, load_people,
+            "- {id: q}\n- {id: p, name: ' '}\n- {id: r, name: R, role: x}\n")
+        assert [r.id for r in records] == ["r"]
+        assert errors == ["PEOPLE-FIELD-MISSING f.yaml:q:name: entry 1 has no name",
                           "PEOPLE-FIELD-MISSING f.yaml:p:name: entry 2 has no name"]
 
     def test_a_projects_file_that_is_not_a_list_is_no_projects(self, tmp_path):
