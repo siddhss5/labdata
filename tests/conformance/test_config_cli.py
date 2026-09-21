@@ -9,7 +9,7 @@ import json
 import pytest
 import yaml
 
-from .support import VALID, case, covers, export, item, publication, run_labdata, write_variant
+from .support import VALID, case, covers, export, item, run_labdata, work, write_variant
 
 
 # --- Config keys: present ----------------------------------------------------
@@ -18,7 +18,7 @@ from .support import VALID, case, covers, export, item, publication, run_labdata
         "config.site")
 def test_config_present(valid_output):
     assert valid_output["lab"]["name"] == "Corpus Lab"
-    categories = {p["category"] for p in valid_output["publications"]}
+    categories = {w["category"] for w in valid_output["works"]}
     assert categories == {"Strings", "Names", "LaTeX", "Structure", "Encoding", "Links",
                           "Projects"}
     # site is for scripts/generate_site_config.py; labdata accepts it and
@@ -28,13 +28,13 @@ def test_config_present(valid_output):
 
 @covers("config.pdf_base_url.present")
 def test_config_pdf_base_url_present(valid_output):
-    assert "present.pdf" in publication(valid_output, "present")["pdf_url"]
+    assert "present.pdf" in work(valid_output, "present")["links"]["pdf"][0]["url"]
 
 
 @covers("config.people_file.present")
 def test_config_people_file_present(valid_output):
     assert len(valid_output["people"]) == 12
-    assert publication(valid_output, "name-last-first")["authors"][0]["person_id"] == "aadams"
+    assert work(valid_output, "name-last-first")["authors"][0]["person_id"] == "aadams"
 
 
 @covers("config.projects_file.present")
@@ -46,16 +46,30 @@ def test_config_projects_file_present(valid_output):
 
 @covers("config.lab.missing")
 def test_config_lab_missing(tmp_path):
+    """The header is always emitted, so `lab: {}` is what no header looks like.
+
+    Under `schema_version` 3 the key was omitted, and a consumer could not
+    tell "no header" from "an empty header". Now it can: the key is there and
+    the header is empty.
+    """
     run, data = export(VALID, tmp_path, write_variant(tmp_path, lab=None))
     assert run.code == 0 and run.crash is None, run.output
-    assert "lab" not in data
+    assert data["lab"] == {}
+    # And an explicitly empty header is the same document, not a different one.
+    run, empty = export(VALID, tmp_path, write_variant(tmp_path, lab={}))
+    assert run.code == 0 and run.crash is None, run.output
+    assert empty["lab"] == {}
 
 
 @covers("config.pdf_base_url.missing")
 def test_config_pdf_base_url_missing(tmp_path):
+    """No base configured is a third answer, distinct from `missing`: there is
+    no PDF link at all rather than one labelled as absent."""
     run, data = export(VALID, tmp_path, write_variant(tmp_path, pdf_base_url=None))
     assert run.code == 0 and run.crash is None, run.output
-    assert [p["pdf_url"] for p in data["publications"] if p["pdf_url"]] == []
+    assert [w["bib_id"] for w in data["works"] if "pdf" in w["links"]] == []
+    # With a base, there is one, so the emptiness above is the config's doing.
+    assert "pdf" in work(valid_pdf_base(tmp_path), "present")["links"]
 
 
 @covers("config.people_file.missing")
@@ -63,8 +77,12 @@ def test_config_people_file_missing(tmp_path):
     run, data = export(VALID, tmp_path, write_variant(tmp_path, people_file=None))
     assert run.code == 0 and run.crash is None, run.output
     assert data["people"] == []
-    assert {a["person_id"] for p in data["publications"] for a in p["authors"]} == {None}
-    assert item(data, "collaborators", "name", "A. Adams")["publication_count"] > 1
+    assert {a["person_id"] for w in data["works"] for a in w["authors"]} == {None}
+    # Every authorship still references exactly one contributor, so nothing
+    # falls out of the graph when there is nobody to resolve against.
+    assert [a for w in data["works"] for a in w["authors"]
+            if not a["collaborator_key"]] == []
+    assert item(data, "collaborators", "name", "Alice Adams")["work_count"] > 1
 
 
 @covers("config.people_file.missing")
@@ -80,19 +98,34 @@ def test_config_projects_file_missing(tmp_path):
     run, data = export(VALID, tmp_path, write_variant(tmp_path, projects_file=None))
     assert run.code == 0 and run.crash is None, run.output
     assert data["projects"] == []
-    # Project tags on publications are kept.
-    assert publication(data, "proj-multiple")["project_ids"] == ["homebot", "sharedarm"]
+    # Project tags on works are kept.
+    assert work(data, "proj-multiple")["project_ids"] == ["homebot", "sharedarm"]
 
 
 # --- Links that depend on config --------------------------------------------
 
+def valid_pdf_base(tmp_path):
+    """The valid corpus exported with its ordinary local `pdf_base_url`."""
+    run, data = export(VALID, tmp_path / "with-base")
+    assert run.code == 0 and run.crash is None, run.output
+    return data
+
+
 @covers("links.pdf.remote_guess", xfail="#20", owns=("missing",))
-def test_remote_pdf_url_not_guessed(tmp_path):
-    """A remote pdf_base_url gives a PDF link only for papers known to have a PDF."""
+def test_remote_pdf_url_not_verified(tmp_path):
+    """A remote pdf_base_url gives a link nobody has checked.
+
+    The link is kept and labelled either way -- that is #56's structural fix
+    for #20 -- but `unchecked` is still not an answer about whether the file
+    is there. #20 is what makes a remote base say `verified` or `missing`,
+    as a local one already does.
+    """
     variant = write_variant(tmp_path, pdf_base_url="https://example.org/pdfs")
     run, data = export(VALID, tmp_path, variant)
     assert run.code == 0 and run.crash is None, run.output
-    assert publication(data, "missing")["pdf_url"] is None
+    link = work(data, "missing")["links"]["pdf"][0]
+    assert link["url"] == "https://example.org/pdfs/missing.pdf"
+    assert link["verification"]["status"] != "unchecked", link
 
 
 # --- CLI flags and output formats --------------------------------------------
@@ -161,7 +194,7 @@ def test_cli_output_creates_parent_dirs(tmp_path, valid_output):
     assert run.code == 0 and run.crash is None, run.output
     assert out.exists()
     assert str(out) in run.stdout
-    assert str(len(valid_output["publications"])) in run.stdout
+    assert str(len(valid_output["works"])) in run.stdout
 
 
 @covers("cli.validate", "diag.unresolved_authors")
@@ -169,9 +202,9 @@ def test_cli_validate(valid_validate, valid_output):
     assert valid_validate.crash is None
     assert valid_validate.code == 0, valid_validate.output
     # Counts, and unresolved external authors, which are not errors.
-    for section in ("publications", "people", "projects"):
+    for section in ("works", "people", "projects"):
         assert str(len(valid_output[section])) in valid_validate.stdout
-    assert "Q. Quinn" in valid_validate.stdout
+    assert "Quentin Quinn" in valid_validate.stdout
 
 
 @covers("diag.validation_passed")
@@ -183,7 +216,7 @@ def test_cli_validate_closes_with_a_summary_line(valid_validate, valid_output):
     """
     assert valid_validate.code == 0, valid_validate.output
     lines = [line for line in valid_validate.stdout.splitlines() if line.strip()]
-    counts = {str(len(valid_output[s])) for s in ("publications", "people", "projects")}
+    counts = {str(len(valid_output[s])) for s in ("works", "people", "projects")}
     closing = lines[-1]
     assert not closing.startswith(" "), closing
     assert not any(count in closing for count in counts), closing

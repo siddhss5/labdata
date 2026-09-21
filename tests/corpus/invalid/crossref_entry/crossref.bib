@@ -1,0 +1,17 @@
+% CASE structure.crossref
+% The reproduction from #65: a child entry that inherits from a parent used
+% to lose every author it did not write itself, with no warning and a
+% successful exit. crossref is rejected rather than resolved, so the run
+% fails and names the child and the file it came from. The parent is an
+% ordinary entry and is not the problem.
+
+@proceedings{proc2024,
+  title  = {Proceedings of the Example Conference},
+  year   = {2024},
+  author = {Adams, Alice}
+}
+
+@inproceedings{child2024,
+  title    = {A Child Entry},
+  crossref = {proc2024}
+}

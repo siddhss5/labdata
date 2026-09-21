@@ -6,6 +6,8 @@
 # CASE config.lab.missing
 # CASE output.lab
 # CASE output.schema_version
+# CASE output.generator
+# CASE output.derived_is_empty
 lab:
   name: "Corpus Lab"
   description: "A fictional lab used only by the labdata conformance tests."
@@ -21,7 +23,7 @@ site:
 # CASE config.bib_dir.present
 bib_dir: "."
 # CASE config.bib_files.present
-# CASE output.publication.category
+# CASE output.work.category
 bib_files:
   - name: "strings.bib"
     category: "Strings"

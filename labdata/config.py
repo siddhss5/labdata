@@ -50,6 +50,10 @@ class LabDataConfig:
     projects_file: Optional[str] = None
     lab: Optional[Dict[str, str]] = None
 
+    # Where this configuration was read from, so a diagnostic about it can
+    # name the file the user would edit. Never emitted.
+    path: Optional[str] = None
+
     @classmethod
     def from_yaml(cls, path: str) -> 'LabDataConfig':
         """Load configuration from a YAML file."""
@@ -67,4 +71,5 @@ class LabDataConfig:
             people_file=data.get('people_file'),
             projects_file=data.get('projects_file'),
             lab=data.get('lab'),
+            path=str(path),
         )

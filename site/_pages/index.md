@@ -6,7 +6,7 @@ classes: wide
 ---
 
 {% assign info = site.data.lab.lab %}
-{% assign pubs = site.data.lab.publications %}
+{% assign pubs = site.data.lab.works %}
 {% assign people = site.data.lab.people %}
 {% assign current = people | where: "status", "current" %}
 {% assign alumni = people | where: "status", "alumni" %}

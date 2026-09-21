@@ -14,11 +14,20 @@ import re
 import sys
 
 
-# The document composes the venue with Markdown emphasis (SPEC.md section 2,
-# Target #18). Rendering markup the document handed us is not the same as
+# A document that hands over a pre-composed venue string writes its emphasis
+# in Markdown. Rendering markup the document handed us is not the same as
 # recovering fields from it: after this substitution the page still cannot
 # say what the journal's name is on its own.
 EMPHASIS = re.compile(r"\*([^*]+)\*")
+
+# The links a page offers, in the order a reader wants them, with the label
+# each gets. The document files links by kind and may carry several of one
+# kind, so every record under a kind is rendered rather than only the first.
+LINK_KINDS = (("pdf", "PDF"), ("doi", "DOI"), ("arxiv", "arXiv"),
+              ("url", "Link"), ("video", "Video"))
+
+# What the page prints beside the venue name, from the work's own properties.
+PLACEMENT = ("volume", "number", "pages")
 
 ROLES = {
     "professor": "Faculty",
@@ -44,13 +53,20 @@ def name_from_parts(author):
 
 
 def venue_html(pub):
-    """The venue, as HTML."""
+    """Where the work appeared, as HTML: the container emphasised, then its
+    placement in it.
+
+    The emphasis is the page's, not the document's. A structured venue gives
+    the container's name and nothing else, so what a reader sees is composed
+    here -- which is the point: a consumer that wants a different citation
+    style can compose a different one.
+    """
     venue = pub.get("venue")
-    if isinstance(venue, dict):
-        head = "<em>%s</em>" % esc(venue.get("name") or "")
-        rest = [str(venue[k]) for k in ("volume", "number", "pages") if venue.get(k)]
-        return ", ".join([head] + [esc(r) for r in rest])
-    return EMPHASIS.sub(r"<em>\1</em>", esc(venue or ""))
+    if not isinstance(venue, dict):
+        return EMPHASIS.sub(r"<em>\1</em>", esc(venue or ""))
+    parts = ["<em>%s</em>" % esc(venue.get("name") or "")]
+    parts += [esc(pub[key]) for key in PLACEMENT if pub.get(key)]
+    return ", ".join(parts)
 
 
 def esc(text):
@@ -73,9 +89,10 @@ def publication_html(pub):
     out.append('<span class="year">%s</span>' % esc(pub["year"]))
     if pub.get("note"):
         out.append("<span>%s</span>" % esc(pub["note"]))
-    links = [link(pub[key], label) for key, label in
-             (("pdf_url", "PDF"), ("doi_url", "DOI"), ("arxiv_url", "arXiv"),
-              ("url", "Link"), ("video_url", "Video")) if pub.get(key)]
+    filed = pub.get("links") or {}
+    links = [link(record["url"], label)
+             for kind, label in LINK_KINDS
+             for record in filed.get(kind) or [] if record.get("url")]
     if links:
         out.append("<span>%s</span>" % " ".join(links))
     if pub.get("abstract"):
@@ -92,7 +109,7 @@ def person_html(person):
     for key in ("degree", "thesis_title", "co_advisor", "current_position"):
         if person.get(key):
             out.append("<span>%s</span>" % esc(person[key]))
-    out.append("<span>%s publications</span>" % esc(person["publication_count"]))
+    out.append("<span>%s works</span>" % esc(person["work_count"]))
     out.append("</li>")
     return "\n".join(out)
 
@@ -105,7 +122,7 @@ def project_html(project):
     if project.get("description"):
         out.append("<p>%s</p>" % esc(project["description"]))
     out.append("<span>%s: %s works, %s people</span>"
-               % (esc(project["status"]), len(project["publication_ids"]),
+               % (esc(project["status"]), len(project["work_ids"]),
                   len(project["people_ids"])))
     out.append("</li>")
     return "\n".join(out)
@@ -122,13 +139,13 @@ def render(doc):
 
     out.append("<h2>Publications</h2>")
     categories = []
-    for pub in doc["publications"]:            # already ordered, SPEC.md section 3
+    for pub in doc["works"]:                   # already ordered, SPEC.md section 3
         if pub["category"] not in categories:
             categories.append(pub["category"])
     for category in categories:
         out.append("<h3>%s</h3>" % esc(category))
         out.append("<ul>")
-        out += [publication_html(p) for p in doc["publications"]
+        out += [publication_html(p) for p in doc["works"]
                 if p["category"] == category]
         out.append("</ul>")
 
@@ -144,8 +161,10 @@ def render(doc):
 
     out.append("<h2>Collaborators</h2>")
     out.append("<ul>")
-    # No id on these: the document gives a collaborator none. That is the
-    # gap graph.py fails on, and this page shows it rather than inventing one.
+    # No id on these. A collaborator's `key` is a lookup key over grouped
+    # authorships and explicitly not an assertion about a human, so this page
+    # does not turn it into the address of a person's entry. A page that
+    # wants collaborator pages should read the key knowing what it is.
     out += ['<li class="collaborator"><span class="name">%s</span></li>' % esc(c["name"])
             for c in doc["collaborators"]]
     out.append("</ul>")

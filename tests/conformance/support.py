@@ -32,7 +32,11 @@ VALID = CORPUS / "valid"
 INVALID = CORPUS / "invalid"
 EXPECTED = CORPUS / "expected"
 REPO_ROOT = TESTS_DIR.parent
-SCHEMA_PATH = REPO_ROOT / "schema" / "output.schema.json"
+SCHEMA_PATH = REPO_ROOT / "schema" / "v4" / "output.schema.json"
+
+# The previous version's schema, which stays reachable byte for byte after v4
+# ships: a consumer pinned to v3 keeps a stable target (SPEC.md section 6).
+PREVIOUS_SCHEMA_PATH = REPO_ROOT / "schema" / "v3" / "output.schema.json"
 
 
 def _xfail_marks(xfail, because=None):
@@ -199,9 +203,9 @@ def xfail_owned_entries() -> Set[str]:
 
 # --- Looking things up in the output ---------------------------------------
 
-def publication(data, bib_id):
-    matches = [p for p in data["publications"] if p["bib_id"] == bib_id]
-    assert len(matches) == 1, f"expected one publication {bib_id!r}, found {len(matches)}"
+def work(data, bib_id):
+    matches = [w for w in data["works"] if w["bib_id"] == bib_id]
+    assert len(matches) == 1, f"expected one work {bib_id!r}, found {len(matches)}"
     return matches[0]
 
 

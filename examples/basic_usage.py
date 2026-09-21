@@ -15,7 +15,7 @@ print("=" * 50)
 config = LabDataConfig.from_yaml("config.yaml")
 data = assemble(config)
 
-print(f"Publications: {len(data.publications)}")
+print(f"Works: {len(data.works)}")
 print(f"People: {len(data.people)}")
 print(f"Projects: {len(data.projects)}")
 
@@ -32,14 +32,15 @@ print("Exported to output/lab.json")
 print("\n\nExample 2: Working with the data")
 print("=" * 50)
 
-for pub in data.publications[:3]:
-    author_names = ", ".join(a.name for a in pub.authors)
-    print(f"\n{pub.title}")
+for work in data.works[:3]:
+    author_names = ", ".join(a.name for a in work.authors)
+    print(f"\n{work.title}")
     print(f"  {author_names}")
-    print(f"  {pub.venue}")
-    if pub.project_ids:
-        print(f"  Projects: {', '.join(pub.project_ids)}")
+    if work.venue:
+        print(f"  {work.venue.name} ({work.venue.kind})")
+    if work.project_ids:
+        print(f"  Projects: {', '.join(work.project_ids)}")
 
 for person in data.people:
     print(f"\n{person.name} ({person.role}, {person.status})")
-    print(f"  {person.publication_count} publications")
+    print(f"  {person.work_count} works")

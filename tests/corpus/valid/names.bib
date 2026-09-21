@@ -1,7 +1,7 @@
 % Fictional author-name cases for tests/COVERAGE.md.
 
 % CASE names.last_first
-% CASE output.publication.authors
+% CASE output.work.authors
 @article{name-last-first,
   title   = {Last, First Form},
   author  = {Adams, Alice},
@@ -234,7 +234,15 @@
 
 % CASE identity.external
 % CASE output.collaborator.name
-% CASE output.collaborator.publication_count
+% CASE output.collaborator.key
+% CASE output.collaborator.grouped_by
+% CASE output.collaborator.name_kind
+% CASE output.collaborator.name_variants
+% CASE output.collaborator.authorships
+% CASE output.collaborator.work_ids
+% CASE output.collaborator.authorship_count
+% CASE output.collaborator.derived
+% CASE output.collaborator.work_count
 % CASE output.collaborator.last_year
 % CASE output.collaborators.order
 @article{id-external-2023,
@@ -249,4 +257,31 @@
   author  = {Adams, Alice and Quinn, Quentin and Ross, Rachel},
   journal = {Journal of Fictional Robots},
   year    = {2019}
+}
+
+% One external name written two ways that normalise alike, and one written
+% with an initial only. The grouping key is the normalised full name, so the
+% two spellings are one key -- which labdata reports, because a key spanning
+% more than one spelling is a merge a consumer cannot see -- and the
+% initials-only name is a key of its own that could be either Quinn.
+% CASE identity.grouping_spellings
+% CASE identity.grouping_initials
+@article{id-grouping,
+  title   = {Two Spellings and an Initial},
+  author  = {Adams, Alice and ROSS, RACHEL and Quinn, Q.},
+  journal = {Journal of Fictional Robots},
+  year    = {2019}
+}
+
+% Two different people listed on one work under one written name, as a
+% collaboration's style sometimes requires. Any grouping by name puts them
+% together, so what has to survive is the occurrence: two authorships at two
+% positions under one key, with a work_count of 1 and an authorship_count
+% of 2.
+% CASE identity.alike_authorships
+@article{id-alike,
+  title   = {Two Co-authors Written Alike},
+  author  = {Adams, Alice and Young, Yolanda and Young, Yolanda},
+  journal = {Journal of Fictional Robots},
+  year    = {2018}
 }

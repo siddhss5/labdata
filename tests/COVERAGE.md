@@ -44,12 +44,13 @@ A case can also be checked by tests other than the one its row names; the
 status column reports `xfail` when any of them is xfailed.
 
 Cases that fail today are not fixed here (that is the linked issue's job):
-#20 (unverified PDF links), #21 (one `@string` summary), #24
-(structured-name matching), #26 (precise
+#20 (verifying a remote link), #21 (one `@string` summary), #24
+(structured-name matching and collaborator aliases), #26 (precise
 diagnostics), #27 (explicit link and award fields), #28 (`keywords` project
 tags). #18 is still open for
 the template side — `| escape`, attribute-safe escaping and the checks on
-rendered output — but every LaTeX-to-text row below passes.
+rendered output — but every LaTeX-to-text row below passes, and the one place
+labdata generated Markdown of its own, the composed `venue`, is gone.
 
 ## `@string` macros and BibTeX structure
 Rule: when a macro is defined more than once, **the last definition wins**, as
@@ -65,20 +66,22 @@ the second definition is the one that reaches the output.
 | `strings.concat` | `"Joined " # "Title"` and `"Proceedings of the " # cfx` | The parts are concatenated, macros expanded | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
 | `strings.macro_journal` | `journal = jfx # " Letters"` | The journal is the expanded macro plus the literal suffix | `tests/corpus/valid/strings.bib` | `test_valid_corpus.py::test_strings` | pass |
 | `strings.undefined` | `booktitle = nosuchmacro`, which no `@string` defines | Warning naming the file, key, field and macro; the entry and its neighbours are kept | `tests/corpus/invalid/undefined_string/macro.bib` | `test_invalid_corpus.py::test_kept` | xfail #26 |
-| `structure.comment_lines` | A `%` comment line between entries | Ignored; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
-| `structure.comment_entry` | `@comment{...}` wrapping something that looks like an entry | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
-| `structure.preamble` | `@preamble{"..."}` | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
-| `structure.comment_mentions_command` | A `%` comment line whose prose contains `@comment{` | Ignored; it is not read as a command, and the entry after it is read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_publications` | pass |
+| `structure.comment_lines` | A `%` comment line between entries | Ignored; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
+| `structure.comment_entry` | `@comment{...}` wrapping something that looks like an entry | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
+| `structure.preamble` | `@preamble{"..."}` | Not a publication; the entries around it are read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
+| `structure.comment_mentions_command` | A `%` comment line whose prose contains `@comment{` | Ignored; it is not read as a command, and the entry after it is read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_comments_and_preamble_are_not_works` | pass |
 | `structure.uppercase` | `@ARTICLE` with `TITLE`, `AUTHOR`, `JOURNAL`, `YEAR` | Read exactly as the lower-case spelling is | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_quoted` | Field values in `"quotes"` | Read like braced values | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_braced` | Field values in `{braces}`, including a doubly braced title | Read; the braces themselves never reach the output | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `structure.value_numeric` | Unquoted numeric `year`, `volume`, `number` | Read like quoted values | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `structure.crossref` | A child entry with `crossref` to a `@proceedings` parent | Missing fields come from the parent: the parent's year, and its title as the booktitle | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `structure.proceedings` | An ordinary `@proceedings` entry that nothing cross-refers to | Read like any other entry: its own year, author and booktitle | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `structure.crossref` | An entry carrying a `crossref` field | Error: stable `BIB-CROSSREF-UNSUPPORTED` names the file, the citation key and the parent key, and the run exits non-zero in every mode. The entry is not emitted | `tests/corpus/invalid/crossref_entry/crossref.bib` | `test_invalid_corpus.py::test_locates` | pass |
+| `structure.crossref_undefined_parent` | A `crossref` naming an entry that does not exist | The same error, not a milder one | `tests/corpus/invalid/crossref_undefined_parent/crossref.bib` | `test_invalid_corpus.py::test_locates` | pass |
 | `structure.bom_crlf` | A file with a UTF-8 BOM and CRLF line endings | Read normally; the BOM is not part of the first key, accents still decode | `tests/corpus/valid/encoding.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `structure.unclosed_brace` | An entry whose `title` brace is never closed | Warning naming the file and key; the entries before and after it are still read | `tests/corpus/invalid/unclosed_brace/broken.bib` | `test_invalid_corpus.py::test_kept` | xfail #26 |
+| `structure.unclosed_brace` | An entry whose `title` brace is never closed | Warning naming the file, key and `title`; the entries before and after it are still read | `tests/corpus/invalid/unclosed_brace/broken.bib` | `test_invalid_corpus.py::test_kept` | xfail #26 |
 | `structure.duplicate_key_file` | The same citation key twice in one file | Stable `BIB-DUPLICATE-KEY` error names the file, key and `citation_key` field | `tests/corpus/invalid/duplicate_key_same_file/dup.bib` | `test_invalid_corpus.py::test_locates` | pass |
 | `structure.duplicate_key_across` | The same citation key in two files | Stable `BIB-DUPLICATE-KEY` error names both files, keys and `citation_key` field | `tests/corpus/invalid/duplicate_key_across_files/first.bib` | `test_invalid_corpus.py::test_locates` | pass |
-| `structure.missing_year` | An entry with no `year` | Warning naming the file, key and field | `tests/corpus/invalid/missing_year/noyear.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
+| `structure.missing_year` | An entry with no `year` | Stable `BIB-YEAR-MISSING` warning names the file, key and `year`; the work is emitted with `year: null` and sorts last | `tests/corpus/invalid/missing_year/noyear.bib` | `test_invalid_corpus.py::test_locates` | pass |
 | `structure.year_not_number` | `year = {in press}` | Warning naming the file, key and field; the entry and its neighbours are kept | `tests/corpus/invalid/year_not_number/badyear.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `structure.missing_journal` | An `@article` with no `journal` | Warning naming the file, key and field; the entry is kept | `tests/corpus/invalid/missing_journal/nojournal.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `structure.missing_booktitle` | An `@inproceedings` with no `booktitle` | Warning naming the file, key and field; the entry is kept | `tests/corpus/invalid/missing_booktitle/nobooktitle.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
@@ -88,65 +91,68 @@ Every type labdata has a venue rule for, plus one it does not.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `types.article` | `@article` with `journal`, `volume`, `number` | Venue: journal, volume(number), year | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `types.inproceedings` | `@inproceedings` with `booktitle` | Venue: booktitle, year | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `types.phdthesis` | `@phdthesis` with `school` | Venue: PhD thesis, school, year | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `types.mastersthesis` | `@mastersthesis` with `school` | Venue: Masters thesis, school, year | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `types.techreport` | `@techreport` with `type`, `number`, `institution` | Venue: type and number, institution, year | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `types.techreport_default` | `@techreport` with only `institution` | Venue: a default report label, institution, year | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `types.misc_arxiv` | `@misc` with `eprint` | Venue: the arXiv identifier and year | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `types.misc` | `@misc` with no venue fields | Venue: the year alone | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `types.article` | `@article` with `journal`, `volume`, `number` | Venue `{kind: journal, name: <journal>}`; `volume` and `number` are properties of the work | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `types.inproceedings` | `@inproceedings` with `booktitle` | Venue `{kind: conference, name: <booktitle>}` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `types.phdthesis` | `@phdthesis` with `school` | Venue `{kind: institution, name: <school>}` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `types.mastersthesis` | `@mastersthesis` with `school` | Venue `{kind: institution, name: <school>}` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `types.techreport` | `@techreport` with `type`, `number`, `institution` | Venue `{kind: institution, name: <institution>}`; `type` and `number` are properties of the work, with BibTeX's meanings | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `types.techreport_default` | `@techreport` with only `institution` | The same venue; `type` is null rather than a label labdata invented | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `types.misc_arxiv` | `@misc` with `eprint` | Venue `{kind: repository, name: arXiv}`; the identifier is `identifiers.arxiv` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `types.misc` | `@misc` with no venue fields | Venue is null: nothing names a container, so the work declares none | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `types.unsupported` | `@book`, a type labdata has no venue rule for | Warning naming the file, key and type; the entry is kept | `tests/corpus/invalid/unsupported_entry_type/book.bib` | `test_invalid_corpus.py::test_locates` | xfail #26 |
-| `types.incollection` | `@incollection` with `booktitle`, `editor`, `chapter`, `pages`, `publisher`, `series`, `isbn` and `month` | No venue rule: the venue is the bare year, and the `booktitle` naming the collection is in no property of the work. The missing warning is `types.unsupported` | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_entry_types_without_a_venue_rule_degrade_to_the_year` | pass |
-| `types.inbook` | `@inbook` with `chapter`, `pages`, `publisher`, `address`, `edition` and `isbn` | No venue rule: the venue is the bare year, and the `publisher` of the book is in no property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_entry_types_without_a_venue_rule_degrade_to_the_year` | pass |
-| `types.book` | `@book` with `publisher`, `address`, `series`, `edition` and `isbn` | No venue rule: the venue is the bare year, and the `publisher` is in no property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_entry_types_without_a_venue_rule_degrade_to_the_year` | pass |
-| `types.manual` | `@manual` with `organization`, `address`, `edition` and `month` | No venue rule: the venue is the bare year, and the issuing `organization` is in no property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_entry_types_without_a_venue_rule_degrade_to_the_year` | pass |
+| `types.incollection` | `@incollection` with `booktitle`, `editor`, `chapter`, `pages`, `publisher`, `series`, `isbn` and `month` | The `booktitle` naming the collection is the venue's name, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
+| `types.inbook` | `@inbook` with `chapter`, `pages`, `publisher`, `address`, `edition` and `isbn` | The `publisher` of the book is a property of the work, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
+| `types.book` | `@book` with `publisher`, `address`, `series`, `edition` and `isbn` | The `publisher` is a property of the work, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
+| `types.manual` | `@manual` with `organization`, `address`, `edition` and `month` | The issuing `organization` is a property of the work, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
 
 ## Fields read
-Every BibTeX field labdata reads. Fields it does not read (`pages`,
-`publisher`, ...) are still preserved in the copyable `bibtex` output field.
+Every BibTeX field labdata reads. A field it emits no property for is still
+preserved in the copyable `bibtex` output field.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `fields.journal` | `journal` | Shown in the venue | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.volume` | `volume` | Shown in the venue | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.number` | `number` | Shown in the venue | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.booktitle` | `booktitle` | Shown in the venue | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.school` | `school` | Shown in the venue of a thesis | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.institution` | `institution` | Shown in the venue of a report | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.type` | `type` | Shown in the venue of a report | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.eprint` | `eprint` | Becomes `arxiv_url` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.archiveprefix` | `archivePrefix = {arXiv}` | Confirms `eprint` is an arXiv identifier | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.doi` | `doi` | Becomes `doi_url` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.url` | `url` | Becomes `video_url` for a known video host, otherwise `url` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.journal` | `journal` | The venue's name, with `kind: journal` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.volume` | `volume` | The `volume` property, as written | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.number` | `number` | The `number` property, keeping BibTeX's name and BibTeX's meaning | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.pages` | `pages` | The `pages` property, as written | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.publisher` | `publisher` | The `publisher` property, converted from LaTeX | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.booktitle` | `booktitle` | The venue's name, with a `kind` the entry type decides | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.school` | `school` | The venue's name, with `kind: institution` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.institution` | `institution` | The venue's name, with `kind: institution` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.type` | `type` | The `type` property: a report's own label, distinct from `entry_type` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.eprint` | `eprint` | An identifier under the scheme `archivePrefix` names | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.archiveprefix` | `archivePrefix = {arXiv}` | Becomes the identifier's scheme, so it needs no property of its own | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.doi` | `doi`, bare or written as a resolver URL | `identifiers.doi`, with the resolver prefix off | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.url` | `url` | A link of kind `video` for a known video host, otherwise `url`, with `origin: input` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.project` | `project = {homebot}` | Becomes `project_ids` | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.unread` | `pages` and `publisher`, which labdata does not read | Not dropped: they stay in the `bibtex` field | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.unread` | `keywords`, which labdata emits no property for | Not dropped: it stays in the `bibtex` field | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_structure` | pass |
 
-## Fields the demo carries that reach no property
-The fields #69 required a fixture for. One row each, and each bound to an
-assertion that **passes**: the field is in the input entry, and its value is
-at no path in the work. The field-loss probe reports all of them together,
-but that test is xfailed and so cannot turn red when a fixture goes missing;
-these rows are what gives each field its own grip. Every value here is also
+## Fields the demo carries, and the property each reaches
+The fields #69 required a fixture for. Under `schema_version` 3 each of them
+reached no property at all, and these rows recorded the loss; v4 closed it,
+and they now record where each one lands. One row each, and each bound to an
+assertion that the field's own **value** is at some path in the work and that
+the round-trip probe can write the field back out. Every value here is also
 preserved in the `bibtex` record, as `fields.unread` says.
 
-Each row reacts to its own field's **value**, wherever in the work it lands --
-a flat property, `identifiers[scheme]`, a parsed `editors` entry, a
+Each row reacts to its own field's value, wherever in the work it lands -- a
+flat property, `identifiers[scheme]`, a parsed `editors` entry, the
 structured `venue` -- and to nothing else. Not to a container that merely
 exists, since `identifiers: {}` and a null flat property are what a work with
 no such field looks like; and not by substring, since `chapter = {9}` and the
 ISBN `978-1-00-000003-5` are on the same work.
-`test_field_absence_reads_the_value_not_the_container` pins both directions.
+`test_field_presence_reads_the_value_not_the_container` pins both directions:
+which removals turn a row red, and which leave it alone.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `fields.editor` | `editor = {Quinn, Quentin and Silva, Sofia}` on an `@incollection` | Read by nothing: no editor's name is a value anywhere in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.month` | `month = {March}` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.chapter` | `chapter = {9}` on an `@inbook` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.isbn` | `isbn` on a `@book` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.organization` | `organization` on a `@manual` | Converted from LaTeX, then read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.issn` | `issn` on an `@article` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/journal.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
-| `fields.howpublished` | `howpublished` on a `@misc` | Read by nothing: its value is at no path in the work, and the round-trip probe cannot emit the field | `examples/demo/bib/other.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_no_property` | pass |
+| `fields.editor` | `editor = {Quinn, Quentin and Silva, Sofia}` on an `@incollection` | Parsed into `editors` beside the authors, name parts and all, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
+| `fields.month` | `month = {March}` | The `month` property, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
+| `fields.chapter` | `chapter = {9}` on an `@inbook` | The `chapter` property, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
+| `fields.isbn` | `isbn` on a `@book` | `identifiers.isbn`, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
+| `fields.organization` | `organization` on a `@manual` | Converted from LaTeX into the `organization` property, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
+| `fields.issn` | `issn` on an `@article` | `identifiers.issn`, and the round-trip probe emits the field | `examples/demo/bib/journal.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
+| `fields.howpublished` | `howpublished` on a `@misc` | The `howpublished` property, and the round-trip probe emits the field | `examples/demo/bib/other.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
 
 ## Name forms
 Author names as they appear in `.bib` files. `name` below is the `authors[].name`
@@ -154,19 +160,19 @@ field of the output.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `names.last_first` | `Adams, Alice` | Name `A. Adams`, resolved to the person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
-| `names.first_last` | `Bob Brown` | Name `B. Brown`, resolved to the person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
-| `names.particle_last_first` | `van den Berg, Victor` | The particle stays with the surname: `V. van den Berg` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
-| `names.particle_first_last` | `Rupert de la Cruz` | The particle stays with the surname: `R. de la Cruz` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.last_first` | `Adams, Alice` | Name `Alice Adams`, resolved to the person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.first_last` | `Bob Brown` | Name `Bob Brown`, resolved to the person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.particle_last_first` | `van den Berg, Victor` | The particle stays with the surname: `Victor van den Berg` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.particle_first_last` | `Rupert de la Cruz` | The particle stays with the surname: `Rupert de la Cruz` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.suffix` | `Smith, Jr., John` | The suffix is kept and is not mistaken for a given name | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.corporate` | `{Example Robotics Consortium}` | Kept as one name, without its braces, and not abbreviated | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.corporate_escaped` | `{AT\&T Research}` | Kept as one name, with `\&` decoded to `&` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
-| `names.hyphenated` | `Green, Grace-Ann` | Both halves of the given name are kept: `G.-A. Green` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
-| `names.structured` | Any author name | The parts BibTeX split it into — given, von, family, suffix, or literal for a corporate name — reach the output beside the display name | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_name_parts` | pass |
-| `names.accent_tex` | `C{\^o}t{\'e}, Carol` | Name `C. Côté`, resolved to the person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.hyphenated` | `Green, Grace-Ann` | The given name is kept whole, not abbreviated: `Grace-Ann Green` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `names.structured` | Any author or editor name | The parts BibTeX split it into — given, von, family, suffix, or literal for a brace-protected name — reach the output, and `name` is those parts joined in reading order, abbreviating nothing | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_name_parts` | pass |
+| `names.accent_tex` | `C{\^o}t{\'e}, Carol` | Name `Carol Côté`, resolved to the person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.accent_utf8` | `Côté, Carol` in raw UTF-8 | Same output as the TeX spelling, resolved to the same person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `names.others` | `... and others` | The real authors are resolved; `others` is not emitted as an author | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
-| `names.equal_contribution` | Each of `$^{*}$`, `^{*}`, `\textsuperscript{*}` and a trailing `*`, written in turn on the given name, the surname, the particle and the suffix — sixteen combinations | The marker is taken off that part: the display name and the structured parts read as they would without it, and the name resolves to the same person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
+| `names.equal_contribution` | Each of `$^{*}$`, `^{*}`, `\textsuperscript{*}` and a trailing `*`, written in turn on the given name, the surname, the particle and the suffix — sixteen combinations | The marker is taken off that part: the readable name and the structured parts read as they would without it, and the name resolves to the same person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
 | `names.equal_contribution_marker` | The same sixteen combinations, and every other author name in the corpus | `equal_contribution` is true for each of the sixteen marked authors and false for every other author in the valid corpus | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
 | `names.equal_contribution_normalized` | `Brown$^{*}$*` (the marker twice), `Kim{$^{*}$}` (in a brace group of its own), `Green\textsuperscript {*}` (a space before the argument, which BibTeX splits into two name parts, also written with a second marker after it) and `Davis{*}` (a brace group holding only a star) | The first three come off whole: nothing is left in the name and those authors are marked and resolve. The last is another command's argument rather than a marker, so it stays in the name and marks nobody | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
 | `names.equal_contribution_escaped` | `Brown\*`, `Davis\^{*}`, `Green\$^{*}$` and `Evans\\textsuperscript {*}` — a star, caret, dollar or backslash written with a backslash in front of it | Not a marker: `equal_contribution` stays false for all four, and the name parts keep their own boundaries. What each escaped spelling becomes is the ordinary LaTeX conversion's doing — the star survives in `Davis\^{*}` and `Green\$^{*}$` and is consumed with `\*` in `Brown\*` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_equal_contribution` | pass |
@@ -184,7 +190,10 @@ cannot be.
 | `identity.full_name` | A full name matching `name`, with no aliases declared | Resolved to that person | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #24 |
 | `identity.normalized` | `DAVIS, D` — different case and punctuation | Resolved: matching ignores case, accents and periods | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
 | `identity.fuzzy` | `Davis, Dave M.`, close to a person's name but not equal | Not auto-linked; reported as a suggestion for a human | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | xfail #24 |
-| `identity.external` | A co-author who is in no people file | Left unresolved and counted as a collaborator | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `identity.external` | A co-author who is in no people file | Left unresolved, grouped into a collaborator, and the authorship references that grouping's key | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_names` | pass |
+| `identity.alike_authorships` | Two different people listed on one work under one written name | One grouping key, two authorships at two positions; `work_count` is 1 and `authorship_count` is 2, so the occurrences survive the grouping | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_two_authorships_written_alike_stay_apart` | pass |
+| `identity.grouping_spellings` | One external name written `Ross, Rachel` on one entry and `ROSS, RACHEL` on another | One key with two `name_variants`, and a `ID-GROUPING-SPANS-SPELLINGS` warning naming the key. Not an error | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_grouping_risks_are_reported` | pass |
+| `identity.grouping_initials` | `Quinn, Q.` beside `Quinn, Quentin` | Two keys, which differ — the instability is intended, not a merge — and a `ID-GROUPING-INITIALS-AMBIGUOUS` warning naming both. Not an error | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_grouping_risks_are_reported` | pass |
 | `identity.ambiguous_alias` | Two people declaring the same alias | Warning naming both ids and the alias; the name resolves to neither | `tests/corpus/invalid/ambiguous_alias/people.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 
 ## LaTeX and text
@@ -220,16 +229,17 @@ the source text are not markup and must survive unchanged.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `links.doi_bare` | `doi = {10.5555/corpus.0001}` | `doi_url` is the DOI resolver URL | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
-| `links.doi_url` | `doi = {https://doi.org/10.5555/corpus.0002}` | Same URL, not doubled up | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
-| `links.arxiv_prefixed` | `eprint` with `archivePrefix = {arXiv}` | `arxiv_url` points at the abstract page | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
-| `links.arxiv_unprefixed` | `eprint` with no `archivePrefix` | `arxiv_url` points at the abstract page | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
-| `links.youtube` | `url` on youtube.com | Becomes `video_url`, not `url` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
-| `links.vimeo` | `url` on vimeo.com | Becomes `video_url`, not `url` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
-| `links.url` | `url` on any other host | Becomes `url`, not `video_url` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
-| `links.pdf.local_present` | `pdf_base_url` is a local directory holding `<key>.pdf` | `pdf_url` points at the file | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
-| `links.pdf.local_missing` | `pdf_base_url` is a local directory with no `<key>.pdf` | `pdf_url` is null: no button for a file that is not there | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
-| `links.pdf.remote_guess` | `pdf_base_url` is a remote URL, nothing says the PDF exists | No guessed `pdf_url` for an unverified paper | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_remote_pdf_url_not_guessed` | xfail #20 |
+| `links.doi_bare` | `doi = {10.5555/corpus.0001}` | A link of kind `doi` at the DOI resolver URL | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.doi_url` | `doi = {https://doi.org/10.5555/corpus.0002}` | The same URL, not doubled up | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.arxiv_prefixed` | `eprint` with `archivePrefix = {arXiv}` | A link of kind `arxiv` at the abstract page | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.arxiv_unprefixed` | `eprint` with no `archivePrefix` | A link of kind `arxiv` at the abstract page | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.youtube` | `url` on youtube.com | A link of kind `video`, and none of kind `url` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.vimeo` | `url` on vimeo.com | A link of kind `video`, and none of kind `url` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.url` | `url` on any other host | A link of kind `url`, and none of kind `video` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.origin` | A link from the entry's own `url`, and one labdata built from an identifier | `origin: input` for the first, `origin: derived` for the second | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.pdf.local_present` | `pdf_base_url` is a local directory holding `<key>.pdf` | A link of kind `pdf` with `verification.status: verified` and `checked_at: null` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.pdf.local_missing` | `pdf_base_url` is a local directory with no `<key>.pdf` | The link is kept with `verification.status: missing`, not deleted: a broken link and an absent one are different answers | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.pdf.remote_guess` | `pdf_base_url` is a remote URL, nothing says the PDF exists | The link says `verified` or `missing` rather than `unchecked`; a build never fetches, so this needs a committed cache | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_remote_pdf_url_not_verified` | xfail #20 |
 | `links.note_link_award` | A `note` holding both an `\href` and an award | Both survive; the award is available as its own field | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | xfail #27 |
 
 ## Projects
@@ -261,7 +271,7 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
 | `config.lab.present` | A `lab:` section | Copied into the output as `lab` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
-| `config.lab.missing` | No `lab:` section | Accepted; the output has no `lab` key | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_lab_missing` | pass |
+| `config.lab.missing` | No `lab:` section | Accepted; `lab` is emitted as `{}`, so no header and an empty header are the same document | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_lab_missing` | pass |
 | `config.lab.wrong_type` | `lab: "Corpus Lab"`, a string | Error naming the file and the key | `tests/corpus/invalid/config_lab_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.site` | A `site:` section, read by the site config script | Accepted by labdata and not copied into the output | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
 | `config.bib_dir.present` | `bib_dir: "."` | The `.bib` files are read from that directory | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
@@ -274,14 +284,14 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 | `config.bib_files.category_missing` | A `bib_files` entry with no `category` | Error naming the file, the section and the missing key | `tests/corpus/invalid/config_bib_file_no_category/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.bib_files.not_found` | A `bib_files` entry naming a file that is not there | Error naming the missing file | `tests/corpus/invalid/bib_file_not_found/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.pdf_base_url.present` | `pdf_base_url` pointing at a local directory | PDF links are built from it | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_pdf_base_url_present` | pass |
-| `config.pdf_base_url.missing` | No `pdf_base_url` | Accepted; no publication gets a `pdf_url` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_pdf_base_url_missing` | pass |
+| `config.pdf_base_url.missing` | No `pdf_base_url` | Accepted; no work gets a link of kind `pdf` at all, which is a third answer beside `verified` and `missing` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_pdf_base_url_missing` | pass |
 | `config.pdf_base_url.wrong_type` | `pdf_base_url: 42` | Error naming the file and the key | `tests/corpus/invalid/config_pdf_base_url_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.people_file.present` | `people_file` pointing at a people list | People are loaded and authors are resolved against them | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_people_file_present` | pass |
 | `config.people_file.missing` | No `people_file` | Accepted; every author is a collaborator, and `--unresolved` says resolution is not configured | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_people_file_missing` | pass |
 | `config.people_file.not_found` | `people_file` naming a file that is not there | Error naming the key and the missing file | `tests/corpus/invalid/people_file_not_found/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.people_file.wrong_type` | `people_file` as a list | Error naming the file and the key | `tests/corpus/invalid/config_people_file_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.projects_file.present` | `projects_file` pointing at a project list | Projects are loaded and tags are validated against them | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_projects_file_present` | pass |
-| `config.projects_file.missing` | No `projects_file` | Accepted; no projects, and project tags are kept on publications | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_projects_file_missing` | pass |
+| `config.projects_file.missing` | No `projects_file` | Accepted; no projects, and project tags are kept on works | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_projects_file_missing` | pass |
 | `config.projects_file.not_found` | `projects_file` naming a file that is not there | Error naming the key and the missing file | `tests/corpus/invalid/projects_file_not_found/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.projects_file.wrong_type` | `projects_file` as a list | Error naming the file and the key | `tests/corpus/invalid/config_projects_file_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
 | `config.unknown_key` | A misspelled key such as `people_fil` | Warning naming the file and the unknown key | `tests/corpus/invalid/config_unknown_key/lab.yaml` | `test_invalid_corpus.py::test_locates` | xfail #26 |
@@ -298,7 +308,7 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 | `cli.format.yaml` | `--format yaml`, and the default with no `--format` | YAML holding the same data as `--format json` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format` | pass |
 | `cli.format.json` | `--format json` | JSON holding the same data as the YAML export | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format` | pass |
 | `cli.format.invalid` | `--format xml` | Usage error naming the bad value; no file is written | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format_invalid` | pass |
-| `cli.validate` | `--validate` | Counts of publications, people and projects, plus any unresolved authors and unknown projects | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_validate` | pass |
+| `cli.validate` | `--validate` | Counts of works, people and projects, plus any unresolved authors, warnings and unknown projects | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_validate` | pass |
 | `cli.unresolved` | `--unresolved` | Lists exactly the author names that did not resolve | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_unresolved` | pass |
 | `cli.unresolved_none` | `--unresolved` when every author resolves | Lists nobody | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_unresolved_none` | pass |
 | `cli.help` | `--help` | Names every flag | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_help` | pass |
@@ -325,55 +335,75 @@ a message does not break them.
 ## Output fields
 Every field of the generated `lab.yml` / `lab.json`, and the checks on the file
 as a whole. The structure is defined by
-[`schema/output.schema.json`](../schema/output.schema.json).
+[`schema/v4/output.schema.json`](../schema/v4/output.schema.json).
+
+Every closed object declares every property it can carry, and a value that
+does not apply is `null` rather than absent. The open maps — `lab`, `links`,
+`identifiers` and every `derived` bag — carry only the keys that have values,
+because emitting nulls over an unbounded key set says nothing.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `output.schema_version` | Any run | The output carries `schema_version` | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.lab` | A `lab:` section in the config | Copied through to `lab` | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.bib_id` | The citation key | `bib_id` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.title` | `title` | `title`, as plain text | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.authors` | `author` | `authors`: a list of `{name, person_id, given, von, family, suffix, literal, equal_contribution}`, in source order | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.year` | `year` | `year`, as an integer | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.venue` | The venue fields for the entry type | `venue`, the formatted venue string | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.category` | The `bib_files` category of the file the entry came from | `category` | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.entry_type` | The `@type` of the entry | `entry_type`, lower-cased | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.abstract` | `abstract` | `abstract`, or null | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.note` | `note` | `note`, or null | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.pdf_url` | A PDF that exists under `pdf_base_url` | `pdf_url`, or null | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.doi_url` | `doi` | `doi_url`, or null | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.arxiv_url` | `eprint` | `arxiv_url`, or null | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.url` | `url` that is not a video | `url`, or null | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.video_url` | `url` on a known video host | `video_url`, or null | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.project_ids` | `project` or namespaced `keywords` | `project_ids` | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.publication.bibtex` | The whole entry | `bibtex`, the copyable source, including fields labdata does not read | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.schema_version` | Any run | The output carries `schema_version` 4 | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.generator` | Any run | `generator` names the compiler, its package version and the schema version, and carries no timestamp | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.lab` | A `lab:` section in the config | Copied through to `lab`, which is always emitted — `{}` when there is no header, so a consumer can tell that from a header with nothing in it | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.bib_id` | The citation key | `bib_id` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.source` | The `bib_files` entry the file was listed under | `source: {file, key}`, where `file` is the configured name and never a path | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.title` | `title` | `title`, as plain text | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.authors` | `author` | `authors`: one authorship per name, in source order, each with `name`, `position`, the four name parts plus `literal`, `resolution`, `derived`, and exactly one of `person_id` and `collaborator_key` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.editors` | `editor` | `editors`: the same record without a grouping key or an equal-contribution marker; `[]` when the entry names none | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.year` | `year` | `year`, as an integer, or null when the entry supplied none | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.venue` | The container field for the entry type | `venue: {kind, name}`, or null when the entry names no container | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.bibliographic` | `volume`, `number`, `pages`, `series`, `edition`, `publisher`, `address`, `organization`, `chapter`, `month`, `howpublished`, `type` | Each flat on the work under BibTeX's own name, and null when the entry wrote none | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.category` | The `bib_files` category of the file the entry came from | `category` | `tests/corpus/valid/lab.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.entry_type` | The `@type` of the entry | `entry_type`, lower-cased | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.abstract` | `abstract` | `abstract`, or null | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.note` | `note` | `note`, or null | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.identifiers` | `doi`, `eprint`, `isbn`, `issn` | `identifiers`, an open map from scheme to a list of identifiers; `{}` when the entry carries none | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.links` | `url`, `pdf_base_url`, and the identifiers labdata builds links from | `links`, an open map from kind to a list of `{url, label, origin, verification}` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.project_ids` | `project` or namespaced `keywords` | `project_ids` | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.bibtex` | The whole entry | `bibtex`, the copyable source, including fields labdata emits no property for; null when it could not be written back out | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.derived` | Any run | `derived`, an open bag reserved for labdata, `{}` today | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.id` | `id` in `people.yaml` | `id` | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.name` | `name` | `name` | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.role` | `role` | `role`, or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.status` | `status` | `status` | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.website` | `website` | `website`, or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.person.photo` | `photo` | `photo`, when set | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.person.email` | `email` | `email`, when set | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.person.co_advisor` | `co_advisor` | `co_advisor`, when set | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.person.start_year` | `start_year` | `start_year`, when set | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.person.end_year` | `end_year` on an alumnus | `end_year`, when set | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.person.degree` | `degree` on an alumnus | `degree`, when set | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.person.thesis_title` | `thesis_title` on an alumnus | `thesis_title`, when set | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.person.current_position` | `current_position` on an alumnus | `current_position`, when set | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.person.publication_count` | Papers the person appears on | `publication_count`, equal to the length of `publication_ids` | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.person.publication_ids` | Papers the person appears on | `publication_ids`, in publication order | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.photo` | `photo` | `photo`, or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.email` | `email` | `email`, or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.co_advisor` | `co_advisor` | `co_advisor`, or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.start_year` | `start_year` | `start_year`, or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.end_year` | `end_year` on an alumnus | `end_year`, declared for everyone and null for anyone who has none | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.degree` | `degree` on an alumnus | `degree`, declared for everyone and null for anyone who has none | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.thesis_title` | `thesis_title` on an alumnus | `thesis_title`, or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.current_position` | `current_position` on an alumnus | `current_position`, or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.work_count` | Works the person authored | `work_count`, equal to the length of `work_ids`; editors are not authorships and are not counted | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.work_ids` | Works the person authored | `work_ids`, in works order | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.person.derived` | Any run | `derived`, `{}` today | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.project.id` | `id` in `projects.yaml` | `id` | `tests/corpus/valid/projects.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.project.title` | `title` | `title` | `tests/corpus/valid/projects.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.project.description` | `description` | `description`, or null | `tests/corpus/valid/projects.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.project.website` | `website` | `website`, or null | `tests/corpus/valid/projects.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.project.status` | `status` | `status` | `tests/corpus/valid/projects.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.project.publication_ids` | Papers tagged with the project | `publication_ids` | `tests/corpus/valid/projects.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.project.people_ids` | Authors of those papers who are lab members | `people_ids`, sorted | `tests/corpus/valid/projects.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.collaborator.name` | An author who resolved to nobody | `name` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.collaborator.publication_count` | Papers that name the collaborator | `publication_count` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.collaborator.last_year` | The most recent of those papers | `last_year` | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.collaborators.order` | Several collaborators | Sorted by last year, then paper count, then name | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_collaborators_order` | pass |
-| `output.schema` | The valid corpus output | Validates against the JSON Schema, which rejects unknown fields | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_valid_corpus_matches_schema` | pass |
+| `output.project.work_ids` | Works tagged with the project | `work_ids` | `tests/corpus/valid/projects.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.project.people_ids` | Authors of those works who are lab members | `people_ids`, sorted | `tests/corpus/valid/projects.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.project.derived` | Any run | `derived`, `{}` today | `tests/corpus/valid/projects.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborator.key` | An authorship that resolved to nobody | `key`: a readable slug of the normalised name plus an always-present short digest. A lookup key, explicitly not an assertion about a human | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborator.grouped_by` | Any collaborator | `grouped_by`, `normalized_name` in v4 | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborator.name_kind` | A parsed name, and a brace-protected one | `name_kind`, `personal` or `literal` — never `organization`, because braces mean "do not parse this" and cover mononyms too | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborator.name` | The spellings this key grouped | `name` is the first in document order, and the name parts beside it are that spelling's | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborator.name_variants` | Two spellings that normalise alike | `name_variants`, the distinct spellings, ascending | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborator.authorships` | The occurrences this key grouped | `authorships`, each `{work_id, position}`, in document order — the record a consumer that distrusts the grouping falls back to | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborator.work_ids` | Works that name the collaborator | `work_ids`, in document order, deduplicated | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborator.work_count` | Works that name the collaborator | `work_count`, deduplicated per work | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborator.authorship_count` | Occurrences this key grouped | `authorship_count`, which counts occurrences rather than works | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborator.last_year` | The most recent of those works | `last_year`, or null when none of them has a year | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborator.derived` | Any run | `derived`, `{}` today | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.collaborators.order` | Several collaborators | Sorted by last year descending with null last, then work count descending, then key | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_collaborators_order` | pass |
+| `output.no_markup` | A title carrying Markdown punctuation, and the demo | Nothing labdata composes is Markdown or HTML; punctuation that survives is input text | `tests/corpus/valid/latex.bib` | `test_output_format.py::test_markup_in_the_corpus_is_only_text_the_input_wrote` | pass |
+| `output.derived_is_empty` | The corpus and the demo | Every `derived` bag is `{}`, so the region cannot quietly fill | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_every_derived_bag_is_empty` | pass |
+| `output.schema` | The valid corpus output | Validates against the JSON Schema, which rejects unknown fields and an authorship carrying two contributor references or none | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_valid_corpus_matches_schema` | pass |
+| `output.versioned_schema` | The published schemas | v4 lives at its own path and v3 stays reachable unchanged, still saying 3 | `schema/v3/output.schema.json` | `test_output_format.py::test_the_previous_schema_stays_reachable_unchanged` | pass |
 | `output.demo_schema` | The Example Lab demo output | Validates against the same schema, in both formats | `examples/demo/lab.yaml` | `test_output_format.py::test_demo_matches_schema` | pass |
 | `output.yaml_json_same` | The same run exported twice | The YAML and JSON exports hold the same data | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_yaml_and_json_hold_the_same_data` | pass |
 | `output.full` | The valid corpus entries no open issue owns | Match `tests/corpus/expected/valid.yaml`, compared as parsed data | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_full_output` | pass |
@@ -388,21 +418,23 @@ scenarios asserted over the node and edge sets `graph.py` builds.
 The field-loss probe is a **field-loss detector, not a value round trip**:
 LaTeX-to-Unicode conversion is one-way, so comparing values would assert
 something false. Its one ignore set member, `project`, is named on its own in
-the test with the reason it is not a loss.
+the test with the reason it is not a loss: it is labdata's own tag field
+rather than a bibliographic one, and it does reach the document, as
+`project_ids`.
 
 The identity rows are filed against **two** issues, because two issues
-promise them. #56 settles a grouping keyed on the normalised full name and
+promise them. #56 settled a grouping keyed on the normalised full name and
 says the policy itself is #24's; under that key `priya patel`, `p patel` and
-`pradeep patel` are three keys, so #56 delivers the separation but by
+`pradeep patel` are three keys, so #56 delivered the separation but by
 construction does not join two spellings of one person. Joining them needs
-the collaborator aliases of #24.
+the collaborator aliases of #24, which is why one row here is still `xfail`.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
 | `probe.roundtrip_shape` | The demo document | One BibTeX entry per work, keyed and typed from the document, carrying exactly the fields the document can still supply | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_entry_is_well_formed` | pass |
 | `probe.link_origin` | A work whose only link states an `origin` of `input`, `enrichment`, `sidecar`, `derived`, `inferred`, or none at all | The round-trip probe reads the link as the entry's `url` only when the document says it came from the input | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_reads_only_a_link_the_input_supplied` | pass |
-| `probe.field_loss` | Every entry of the demo, across its four `.bib` files | Every field name in a source entry reaches a first-class property, except `project`; the failure names every field lost, by entry and overall | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_loses_no_field` | xfail #56 |
+| `probe.field_loss` | Every entry of the demo, across its four `.bib` files | Every field name in a source entry reaches a first-class property, except `project`; the failure names every field lost, by entry and overall | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_loses_no_field` | pass |
 | `probe.identity_fixtures` | The demo document: one external co-author on three works in two spellings, a second with the same first initial and family name on a fourth, and two different people under one written name on a fifth | All four scenarios are present, with the given names kept apart on the authorships and one display name across all of them | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_identity_fixtures_are_present` | pass |
 | `probe.identity_one_person` | `Patel, Priya` on two works and `Patel, P.` on a third | Exactly one contributor in the `collaborator:` namespace touches any of the three works, and it holds exactly those three | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_joins_one_co_author_written_two_ways` | xfail #24 |
-| `probe.identity_distinct_people` | `Patel, Pradeep` on a fourth work | Exactly one contributor in the `collaborator:` namespace holds that work, it holds exactly that work, and it shares no contributor with the three above | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_separates_co_authors_sharing_an_initial` | xfail #56 |
-| `probe.identity_authorship` | `Lee, Lin and Lee, Lin`, two different people on one work | The document declares each authorship's `position`, and the graph carries two `authored` edges at those two positions from **one** contributor: one grouping, two addressable authorships | `examples/demo/bib/conference.bib` | `test_consumer_probes.py::test_graph_keeps_two_authorships_written_alike_apart` | xfail #56 |
+| `probe.identity_distinct_people` | `Patel, Pradeep` on a fourth work | Exactly one contributor in the `collaborator:` namespace holds that work, it holds exactly that work, and it shares no contributor with the three above | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_separates_co_authors_sharing_an_initial` | pass |
+| `probe.identity_authorship` | `Lee, Lin and Lee, Lin`, two different people on one work | The document declares each authorship's `position`, and the graph carries two `authored` edges at those two positions from **one** contributor: one grouping, two addressable authorships | `examples/demo/bib/conference.bib` | `test_consumer_probes.py::test_graph_keeps_two_authorships_written_alike_apart` | pass |

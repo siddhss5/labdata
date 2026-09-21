@@ -82,7 +82,7 @@ def test_kept(tmp_path, case_id, spec):
     run, data = export(INVALID / spec["dir"], tmp_path)
     assert run.crash is None, f"labdata crashed: {run.crash}"
     assert data is not None, run.output
-    keys = [p["bib_id"] for p in data["publications"]]
+    keys = [w["bib_id"] for w in data["works"]]
     missing = [k for k in spec["kept"] if k not in keys]
     assert not missing, f"entries dropped: {missing}"
 
@@ -92,7 +92,7 @@ def test_unknown_macro_keeps_its_text(tmp_path):
     """The macro's argument survives and no raw LaTeX reaches the output."""
     run, data = export(INVALID / DIAGNOSTICS["latex.unknown_macro"]["dir"], tmp_path)
     assert run.crash is None, run.crash
-    title = next(p["title"] for p in data["publications"] if p["bib_id"] == "unknown-macro")
+    title = next(w["title"] for w in data["works"] if w["bib_id"] == "unknown-macro")
     assert "Strange" in title
     assert "\\" not in title, title
 

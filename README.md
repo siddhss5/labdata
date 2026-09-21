@@ -17,8 +17,9 @@ labdata --config lab.yaml --output lab.yml
 
 - [`SPEC.md`](SPEC.md) — the normative contract: what the strings are, what
   order the lists are in, which fields are derived, when the version changes.
-- [`schema/output.schema.json`](schema/output.schema.json) — the document's
-  JSON Schema.
+- [`schema/v4/output.schema.json`](schema/v4/output.schema.json) — the
+  document's JSON Schema. Published versions are immutable and live at their
+  own paths; [`schema/v3/`](schema/v3/output.schema.json) is still there.
 - [`tests/COVERAGE.md`](tests/COVERAGE.md) — every input case labdata
   supports, and every case it does not, with the fixture and test for each.
 
@@ -92,25 +93,25 @@ nothing else:
 | Field | Becomes |
 |-------|---------|
 | `title` | `title`, LaTeX converted to plain Unicode text; `$...$` math kept as TeX |
-| `author` | `authors`, each with a display `name`, its `given` / `von` / `family` / `suffix` parts (or `literal` for a corporate name), a `person_id` when it matched someone in `people.yaml`, and `equal_contribution` |
-| `year` | `year`, and the sort order of the publication list |
-| `journal` / `booktitle` / `school` / `institution`, with `volume`, `number`, `type` | `venue`, composed according to the entry type ([`SPEC.md` §5](SPEC.md)). For an entry type there is no rule for — `@book`, `@incollection`, `@inbook`, `@manual` — the venue is the bare year and none of these fields reaches the document |
-| `doi` | `doi_url` |
-| `eprint` + `archivePrefix` | `arxiv_url` |
+| `author` | `authors`, one authorship per name, each with its `position`, a readable `name`, its `given` / `von` / `family` / `suffix` parts (or `literal` for a brace-protected name), `equal_contribution`, a `resolution` record, and exactly one of `person_id` and `collaborator_key` |
+| `editor` | `editors`, read by the same machinery. Editing a volume is not an authorship: editors count towards nobody's `work_count` and produce no collaborator |
+| `year` | `year`, and the sort order of the works list. `null`, with a diagnostic, when the entry has none |
+| `journal` / `booktitle` / `school` / `institution` | `venue`, as `{kind, name}` — the one place labdata normalises across entry types. `null` when the entry names no container |
+| `volume`, `number`, `pages`, `series`, `edition`, `publisher`, `address`, `organization`, `chapter`, `month`, `howpublished`, `type` | Properties of the work, under BibTeX's own names and with BibTeX's own meanings |
+| `doi`, `isbn`, `issn`, `eprint` + `archivePrefix` | `identifiers`, an open map from scheme to a list of identifiers, plus the links built from them |
 | `abstract` | `abstract` |
 | `note` | `note` |
-| `url` | `video_url` when it points at YouTube or Vimeo, otherwise `url` |
+| `url` | A link of kind `video` when it points at YouTube or Vimeo, otherwise of kind `url` |
 | `project` | `project_ids` (see below) |
-| `crossref` | Nothing directly: the named parent entry supplies fields this entry omits, and the parent's `title` becomes this entry's `booktitle`. `author` is **not** inherited |
-| `series`, `publisher`, `address`, `organization` | Nothing. They are LaTeX-converted like any other prose field — a malformed one is reported, naming the field — but the converted value is then used by nothing, so they reach the document only inside `bibtex` |
+| `crossref` | **An error.** Partial inheritance dropped every author a child entry did not write itself, silently; labdata rejects the field instead, names the file, the key and the parent, and fails the run. Write the fields out on the entry itself |
 
 The entry is also re-serialized into a `bibtex` field, so fields labdata does
-not interpret are still carried. It is a re-serialization, not a copy: field order,
-braces and quoting are normalised, `@string` macros are expanded, and fields
-inherited through `crossref` are not included. The full list of bibliographic
-fields the document does not yet carry as first-class properties is tracked in
-[#56](https://github.com/siddhss5/labdata/issues/56), and measured against the
-demo by `examples/consumers/bibtex_roundtrip.py`.
+not interpret are still carried. It is a re-serialization, not a copy: field
+order, braces and quoting are normalised and `@string` macros are expanded.
+That every field name in the demo's input reaches a first-class property is
+measured, not asserted: `examples/consumers/bibtex_roundtrip.py` re-emits each
+entry from the document alone and the test behind it fails naming any field
+that reached none.
 
 ### The `project` tag
 
@@ -131,7 +132,7 @@ project:
 
 Several projects go in one field, comma-separated:
 `project = {homebot, sharedcontrol}`. Each project in the document then
-back-links the publications tagged with it, and the people who wrote them.
+back-links the works tagged with it, and the people who wrote them.
 
 ### People (optional, `data/people.yaml`)
 
@@ -186,30 +187,45 @@ labdata matches BibTeX author names to lab members in two passes:
    for fuzzy matching — which is not the same as matching: they can still fall
    below the threshold and resolve to nobody.
 
-A name that matches nobody keeps `person_id: null` and appears in the derived
-`collaborators` list. `labdata --config lab.yaml --unresolved` lists those
-names so you can add aliases — or, if you have configured no `people_file`,
-tells you resolution was never attempted.
+Matching reads a private, abbreviated form of the name, never the `name` the
+document emits. The two are independent on purpose: what a consumer sees can
+change without changing who resolves to whom, and the matching policy can
+change without changing the schema.
 
-`collaborators` is keyed by display name, which is not an identity: three
-people who all write as `J. Smith` are one entry. Its `publication_count` is
-the number of unresolved authorship occurrences, not distinct publications.
-Read it as an index of unresolved authorships, not as a list of humans.
+A name that matches nobody keeps `person_id: null` and its authorship
+references a `collaborators` entry instead, by `collaborator_key`.
+`labdata --config lab.yaml --unresolved` lists those names so you can add
+aliases — or, if you have configured no `people_file`, tells you resolution
+was never attempted.
+
+**`collaborators` is a grouping over unresolved authorships, not a list of
+humans.** Its `key` is a lookup key — a slug of the normalised name plus a
+short digest — and explicitly not an assertion about a person: two people who
+write their names identically are one key. That is why each entry also lists
+the `authorships` it grouped, by `(work_id, position)`: a consumer that
+distrusts the grouping can ignore it and work from the occurrences. The
+grouping is keyed on the normalised full name, which over-splits — one person
+written `Priya Patel` on two papers and `P. Patel` on a third is two keys —
+and labdata reports both risks rather than leaving them silent: a key that
+spans more than one spelling, and an initials-only key that could be any of
+several fuller ones. Tuning the policy is
+[#24](https://github.com/siddhss5/labdata/issues/24).
 
 ## Reading the document
 
 The output is one YAML or JSON file. Strings in it that are meant for display
-— titles, abstracts, notes, names, project descriptions, each publication's
+— titles, abstracts, notes, names, project descriptions, each work's
 `category` — are plain Unicode text: not HTML, not Markdown, not escaped. They
 are untrusted, and a title really may contain `<`, `&`, `"` or `*`, so
 **escape them when you render them**. Math is the one intended markup
 exception and stays delimited by `$…$`.
 
-Two strings sit outside that rule. `bibtex` is a machine-oriented BibTeX
-record that deliberately keeps its LaTeX — copy it, do not display it as text.
-And `venue` contains generated Markdown today, a known deviation tracked in
-[#18](https://github.com/siddhss5/labdata/issues/18). Identifiers and URLs are
-not display text either. [`SPEC.md` §2](SPEC.md) treats all of this properly.
+One string sits outside that rule: `bibtex` is a machine-oriented BibTeX
+record that deliberately keeps its LaTeX — copy it, do not display it as
+text. Identifiers and URLs are not display text either. labdata itself
+generates no markup anywhere; where the document carries Markdown
+punctuation, an author wrote it. [`SPEC.md` §2](SPEC.md) treats all of this
+properly.
 
 labdata *enforces* that rule only where it converts: the BibTeX prose fields
 it reads. Strings you supply directly in YAML — names and roles in
@@ -226,7 +242,7 @@ is a test-only dependency, so install it first:
 pip install jsonschema
 python -c "
 import json, yaml, jsonschema
-schema = json.load(open('schema/output.schema.json'))
+schema = json.load(open('schema/v4/output.schema.json'))
 jsonschema.Draft202012Validator(schema).validate(yaml.safe_load(open('lab.yml')))
 print('valid')
 "
@@ -245,9 +261,9 @@ data = assemble(config)
 
 export_to_yaml(data, "lab.yml")
 
-for pub in data.publications:
-    authors = ", ".join(a.name for a in pub.authors)
-    print(f"{pub.title} ({authors})")
+for work in data.works:
+    authors = ", ".join(a.name for a in work.authors)
+    print(f"{work.title} ({authors})")
 ```
 
 Public: the names exported from `labdata/__init__.py`. Everything else —

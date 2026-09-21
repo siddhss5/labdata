@@ -55,8 +55,7 @@ def csl_name(author):
 def venue_parts(pub):
     """The venue as structured data, or None when the document composed it.
 
-    Today `venue` is one pre-composed string with Markdown emphasis inside
-    it -- `*Transactions on Robot Learning*, 4(2), 2025` -- so there is no
+    A document that hands over a pre-composed display string instead gives no
     container title to put in `container-title` and no volume or number
     beside it. Taking that string apart, or reading the opaque re-serialized
     export the document carries alongside it, would prove nothing about the
@@ -64,6 +63,41 @@ def venue_parts(pub):
     """
     venue = pub.get("venue")
     return venue if isinstance(venue, dict) else None
+
+
+def identifier(pub, scheme):
+    """The first identifier the document files under one scheme, or None.
+
+    CSL wants identifiers, not links. A link built from an identifier is not
+    invertible -- a `doi` written as a URL in the input is passed through as
+    the link unchanged -- so the identifier is read from the registry that
+    holds identifiers, and never reconstructed from a link. A document that
+    still carries the identifier as a flat property is read there too.
+    """
+    found = (pub.get("identifiers") or {}).get(scheme)
+    if isinstance(found, str):
+        found = [found]
+    if found:
+        return found[0]
+    return pub.get(scheme)
+
+
+def link_url(pub, *kinds):
+    """The first URL the document files under any of these link kinds.
+
+    Each kind is tried in turn, and a document that still carries a flat
+    `<kind>_url` property is read there too, so a link is not reported
+    missing because this looked in only one of the two places it could sit.
+    """
+    links = pub.get("links") or {}
+    for kind in kinds:
+        for record in links.get(kind) or []:
+            if isinstance(record, dict) and record.get("url"):
+                return record["url"]
+        flat = pub.get(kind + "_url")
+        if flat:
+            return flat
+    return None
 
 
 def bibliographic(pub, key):
@@ -96,22 +130,16 @@ def record(pub):
     if pages:
         out["page"] = str(pages).replace("--", "-")
 
-    # CSL wants identifiers, not links. `doi_url` and `arxiv_url` are links:
-    # the document builds them from an identifier it does not itself emit,
-    # and the construction is not invertible, because a `doi` written as a
-    # URL in the input is passed through as the link unchanged. So a probe
-    # cannot read the identifier back out of the link.
-    doi = bibliographic(pub, "doi")
+    doi = identifier(pub, "doi")
     if doi:
         out["DOI"] = str(doi)
-    for csl_key, doc_key in (("URL", "url"), ("abstract", "abstract"),
-                             ("note", "note")):
+    for csl_key, doc_key in (("abstract", "abstract"), ("note", "note")):
         if pub.get(doc_key):
             out[csl_key] = pub[doc_key]
-    out.setdefault("URL", pub.get("pdf_url") or pub.get("doi_url")
-                   or pub.get("arxiv_url"))
-    if out["URL"] is None:
-        del out["URL"]
+    # The work's own web page first, then whatever else it can be reached at.
+    url = link_url(pub, "url", "pdf", "doi", "arxiv")
+    if url is not None:
+        out["URL"] = url
     return out
 
 
@@ -121,7 +149,7 @@ def main(argv):
         return 2
     with open(argv[1], encoding="utf-8") as f:
         doc = json.load(f)
-    text = json.dumps([record(p) for p in doc["publications"]],
+    text = json.dumps([record(p) for p in doc["works"]],
                       indent=2, ensure_ascii=False, sort_keys=True)
     # Written as bytes so the export is UTF-8 whatever the locale says.
     sys.stdout.buffer.write((text + "\n").encode("utf-8"))

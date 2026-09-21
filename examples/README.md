@@ -3,7 +3,7 @@
 Minimal examples showing how to use labdata from the command line and from Python.
 
 All examples use the fictional **Example Lab** in [`demo/`](demo/): four BibTeX files,
-`people.yaml` and `projects.yaml`. Its people, publications and projects, and their
+`people.yaml` and `projects.yaml`. Its people, works and projects, and their
 example.org, DOI, arXiv and video links, are invented. Only `site.url` and `site.baseurl`
 in `demo/lab.yaml` are real: they are where the demo is deployed.
 Run the commands below from this `examples/` directory.

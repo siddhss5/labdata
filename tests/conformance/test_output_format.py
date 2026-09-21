@@ -10,13 +10,15 @@ and review the diff (git diff tests/corpus/expected/valid.yaml) before committin
 
 import json
 import os
+import re
 
 import jsonschema
 import pytest
 import yaml
 
 from .support import (
-    EXPECTED, REPO_ROOT, SCHEMA_PATH, VALID, covers, corpus_entry_keys, export, item, xfail_owned_entries,
+    EXPECTED, PREVIOUS_SCHEMA_PATH, REPO_ROOT, SCHEMA_PATH, VALID, covers,
+    corpus_entry_keys, export, item, xfail_owned_entries,
 )
 
 DEMO_CONFIG = "examples/demo/lab.yaml"
@@ -51,20 +53,38 @@ def schema_errors(validator, data):
 def check_references(data):
     """Every ID the output refers to exists in the output."""
     people = {p["id"] for p in data["people"]}
-    publications = {p["bib_id"] for p in data["publications"]}
-    for pub in data["publications"]:
-        for author in pub["authors"]:
-            assert author["person_id"] in people | {None}, (pub["bib_id"], author)
+    works = {w["bib_id"] for w in data["works"]}
+    keys = {c["key"] for c in data["collaborators"]}
+    for work in data["works"]:
+        for author in work["authors"]:
+            assert author["person_id"] in people | {None}, (work["bib_id"], author)
+            assert author["collaborator_key"] in keys | {None}, (work["bib_id"], author)
+            # Exactly one contributor, which is the `oneOf` the schema states
+            # and which is checked here too so it holds of the document even
+            # where nothing validates it.
+            assert (author["person_id"] is None) != (author["collaborator_key"] is None), \
+                (work["bib_id"], author)
+        for editor in work["editors"]:
+            assert editor["person_id"] in people | {None}, (work["bib_id"], editor)
     for person in data["people"]:
-        assert set(person.get("publication_ids", [])) <= publications, person["id"]
-        assert person["publication_count"] == len(person.get("publication_ids", []))
+        assert set(person["work_ids"]) <= works, person["id"]
+        assert person["work_count"] == len(person["work_ids"])
     for project in data["projects"]:
-        assert set(project["publication_ids"]) <= publications, project["id"]
+        assert set(project["work_ids"]) <= works, project["id"]
         assert set(project["people_ids"]) <= people, project["id"]
-    collaborator_names = {c["name"] for c in data["collaborators"]}
-    unresolved = {a["name"] for p in data["publications"] for a in p["authors"]
-                  if a["person_id"] is None}
-    assert collaborator_names == unresolved
+    positions = {(w["bib_id"], a["position"]) for w in data["works"]
+                 for a in w["authors"]}
+    for collaborator in data["collaborators"]:
+        grouped = [(a["work_id"], a["position"]) for a in collaborator["authorships"]]
+        assert set(grouped) <= positions, collaborator["key"]
+        assert collaborator["authorship_count"] == len(grouped)
+        assert collaborator["work_count"] == len(set(w for w, _ in grouped))
+        assert collaborator["work_ids"] == sorted(
+            {w for w, _ in grouped}, key=[w for w, _ in grouped].index)
+    # Every unresolved authorship is grouped, and every grouping is used.
+    referenced = {a["collaborator_key"] for w in data["works"] for a in w["authors"]
+                  if a["collaborator_key"]}
+    assert referenced == keys
 
 
 @covers("output.schema")
@@ -84,8 +104,148 @@ def test_demo_matches_schema(validator, demo_exports):
 def test_schema_rejects_unknown_fields(validator, valid_output):
     """The schema is closed, so a new output field must be added to it."""
     data = json.loads(json.dumps(valid_output))
-    data["publications"][0]["surprise"] = True
+    data["works"][0]["surprise"] = True
     assert schema_errors(validator, data)
+
+
+@covers("output.schema")
+def test_schema_rejects_an_authorship_with_two_references_or_none(validator,
+                                                                  valid_output):
+    """The `oneOf` on the contributor reference is enforced, both ways."""
+    for change in ({"person_id": "aadams", "collaborator_key": "k-00000000"},
+                   {"person_id": None, "collaborator_key": None}):
+        data = json.loads(json.dumps(valid_output))
+        data["works"][0]["authors"][0].update(change)
+        assert schema_errors(validator, data), change
+
+
+@covers("output.versioned_schema")
+def test_the_previous_schema_stays_reachable_unchanged(validator):
+    """v3 is still at its own path, still says 3, and is a schema in its own
+    right -- a consumer pinned to it keeps a stable target."""
+    with open(PREVIOUS_SCHEMA_PATH, encoding="utf-8") as f:
+        previous = json.load(f)
+    jsonschema.Draft202012Validator.check_schema(previous)
+    assert previous["properties"]["schema_version"]["const"] == 3
+    assert validator.schema["properties"]["schema_version"]["const"] == 4
+    # The two are different documents at different paths, not one file read
+    # twice.
+    assert PREVIOUS_SCHEMA_PATH != SCHEMA_PATH
+    assert previous["$id"] != validator.schema["$id"]
+
+
+# --- The two properties the document must have as a whole -------------------
+
+# Markdown emphasis, and an HTML tag. The emphasis pattern is deliberately
+# narrow: a lone `*` is not emphasis, which matters because `Informed RRT*`
+# and `BIT*` are real paper titles and `Davis*` is a real corpus name.
+MARKDOWN_EMPHASIS = re.compile(r"\*[^*\s][^*]*\*")
+HTML_TAG = re.compile(r"</?[A-Za-z][^<>]*>")
+
+# The properties whose value the input supplies verbatim. Markdown
+# punctuation in one of these is text an author wrote, which SPEC.md section
+# 2 says labdata neither escapes nor strips -- the corpus carries `not
+# *emphasis*` in a title on purpose. Anywhere else it would be markup labdata
+# generated, which is what composing `venue` used to do and what #56 removed.
+INPUT_TEXT = {"title", "abstract", "note", "name", "given", "von", "family",
+              "suffix", "literal", "name_variants", "description",
+              "thesis_title", "current_position", "role", "status",
+              "category", "key", "url"}
+
+
+def markup_paths(data):
+    """Every path outside the re-serialized export whose string carries markup.
+
+    The export is skipped because it is the entry re-typeset and still holds
+    LaTeX by design (SPEC.md section 5). Everything else is walked to any
+    depth, and the path is returned rather than a count, so a failure says
+    where the markup is.
+    """
+    found = []
+
+    def walk(value, path):
+        if isinstance(value, dict):
+            for name, inner in value.items():
+                if name != "bibtex":
+                    walk(inner, path + "/" + str(name))
+        elif isinstance(value, list):
+            for index, inner in enumerate(value):
+                walk(inner, path + "/" + str(index))
+        elif isinstance(value, str):
+            if MARKDOWN_EMPHASIS.search(value) or HTML_TAG.search(value):
+                found.append("%s = %r" % (path, value))
+
+    walk(data, "")
+    return sorted(found)
+
+
+def leaf_property(path):
+    """The property name a path ends at, skipping list indices."""
+    parts = [part for part in path.split("/") if part and not part.isdigit()]
+    return parts[-1] if parts else ""
+
+
+@covers("output.no_markup")
+def test_the_demo_document_carries_no_markup(demo_exports):
+    """Nothing labdata emits for the demo is Markdown or HTML.
+
+    The demo's input is plain, so any markup in its output would be markup
+    labdata generated. Under `schema_version` 3 `venue` was exactly that:
+    `*Transactions on Robot Learning*, 4(2), 2025`.
+    """
+    for data in demo_exports:
+        assert markup_paths(data) == []
+    # An empty list has to mean "looked and found none": the venue string v3
+    # composed must be rejected by the same scan.
+    composed = {"works": [{"venue": "*Transactions on Robot Learning*, 4(2), 2025"}]}
+    assert markup_paths(composed) != []
+    assert markup_paths({"lab": {"name": "<b>Lab</b>"}}) != []
+
+
+@covers("output.no_markup")
+def test_markup_in_the_corpus_is_only_text_the_input_wrote(valid_output):
+    """Where the corpus does carry Markdown punctuation, it is input text.
+
+    The corpus writes `[a link](x)`, `# heading` and `*emphasis*` into a
+    title on purpose, and SPEC.md section 2 says those are text rather than
+    markup. What must never happen is markup in a property labdata composes,
+    and that is what this pins.
+    """
+    found = markup_paths(valid_output)
+    assert found != [], "the corpus is supposed to exercise this"
+    offenders = [path for path in found
+                 if leaf_property(path.split(" = ")[0]) not in INPUT_TEXT]
+    assert offenders == []
+
+
+@covers("output.derived_is_empty")
+def test_every_derived_bag_is_empty(valid_output, demo_exports):
+    """`derived` is labdata-owned and labdata puts nothing in it yet.
+
+    Asserted so the region cannot quietly fill: a key appearing there is a
+    change a reader of this test has to make on purpose.
+    """
+    def bags(data):
+        found = []
+
+        def walk(value, path):
+            if isinstance(value, dict):
+                if "derived" in value:
+                    found.append((path + "/derived", value["derived"]))
+                for name, inner in value.items():
+                    walk(inner, path + "/" + str(name))
+            elif isinstance(value, list):
+                for index, inner in enumerate(value):
+                    walk(inner, path + "/" + str(index))
+
+        walk(data, "")
+        return found
+
+    for data in [valid_output] + list(demo_exports):
+        filled = [path for path, bag in bags(data) if bag != {}]
+        assert filled == [], filled
+    # The walk has to have found the bags it is reporting on.
+    assert len(bags(valid_output)) > 100, len(bags(valid_output))
 
 
 @covers("output.yaml_json_same")
@@ -106,7 +266,7 @@ def test_yaml_and_json_hold_the_same_data(tmp_path, valid_output, demo_exports):
 # test_valid_corpus.py stay the only place that behavior is stated.
 
 SNAPSHOT = {
-    "publications": [
+    "works": [
         "str-repeat",         # an expanded @string macro
         "type-article",       # journal, volume and number in the venue
         "type-phdthesis",     # a thesis venue
@@ -118,14 +278,15 @@ SNAPSHOT = {
     ],
     "people": ["ccote", "eevans", "vvandenberg"],
     "projects": ["homebot"],
-    "collaborators": ["Q. Quinn", "R. Ross"],
+    "collaborators": ["Quentin Quinn", "Rachel Ross"],
 }
-KEYS = {"publications": "bib_id", "people": "id", "projects": "id", "collaborators": "name"}
+KEYS = {"works": "bib_id", "people": "id", "projects": "id", "collaborators": "name"}
 
 
 def select(data):
     """The part of the output the snapshot owns, in the order SNAPSHOT lists."""
-    chosen = {"schema_version": data["schema_version"], "lab": data["lab"]}
+    chosen = {"schema_version": data["schema_version"],
+              "generator": data["generator"], "lab": data["lab"]}
     for section, wanted in SNAPSHOT.items():
         chosen[section] = [item(data, section, KEYS[section], value) for value in wanted]
     return chosen
@@ -140,20 +301,19 @@ def test_snapshot_avoids_xfailed_cases(valid_output):
     the snapshot and the tempting way out would be to re-record the behavior
     the xfail rejects.
     """
-    bib_ids = {p["bib_id"] for p in valid_output["publications"]}
+    bib_ids = {w["bib_id"] for w in valid_output["works"]}
     excluded = bib_ids & xfail_owned_entries()
     assert excluded, "expected some xfailed entries to exclude"
 
     chosen = select(valid_output)
-    assert [p["bib_id"] for p in chosen["publications"] if p["bib_id"] in excluded] == []
+    assert [w["bib_id"] for w in chosen["works"] if w["bib_id"] in excluded] == []
     for section in ("people", "projects"):
         for entry in chosen[section]:
-            overlap = sorted(set(entry.get("publication_ids", [])) & excluded)
+            overlap = sorted(set(entry["work_ids"]) & excluded)
             assert overlap == [], f"{section} {entry['id']} depends on {overlap}"
     for collaborator in chosen["collaborators"]:
-        from_pubs = {p["bib_id"] for p in valid_output["publications"]
-                     if any(a["name"] == collaborator["name"] for a in p["authors"])}
-        assert sorted(from_pubs & excluded) == [], collaborator["name"]
+        grouped = {a["work_id"] for a in collaborator["authorships"]}
+        assert sorted(grouped & excluded) == [], collaborator["name"]
 
 
 def test_xfail_ownership_names_real_entries():

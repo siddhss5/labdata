@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Consumer probe: a LaTeX CV fragment, publications grouped by year.
+"""Consumer probe: a LaTeX CV fragment, works grouped by year.
 
-    python examples/consumers/cv_tex.py lab.json > publications.tex
+    python examples/consumers/cv_tex.py lab.json > works.tex
 
 Standard library only. Reads the document named on the command line and
 nothing else. See README.md in this directory for the rule this probe exists
@@ -41,12 +41,11 @@ def name_from_parts(author):
 def venue_parts(pub):
     """The venue as structured data, or None when the document composed it.
 
-    Today `venue` is one pre-composed string with Markdown emphasis inside
-    it -- `*Transactions on Robot Learning*, 4(2), 2025` -- so a LaTeX
-    consumer has no venue name to put in `\\emph{}` and no volume or number
-    to typeset beside it. Recovering them by taking that string apart, or by
-    reading the opaque re-serialized export the document carries alongside
-    it, would prove nothing about the document: see README.md.
+    A document that hands over a pre-composed display string instead gives a
+    LaTeX consumer no venue name to put in `\\emph{}`. Recovering one by
+    taking that string apart, or by reading the opaque re-serialized export
+    the document carries alongside it, would prove nothing about the
+    document: see README.md.
     """
     venue = pub.get("venue")
     return venue if isinstance(venue, dict) else None
@@ -58,6 +57,19 @@ def bibliographic(pub, key):
     if value is None:
         value = (venue_parts(pub) or {}).get(key)
     return value
+
+
+def link_url(pub, kind):
+    """The first URL the document files under one link kind, or None.
+
+    A document that still carries a flat `<kind>_url` property is read there
+    too, so this probe does not report a link lost because it looked in only
+    one of the two places it could sit.
+    """
+    for record in (pub.get("links") or {}).get(kind) or []:
+        if isinstance(record, dict) and record.get("url"):
+            return record["url"]
+    return pub.get(kind + "_url")
 
 
 def entry(pub):
@@ -78,15 +90,16 @@ def entry(pub):
     where.append(tex(pub["year"]))
     out.append(r"\newblock %s." % ", ".join(where))
 
-    for key in ("doi_url", "arxiv_url"):
-        if pub.get(key):
-            out.append(r"\newblock \url{%s}" % pub[key])
+    for kind in ("doi", "arxiv"):
+        url = link_url(pub, kind)
+        if url:
+            out.append(r"\newblock \url{%s}" % url)
     return "\n".join(out)
 
 
 def render(doc):
     by_year = {}
-    for pub in doc["publications"]:
+    for pub in doc["works"]:
         by_year.setdefault(pub["year"], []).append(pub)
     out = ["% Publications, newest first. Include this file from a CV class."]
     for year in sorted(by_year, reverse=True):

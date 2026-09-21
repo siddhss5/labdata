@@ -37,11 +37,10 @@ Two namespaces, never one. `people` is a list of humans; `collaborators` is a
 *grouping over unresolved authorships*, which is not the same kind of thing
 and must not be labelled as if it were. So a lab member is `person:<id>` and
 a group is `collaborator:<key>`, and an unresolved string is never labelled a
-person. The person side works today: `people` carries ids and an authorship
-that resolved carries `person_id`. It is the collaborator side that comes
-back empty -- no entry carries a `key` and no authorship carries a
-`collaborator_key` -- which is why every co-author the demo cannot resolve is
-missing from the output below.
+person. Both sides work: `people` carries ids and an authorship that resolved
+carries `person_id`, while `collaborators` carries a `key` and an authorship
+that resolved to nobody carries the `collaborator_key` of the grouping it
+fell into.
 """
 
 import json
@@ -60,7 +59,6 @@ def contributor_nodes(doc):
     the graph only through `collaborators`, whose entries are read here for
     a `key` -- the lookup key a grouping offers, as against an `id`, which
     would be a claim about a human that a name-derived value cannot support.
-    It is absent today, so those entries yield no node.
     """
     nodes = {}
     for person in doc["people"]:
@@ -93,15 +91,15 @@ def position_of(author, index):
 
     `position` is read when the document declares it. Otherwise the index is
     used, and that is faithful rather than a guess: the document states that
-    `publication.authors` is in the order the entry wrote them (SPEC.md
-    section 3), so the index is that order and nothing is being invented.
+    `work.authors` is in the order the entry wrote them (SPEC.md section 3),
+    so the index is that order and nothing is being invented.
     """
     return str(author.get("position") or index)
 
 
 def render(doc):
     contributors = contributor_nodes(doc)
-    works = {"work:" + p["bib_id"]: clean(p["title"]) for p in doc["publications"]}
+    works = {"work:" + p["bib_id"]: clean(p["title"]) for p in doc["works"]}
     projects = {"project:" + p["id"]: clean(p["title"]) for p in doc["projects"]}
 
     nodes = {}
@@ -110,7 +108,7 @@ def render(doc):
     nodes.update(projects)
 
     edges = []
-    for pub in doc["publications"]:
+    for pub in doc["works"]:
         work = "work:" + pub["bib_id"]
         for index, author in enumerate(pub["authors"], 1):
             node = contributor_of(author)

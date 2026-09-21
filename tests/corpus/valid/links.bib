@@ -2,7 +2,8 @@
 
 % CASE links.doi_bare
 % CASE fields.doi
-% CASE output.publication.doi_url
+% CASE output.work.identifiers
+% CASE links.origin
 @article{link-doi-bare,
   title   = {Bare DOI},
   author  = {Adams, Alice},
@@ -22,7 +23,6 @@
 
 % CASE links.arxiv_prefixed
 % CASE fields.archiveprefix
-% CASE output.publication.arxiv_url
 @misc{link-arxiv-prefix,
   title         = {arXiv with archivePrefix},
   author        = {Adams, Alice},
@@ -41,7 +41,7 @@
 
 % CASE links.youtube
 % CASE fields.url
-% CASE output.publication.video_url
+% CASE output.work.links
 @inproceedings{link-youtube,
   title     = {A YouTube Video},
   author    = {Adams, Alice},
@@ -60,7 +60,8 @@
 }
 
 % CASE links.url
-% CASE output.publication.url
+% CASE links.origin
+% CASE output.work.links
 @inproceedings{link-url,
   title     = {A Plain Web Link},
   author    = {Adams, Alice},
@@ -71,7 +72,6 @@
 
 % pdfs/present.pdf exists for this key.
 % CASE links.pdf.local_present
-% CASE output.publication.pdf_url
 @inproceedings{present,
   title     = {A Paper Whose PDF Is Present},
   author    = {Adams, Alice},

@@ -1,0 +1,10 @@
+% CASE structure.crossref_undefined_parent
+% A crossref naming an entry that does not exist is the same error, not a
+% milder one: the field is rejected wherever it points.
+
+@inproceedings{orphan-child,
+  title    = {A Child With No Parent},
+  author   = {Adams, Alice},
+  year     = {2024},
+  crossref = {no-such-parent}
+}

@@ -36,17 +36,19 @@ class TestDemoLab:
     def test_assembles(self, demo_result):
         data = demo_result.data
         assert data.lab["name"] == "Example Lab"
-        assert 17 <= len(data.publications) <= 21
+        assert 17 <= len(data.works) <= 21
         assert 2 <= len(data.projects) <= 3
         assert demo_result.unknown_projects == []
+        # crossref is rejected, and the demo uses none, so nothing is fatal.
+        assert demo_result.fatal_errors == []
 
-    def test_every_person_is_linked_to_a_publication(self, demo_result):
+    def test_every_person_is_linked_to_a_work(self, demo_result):
         for person in demo_result.data.people:
-            assert person.publication_count > 0, person.id
+            assert person.work_count > 0, person.id
 
-    def test_every_project_has_publications(self, demo_result):
+    def test_every_project_has_works(self, demo_result):
         for project in demo_result.data.projects:
-            assert project.publication_ids, project.id
+            assert project.work_ids, project.id
 
     def test_covers_template_roles(self, demo_result):
         roles = {(p.role, p.status) for p in demo_result.data.people}
@@ -60,16 +62,20 @@ class TestDemoLab:
     def test_has_external_collaborators(self, demo_result):
         assert demo_result.data.collaborators
 
-    def test_shows_each_publication_feature(self, demo_result):
-        pubs = demo_result.data.publications
-        assert any(p.abstract for p in pubs)
-        assert any(p.doi_url for p in pubs)
-        assert any(p.arxiv_url for p in pubs)
-        assert any(p.video_url for p in pubs)
-        assert any(p.note and "Award" in p.note for p in pubs)
-        assert any(len(p.project_ids) > 1 for p in pubs)
-        assert len({p.entry_type for p in pubs}) >= 5
-        assert len({p.year for p in pubs}) >= 5
+    def test_shows_each_work_feature(self, demo_result):
+        works = demo_result.data.works
+        assert any(w.abstract for w in works)
+        assert any("doi" in w.identifiers for w in works)
+        assert any("arxiv" in w.identifiers for w in works)
+        assert any("video" in w.links for w in works)
+        assert any(w.note and "Award" in w.note for w in works)
+        assert any(len(w.project_ids) > 1 for w in works)
+        assert len({w.entry_type for w in works}) >= 5
+        assert len({w.year for w in works}) >= 5
+        # The structured bibliography, which is what v4 added.
+        assert any(w.venue and w.venue.kind == "journal" for w in works)
+        assert any(w.pages and w.volume and w.number for w in works)
+        assert any(w.editors for w in works)
 
     def test_bib_input_has_equal_contribution_markers(self):
         """The demo .bib input marks equal contribution with $^{*}$."""
@@ -85,25 +91,29 @@ class TestDemoLab:
         The demo writes the marker on the surname, which is what stopped Bob
         Brown and Carol Côté resolving until #46.
         """
-        pub = next(p for p in demo_result.data.publications
-                   if p.bib_id == "brown2025tidy")
-        marked = [a for a in pub.authors if a.equal_contribution]
-        assert [a.name for a in marked] == ["B. Brown", "C. Côté"]
+        work = next(w for w in demo_result.data.works
+                    if w.bib_id == "brown2025tidy")
+        marked = [a for a in work.authors if a.equal_contribution]
+        assert [a.name for a in marked] == ["Bob Brown", "Carol Côté"]
         assert [a.person_id for a in marked] == ["bbrown", "ccote"]
         assert [a.family for a in marked] == ["Brown", "Côté"]
-        assert pub.authors[-1].equal_contribution is False
+        assert work.authors[-1].equal_contribution is False
 
     def test_only_outside_collaborators_are_unresolved(self, demo_result):
         """Every unresolved name is an outside co-author, not a marked member.
 
-        Two of these names are each shared by more than one person, which is
-        the identity fixture #69 added: `P. Patel` is Priya Patel on three
-        works and Pradeep Patel on a fourth, and `L. Lee` is the two
-        different people `nolan2020stairs` lists under one written name.
+        The names are the readable form of what each entry wrote, so the
+        identity fixture #69 added shows up as three Patels rather than one:
+        `Priya Patel` on two works, `P. Patel` on a third and `Pradeep Patel`
+        on a fourth. Two of those three are the same person, which no key
+        built from a name can tell, and joining them is #24's. `Lin Lee` is
+        one name written twice on `nolan2020stairs` by two different people,
+        which is why the authorship rather than the grouping is the record a
+        consumer falls back to.
         """
         assert demo_result.unresolved_authors == [
-            "L. Lee", "O. Ortiz", "P. Park", "P. Patel", "R. Reed",
-            "S. Stone", "T. Turner"]
+            "Lin Lee", "Olivia Ortiz", "P. Park", "P. Patel", "Pradeep Patel",
+            "Priya Patel", "R. Reed", "Sybil Stone", "Trent Turner"]
 
 
 class TestGenerateSiteConfig:

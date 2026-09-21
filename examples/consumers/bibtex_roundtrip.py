@@ -219,7 +219,7 @@ def entry(publication):
 
 
 def render(doc):
-    return "\n\n".join(entry(p) for p in doc["publications"]) + "\n"
+    return "\n\n".join(entry(p) for p in doc["works"]) + "\n"
 
 
 def main(argv):

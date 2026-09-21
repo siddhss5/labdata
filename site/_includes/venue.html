@@ -1,0 +1,15 @@
+{%- comment -%}
+Where a work appeared, and its placement there.
+
+`venue` is structured -- a container kind and its name -- and the
+bibliographic parts are properties of the work, so the emphasis and the
+punctuation below are this renderer's rather than the document's. A work with
+no venue simply prints the parts it does have. Plain Liquid only: no array
+filters, so this renders the same under any Jekyll.
+{%- endcomment -%}
+{%- assign sep = "" -%}
+{%- if include.work.venue -%}<em>{{ include.work.venue.name }}</em>{%- assign sep = ", " -%}{%- endif -%}
+{%- if include.work.volume -%}{{ sep }}{{ include.work.volume }}{%- if include.work.number -%}({{ include.work.number }}){%- endif -%}{%- assign sep = ", " -%}{%- endif -%}
+{%- if include.work.pages -%}{{ sep }}pp. {{ include.work.pages }}{%- assign sep = ", " -%}{%- endif -%}
+{%- if include.work.publisher -%}{{ sep }}{{ include.work.publisher }}{%- assign sep = ", " -%}{%- endif -%}
+{%- if include.work.year -%}{{ sep }}{{ include.work.year }}{%- endif -%}
