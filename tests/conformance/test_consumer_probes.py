@@ -19,8 +19,9 @@ artifact would have contained.
 one test.** What the probe can do today -- the CSL export validating against
 the published schema, the CV grouping by year, the graph's edges resolving to
 declared nodes -- is asserted in tests that pass. Only the assertions that
-name the missing properties sit under `xfail`, one marker per missing
-property rather than one per probe, so each says what it is waiting for and
+name the missing properties sit under `xfail`, one marker per claim rather
+than one blanket marker per probe -- a claim may name several properties at
+once, as the field-loss one does -- so each says what it is waiting for and
 for whom. Keeping them together would neuter the first
 group: a regression in schema validity would surface as the already-expected
 `#56` xfail and CI would stay green.

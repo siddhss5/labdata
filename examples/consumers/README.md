@@ -39,8 +39,9 @@ python examples/consumers/bibtex_roundtrip.py lab.json > works.bib
 output in CI, the same way: as a subprocess handed a path.
 
 Each **failing** probe's obligations are split by kind rather than gathered
-into one test, and there is one marker per missing property rather than one
-per probe. The assertions
+into one test, and a marker covers one claim about what is missing rather
+than everything a probe cannot do — a single claim may name several
+properties, as the field-loss one does. The assertions
 naming the missing properties carry `xfail(strict=True)` against the issue that owns
 the missing property -- #56 for all but one, which is #24's, for the reason
 the identity paragraph under `graph.py` gives -- and
