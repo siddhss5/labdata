@@ -172,10 +172,11 @@ class TestBibFileNameIsNeverAbsolute:
         """`BibFile` and `LabDataConfig` are public, so a caller can assemble
         a configuration without going near YAML.
 
-        A guarantee about the emitted document has to hold however the
-        configuration was built, so the check is in the constructor and not
-        only in `from_yaml()`. Without it, `assemble()` emits an absolute
-        `work.source.file` and no diagnostic at all.
+        The constructor catches the mistake where it is made, which is the
+        earliest and clearest place to report it. It is not what makes the
+        guarantee true -- `Work.to_dict()` is, at the boundary every emitted
+        document passes through -- because this class is mutable and a name
+        can be set after it was checked.
         """
         with pytest.raises(ConfigurationError) as raised:
             BibFile(name=name, category="Journal Papers")
@@ -193,10 +194,13 @@ class TestBibFileNameIsNeverAbsolute:
     def test_an_absolute_name_set_after_construction_is_rejected(self, tmp_path, name):
         """`BibFile` is a plain, mutable dataclass, which is public API.
 
-        Checking only in the constructor leaves the guarantee one assignment
-        away from being false, and `assemble()` would emit the absolute path
-        with no diagnostic at all. The check that holds is the one made on
-        every name about to be compiled.
+        Checking only in the constructor leaves it one assignment away from
+        being missed, so `assemble()` checks every configured name before it
+        parses anything -- which fails before the work of reading the files,
+        and is what this asserts. The check that *holds* is neither of them:
+        it is `Work.to_dict()`, and
+        `test_a_work_built_by_hand_is_rejected_when_it_is_serialized` covers
+        it.
         """
         bib_file = BibFile(name="journal.bib", category="Journal Papers")
         bib_file.name = name

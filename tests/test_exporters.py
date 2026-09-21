@@ -142,7 +142,11 @@ class TestARefusedDocumentLeavesTheOutputAlone:
     empty file where a good document had been.
     """
 
-    SENTINEL = "# the document from the last good run\n"
+    # Not a comment, on purpose. A `#` line is valid YAML anywhere in a
+    # file, so a sentinel written that way would survive an append and still
+    # let the document parse; this one leaves a file that is neither valid
+    # JSON nor valid YAML if anything is appended after it.
+    SENTINEL = "the document from the last good run\n"
 
     @pytest.fixture
     def refused(self):
@@ -174,16 +178,29 @@ class TestARefusedDocumentLeavesTheOutputAlone:
             export(refused, str(out))
         assert not out.exists()
 
-    @pytest.mark.parametrize("export, name",
-                             [(export_to_json, "lab.json"),
-                              (export_to_yaml, "lab.yml")],
+    @pytest.mark.parametrize("export, name, load",
+                             [(export_to_json, "lab.json", json.load),
+                              (export_to_yaml, "lab.yml", yaml.safe_load)],
                              ids=["json", "yaml"])
-    def test_a_document_it_will_emit_still_replaces_the_old_one(self, tmp_path,
-                                                                sample_data,
-                                                                export, name):
-        """The guard above must not be a refusal to write at all."""
+    def test_a_document_it_will_emit_replaces_the_old_file_whole(self, tmp_path,
+                                                                 sample_data,
+                                                                 export, name,
+                                                                 load):
+        """The guard above must not be a refusal to write -- nor a write that
+        leaves any of the old file behind.
+
+        Asked two ways, because neither is enough on its own. Opening in
+        append mode changes the contents and puts the new document in the
+        file, so a test that asked only whether the text changed would pass
+        while the old document was still sitting at the top; and reading the
+        file back would catch that for JSON but not for every sentinel a
+        YAML parser tolerates. So the sentinel must be gone, and the file
+        must parse **in full** to the document that was written.
+        """
         out = tmp_path / name
         out.write_text(self.SENTINEL, encoding="utf-8")
         export(sample_data, str(out))
-        assert out.read_text(encoding="utf-8") != self.SENTINEL
-        assert "adams2024robot" in out.read_text(encoding="utf-8")
+
+        assert self.SENTINEL not in out.read_text(encoding="utf-8")
+        with open(out, encoding="utf-8") as f:
+            assert load(f) == sample_data.to_dict()
