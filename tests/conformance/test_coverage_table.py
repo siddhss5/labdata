@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-import labdata
+import sslabdata
 
 from .coverage_check import read_table, validate
 from .support import CORPUS, EXPECTED, REPO_ROOT, TESTS_DIR
@@ -188,7 +188,7 @@ def test_a_declared_raises_rejects_a_marker_that_broke_before_its_assertion(pyte
 
 # --- Test-suite hygiene (acceptance criteria of #43) ------------------------
 
-PUBLIC = set(labdata.__all__) | {"main"}
+PUBLIC = set(sslabdata.__all__) | {"main"}
 
 
 def imports(path):
@@ -203,12 +203,12 @@ def imports(path):
 
 
 # The adapter of #23: the only place pybtex and pylatexenc may be imported.
-ADAPTER = {"labdata/parsers/bibtex.py", "labdata/parsers/latex.py"}
+ADAPTER = {"sslabdata/parsers/bibtex.py", "sslabdata/parsers/latex.py"}
 PARSER_LIBRARIES = {"pybtex", "pylatexenc", "bibtexparser"}
 
 
 def test_no_test_imports_a_parser_library():
-    """Tests check labdata's output, never a parser library's objects."""
+    """Tests check sslabdata's output, never a parser library's objects."""
     offenders = [str(p.relative_to(TESTS_DIR)) for p in TESTS_DIR.rglob("*.py")
                  if any(m.split(".")[0] in PARSER_LIBRARIES for m, _ in imports(p))]
     assert offenders == []
@@ -217,7 +217,7 @@ def test_no_test_imports_a_parser_library():
 def test_only_the_adapter_imports_a_parser_library():
     """pybtex and pylatexenc stay behind the adapter, as #23 requires."""
     offenders = []
-    for path in sorted((REPO_ROOT / "labdata").rglob("*.py")):
+    for path in sorted((REPO_ROOT / "sslabdata").rglob("*.py")):
         relative = path.relative_to(REPO_ROOT).as_posix()
         if relative in ADAPTER:
             continue
@@ -232,19 +232,19 @@ def test_only_the_adapter_imports_a_parser_library():
     assert {"pybtex", "pylatexenc"} <= found
 
 
-def test_only_unit_tests_import_labdata_internals():
-    """Outside tests/unit/, tests use only labdata's public names and cli.main."""
+def test_only_unit_tests_import_sslabdata_internals():
+    """Outside tests/unit/, tests use only sslabdata's public names and cli.main."""
     offenders = []
     for path in TESTS_DIR.rglob("*.py"):
         if "unit" in path.relative_to(TESTS_DIR).parts:
             continue
         for module, name in imports(path):
-            if not module.startswith("labdata"):
+            if not module.startswith("sslabdata"):
                 continue
             if name is None:
-                public = module == "labdata"
+                public = module == "sslabdata"
             else:
-                public = name in PUBLIC and (name != "main" or module == "labdata.cli")
+                public = name in PUBLIC and (name != "main" or module == "sslabdata.cli")
             if not public:
                 offenders.append(f"{path.relative_to(TESTS_DIR)}: {module} {name}")
     assert offenders == []

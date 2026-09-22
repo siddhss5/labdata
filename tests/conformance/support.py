@@ -1,7 +1,7 @@
 """Helpers for the conformance tests (see tests/COVERAGE.md).
 
-The conformance tests run labdata only through its public entry points,
-``labdata.cli.main()`` and the assembler, and check labdata's own output and
+The conformance tests run sslabdata only through its public entry points,
+``sslabdata.cli.main()`` and the assembler, and check sslabdata's own output and
 messages. They never look at parser-library objects or messages, so the same
 tests run before and after the parser swap in #23.
 
@@ -23,7 +23,7 @@ from typing import Dict, Iterable, List, Optional, Set
 import pytest
 import yaml
 
-from labdata.cli import main
+from sslabdata.cli import main
 
 
 TESTS_DIR = Path(__file__).parent.parent
@@ -119,11 +119,11 @@ def covers(*case_ids, xfail=None, because=None, owns=None,
     return decorate
 
 
-# --- Running labdata ---------------------------------------------------------
+# --- Running sslabdata ---------------------------------------------------------
 
 @dataclass
 class Run:
-    """The result of one ``labdata`` command run in-process."""
+    """The result of one ``sslabdata`` command run in-process."""
     code: int
     stdout: str
     stderr: str
@@ -144,8 +144,8 @@ def working_dir(path):
         os.chdir(old)
 
 
-def run_labdata(args: List[str], cwd: Path) -> Run:
-    """Run ``labdata <args>`` from ``cwd``, capturing its exit code and output."""
+def run_sslabdata(args: List[str], cwd: Path) -> Run:
+    """Run ``sslabdata <args>`` from ``cwd``, capturing its exit code and output."""
     out, err = io.StringIO(), io.StringIO()
     code, crash = 0, None
     with working_dir(cwd), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
@@ -159,9 +159,9 @@ def run_labdata(args: List[str], cwd: Path) -> Run:
 
 
 def export(cwd: Path, out_dir: Path, config="lab.yaml", fmt="json"):
-    """Run ``labdata --output`` from ``cwd`` and return (run, parsed output)."""
+    """Run ``sslabdata --output`` from ``cwd`` and return (run, parsed output)."""
     out_path = Path(out_dir) / f"lab.{fmt}"
-    run = run_labdata(["--config", config, "--format", fmt, "--output", out_path], cwd)
+    run = run_sslabdata(["--config", config, "--format", fmt, "--output", out_path], cwd)
     data = None
     if run.crash is None and run.code == 0:
         with open(out_path, encoding="utf-8") as f:

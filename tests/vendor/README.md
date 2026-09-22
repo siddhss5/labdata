@@ -1,7 +1,7 @@
 # Vendored third-party files
 
 Files copied into this repository from elsewhere, so the test suite can use
-them without a network fetch. Nothing here is labdata's own work, and nothing
+them without a network fetch. Nothing here is sslabdata's own work, and nothing
 here is modified: each file is byte-for-byte the upstream file at the pinned
 revision.
 

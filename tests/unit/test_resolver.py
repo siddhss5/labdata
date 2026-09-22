@@ -3,9 +3,9 @@
 import pytest
 from pathlib import Path
 
-from labdata.models import Author, Contributor, Work, Person, Project, LabData
-from labdata.loaders import load_collaborators, load_people, load_projects
-from labdata.resolver import (
+from sslabdata.models import Author, Contributor, Work, Person, Project, LabData
+from sslabdata.loaders import load_collaborators, load_people, load_projects
+from sslabdata.resolver import (
     normalize_name,
     is_abbreviated,
     build_alias_index,
@@ -17,8 +17,8 @@ from labdata.resolver import (
     resolve_projects,
     compute_backlinks,
 )
-from labdata.assembler import assemble
-from labdata.config import LabDataConfig, BibFile
+from sslabdata.assembler import assemble
+from sslabdata.config import LabDataConfig, BibFile
 
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
@@ -531,7 +531,7 @@ class TestResolveAuthors:
 
     def test_editors_resolve_but_are_never_reported_as_unresolved(self):
         """Editing a volume is not an authorship, so an editor nobody matches
-        is not an author labdata could not resolve."""
+        is not an author sslabdata could not resolve."""
         people = [Person(id="aadams", name="Alice Adams", aliases=["A. Adams"])]
         editors = [Contributor(name="Alice Adams", position=1, given="Alice",
                                family="Adams"),
@@ -680,7 +680,7 @@ class TestDeclaredCollaboratorGrouping:
     """`collaborators_file` groups spellings; it never produces a person."""
 
     def assemble(self, people, declared, *authors_by_work):
-        from labdata.assembler import declared_collaborators, group_collaborators
+        from sslabdata.assembler import declared_collaborators, group_collaborators
         works = [Work(bib_id=f"w{i}", title="T", category="C", entry_type="article",
                       year=2020 + i, source_file="w.bib", authors=list(authors))
                  for i, authors in enumerate(authors_by_work)]
@@ -690,7 +690,7 @@ class TestDeclaredCollaboratorGrouping:
         return works, group_collaborators(works, "bib", warnings, entries, people), warnings
 
     def test_a_declared_alias_joins_one_person_and_not_another(self):
-        from labdata.loaders import DeclaredCollaborator
+        from sslabdata.loaders import DeclaredCollaborator
         works, collaborators, warnings = self.assemble(
             [], [DeclaredCollaborator("Priya Patel", ["P. Patel"])],
             [Author(name="Priya Patel", position=1, given="Priya", family="Patel")],
@@ -703,7 +703,7 @@ class TestDeclaredCollaboratorGrouping:
         assert warnings == []
 
     def test_run_together_initials_match_a_spaced_declared_alias(self):
-        from labdata.loaders import DeclaredCollaborator
+        from sslabdata.loaders import DeclaredCollaborator
         _, collaborators, warnings = self.assemble(
             [], [DeclaredCollaborator("Priya Sun Patel", ["P. S. Patel"])],
             [Author(name="Priya Sun Patel", position=1, given="Priya Sun",
@@ -714,7 +714,7 @@ class TestDeclaredCollaboratorGrouping:
         assert warnings == []
 
     def test_spaced_initials_match_a_run_together_declared_alias(self):
-        from labdata.loaders import DeclaredCollaborator
+        from sslabdata.loaders import DeclaredCollaborator
         _, collaborators, warnings = self.assemble(
             [], [DeclaredCollaborator("Priya Sun Patel", ["P.S. Patel"])],
             [Author(name="P. S. Patel", position=1, given="P. S.", family="Patel")])
@@ -723,7 +723,7 @@ class TestDeclaredCollaboratorGrouping:
         assert warnings == []
 
     def test_a_run_together_alias_a_member_declares_spaced_is_reported(self):
-        from labdata.loaders import DeclaredCollaborator
+        from sslabdata.loaders import DeclaredCollaborator
         people = [Person(id="sivers", name="Stella Sky Ivers",
                          aliases=["S. S. Ivers"])]
         _, _, warnings = self.assemble(
@@ -736,7 +736,7 @@ class TestDeclaredCollaboratorGrouping:
     def test_declared_collaborators_differing_in_the_family_name_stay_apart(self):
         """`S.S. S.S.` spaces its given name only, so it is not `S. S. S. S.`,
         and the authorships of the two are not merged."""
-        from labdata.loaders import DeclaredCollaborator
+        from sslabdata.loaders import DeclaredCollaborator
         _, collaborators, warnings = self.assemble(
             [], [DeclaredCollaborator("S.S. S.S."), DeclaredCollaborator("S. S. S. S.")],
             [Author(name="S.S. S.S.", position=1, given="S.S.", family="S.S.")],
@@ -760,7 +760,7 @@ class TestDeclaredCollaboratorGrouping:
         assert literal.key.startswith("ss-quinn-")
 
     def test_a_name_fitting_two_declared_collaborators_is_reported(self):
-        from labdata.loaders import DeclaredCollaborator
+        from sslabdata.loaders import DeclaredCollaborator
         _, collaborators, warnings = self.assemble(
             [], [DeclaredCollaborator("Priya Patel", ["P. Patel"]),
                            DeclaredCollaborator("Pradeep Patel")],
@@ -780,7 +780,7 @@ class TestDeclaredCollaboratorGrouping:
         `RESOLVE-AMBIGUOUS-NAME` (#26 decision 6): it is reported with the
         other grouping ambiguity, as an unresolved outside co-author may be.
         """
-        from labdata.loaders import DeclaredCollaborator
+        from sslabdata.loaders import DeclaredCollaborator
         people = [Person(id="ppatel", name="Paul Patel")]
         works, collaborators, warnings = self.assemble(
             people, [DeclaredCollaborator("Priya Patel", ["P. Patel"])],
@@ -792,7 +792,7 @@ class TestDeclaredCollaboratorGrouping:
         assert not any(w.startswith("RESOLVE-AMBIGUOUS-NAME") for w in warnings)
 
     def test_a_declared_name_that_is_a_member_is_left_to_the_member(self):
-        from labdata.loaders import DeclaredCollaborator
+        from sslabdata.loaders import DeclaredCollaborator
         people = [Person(id="aadams", name="Alice Adams", aliases=["A. Adams"])]
         works, collaborators, warnings = self.assemble(
             people, [DeclaredCollaborator("Alice Adams")],

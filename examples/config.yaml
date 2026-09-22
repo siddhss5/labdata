@@ -1,11 +1,11 @@
-# Example configuration file for labdata
+# Example configuration file for sslabdata
 #
-# This file tells labdata where to find your BibTeX files,
+# This file tells sslabdata where to find your BibTeX files,
 # people, and projects. It points at the fictional Example Lab in demo/,
 # so run it from this directory:
-#   labdata --config config.yaml --validate
+#   sslabdata --config config.yaml --validate
 #
-# Paths are relative to the directory you run labdata from.
+# Paths are relative to the directory you run sslabdata from.
 # demo/lab.yaml is the same lab configured from the repository root.
 
 # Lab information (optional), shown on the site's landing page

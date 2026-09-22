@@ -1,5 +1,5 @@
 """
-Export utilities for labdata.
+Export utilities for sslabdata.
 
 Serializes LabData to YAML or JSON files.
 
@@ -19,7 +19,7 @@ def _write(output_path: str, text: str) -> None:
     """Write a serialized document, after it has been serialized.
 
     The document is built in full before the file is opened, so a document
-    labdata refuses to emit -- one whose `source.file` is absolute, say --
+    sslabdata refuses to emit -- one whose `source.file` is absolute, say --
     leaves no file behind, and an existing one is not truncated by a failure
     part way through.
     """

@@ -34,19 +34,19 @@ jobs:
       with:
         version: "0.12.15"
 
-    - name: Install labdata
+    - name: Install sslabdata
       run: |
         uv sync --frozen --extra test
 
     # The floor matches [tool.coverage.report] fail_under in pyproject.toml.
     - name: Run tests with coverage
       run: |
-        uv run --frozen pytest --cov=labdata --cov-branch --cov-report=term-missing --cov-fail-under=97
+        uv run --frozen pytest --cov=sslabdata --cov-branch --cov-report=term-missing --cov-fail-under=97
 
     - name: Validate demo lab
       run: |
-        uv run --frozen labdata --config examples/demo/lab.yaml --validate
+        uv run --frozen sslabdata --config examples/demo/lab.yaml --validate
 
     - name: Validate demo lab under --strict
       run: |
-        uv run --frozen labdata --config examples/demo/lab.yaml --validate --strict
+        uv run --frozen sslabdata --config examples/demo/lab.yaml --validate --strict

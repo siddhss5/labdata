@@ -1,5 +1,5 @@
 """
-Data models for labdata.
+Data models for sslabdata.
 
 Defines the core entity types: Work, Author, Person, Project, Collaborator,
 and the assembled LabData output.
@@ -14,7 +14,7 @@ from typing import Dict, List, Optional
 
 # The one guarantee about an emitted value that the input can break: a
 # configured `.bib` name reaches the document as `work.source.file`, and is
-# promised never to be absolute. `labdata.config` owns the code and the
+# promised never to be absolute. `sslabdata.config` owns the code and the
 # exception type because the condition is a configuration mistake; the check
 # is made here as well because this is the boundary every emitted document
 # passes through, whatever built the objects.
@@ -34,7 +34,7 @@ from .config import reject_absolute_name
 SCHEMA_VERSION = 4
 
 # The name of the compiler, as the document's `generator` record reports it.
-GENERATOR_NAME = "labdata"
+GENERATOR_NAME = "sslabdata"
 
 # The one policy for closed objects (SPEC.md section 4): every declared
 # property is present, and `null` when it does not apply. The open maps --
@@ -215,7 +215,7 @@ class Work:
         ``source.file`` is checked here rather than only where it was set.
         This is the boundary every emitted document passes through — both
         exporters and the CLI serialize through it — so a `Work` built by
-        hand, or one parsed straight from `labdata.parsers`, cannot carry a
+        hand, or one parsed straight from `sslabdata.parsers`, cannot carry a
         compiling machine's directory layout into a document that is shared.
         A relative directory is not absolute and passes.
         """

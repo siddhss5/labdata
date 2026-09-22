@@ -1,5 +1,5 @@
 """
-Configuration for labdata.
+Configuration for sslabdata.
 
 Single-layer configuration loaded from a YAML file (lab.yaml).
 Replaces the old two-layer LibraryConfig → PublicationsConfig system.
@@ -26,14 +26,14 @@ from .diagnostics import diagnostic
 # accepted or rejected wherever it is compiled.
 BIB_FILE_ABSOLUTE = "CONFIG-BIB-FILE-ABSOLUTE"
 
-# A `lab.yaml` labdata cannot compile from, found while it is read. Each is
+# A `lab.yaml` sslabdata cannot compile from, found while it is read. Each is
 # fatal at load, like the absolute name above: nothing is assembled from a
 # configuration whose shape is wrong, so there is no partial document either.
 NOT_A_MAPPING = "CONFIG-NOT-A-MAPPING"
 KEY_MISSING = "CONFIG-KEY-MISSING"
 TYPE_INVALID = "CONFIG-TYPE-INVALID"
 
-# Every key `lab.yaml` may hold. `site` is read by renderers, not by labdata,
+# Every key `lab.yaml` may hold. `site` is read by renderers, not by sslabdata,
 # and is accepted without being checked. Any other key is reported, because a
 # misspelt `people_fil` would otherwise be silently the same as no key at all.
 KNOWN_KEYS = ("lab", "site", "bib_dir", "bib_files", "pdf_base_url",
@@ -44,7 +44,7 @@ _STRING_KEYS = ("pdf_base_url", "people_file", "projects_file")
 
 
 class ConfigurationError(ValueError):
-    """A configuration labdata will not compile from.
+    """A configuration sslabdata will not compile from.
 
     Its own type, not a bare ``ValueError``, so that a caller can tell a
     rejected configuration from anything else that raises one. Its message
@@ -88,7 +88,7 @@ class BibFile:
     constructor checks it, so the mistake is caught where it is made -- but
     this class is a plain, mutable dataclass, which is public API, so a name
     can be set after it was checked. The check that *holds* is the one
-    `labdata.models.Work.to_dict()` makes, at the boundary every emitted
+    `sslabdata.models.Work.to_dict()` makes, at the boundary every emitted
     document passes through.
     """
     name: str
@@ -100,7 +100,7 @@ class BibFile:
 
 @dataclass
 class LabDataConfig:
-    """Configuration for labdata, loadable from YAML.
+    """Configuration for sslabdata, loadable from YAML.
 
     Example lab.yaml:
         lab:
@@ -135,7 +135,7 @@ class LabDataConfig:
     # so the positional order of the fields above is unchanged.
     collaborators_file: Optional[str] = None
 
-    # Keys `lab.yaml` held that labdata does not read, in file order, so the
+    # Keys `lab.yaml` held that sslabdata does not read, in file order, so the
     # assembler can report them against `path`. Never emitted.
     unknown_keys: List[str] = field(default_factory=list)
 

@@ -1,6 +1,6 @@
 # Examples
 
-Minimal examples showing how to use labdata from the command line and from Python.
+Minimal examples showing how to use sslabdata from the command line and from Python.
 
 All examples use the fictional **Example Lab** in [`demo/`](demo/): four BibTeX files,
 `people.yaml` and `projects.yaml`. Its people, works and projects, and their
@@ -11,22 +11,22 @@ Run the commands below from this `examples/` directory.
 
 ```bash
 # Generate YAML output
-labdata --config config.yaml --output lab.yml
+sslabdata --config config.yaml --output lab.yml
 
 # Generate JSON output
-labdata --config config.yaml --format json --output lab.json
+sslabdata --config config.yaml --format json --output lab.json
 
 # Validate data and see a summary
-labdata --config config.yaml --validate
+sslabdata --config config.yaml --validate
 
 # List author names that couldn't be matched to lab members
-labdata --config config.yaml --unresolved
+sslabdata --config config.yaml --unresolved
 ```
 
 ## Python API
 
 ```python
-from labdata import LabDataConfig, assemble, export_to_yaml
+from sslabdata import LabDataConfig, assemble, export_to_yaml
 
 config = LabDataConfig.from_yaml("config.yaml")
 data = assemble(config)
@@ -51,6 +51,6 @@ current schema, and that is the point. See [`consumers/README.md`](consumers/REA
 
 ## Demo Site
 
-[labdata-site](https://github.com/siddhss5/labdata-site) is an optional
-downstream renderer of labdata output. It keeps its own copy of the Example Lab
+[sslabdata-site](https://github.com/siddhss5/sslabdata-site) is an optional
+downstream renderer of sslabdata output. It keeps its own copy of the Example Lab
 and builds the demo site from it.

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Basic usage example for labdata.
+Basic usage example for sslabdata.
 
 This demonstrates the Python API for assembling academic lab data.
 """
 
 from pathlib import Path
-from labdata import LabDataConfig, assemble, export_to_yaml, export_to_json
+from sslabdata import LabDataConfig, assemble, export_to_yaml, export_to_json
 
 # Example 1: Assemble data from config file
 print("Example 1: Assemble from YAML config")

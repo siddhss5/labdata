@@ -4,7 +4,7 @@
 is a schema bug, not a probe bug.**
 
 That rule is why this directory exists. The demo site in
-[labdata-site](https://github.com/siddhss5/labdata-site) is the only other
+[sslabdata-site](https://github.com/siddhss5/sslabdata-site) is the only other
 evidence that the emitted document is enough to build anything with, and it
 is weak evidence: it grew up alongside the data and quietly
 absorbed its quirks. These five probes are the falsification test. Each one is
@@ -28,7 +28,7 @@ to build a site. Nobody should copy them. They are small and ugly on purpose.
 Each takes the document as its one argument and writes to standard output:
 
 ```bash
-labdata --config examples/demo/lab.yaml --format json --output lab.json
+sslabdata --config examples/demo/lab.yaml --format json --output lab.json
 python examples/consumers/plain_html.py lab.json > lab.html
 python examples/consumers/cv_tex.py    lab.json > works.tex
 python examples/consumers/csl_json.py  lab.json > lab.csl.json
@@ -82,9 +82,9 @@ each test matches a record *by* differs, because the artifacts differ:
 ## What a probe may read
 
 - **The emitted document, and only the emitted document.** No
-  `import labdata`, no `.bib` file, no `lab.yaml`, `people.yaml` or
+  `import sslabdata`, no `.bib` file, no `lab.yaml`, `people.yaml` or
   `projects.yaml`. The test module checks both statically: no probe imports
-  `labdata`, no probe names an input file, and each probe opens exactly one
+  `sslabdata`, no probe names an input file, and each probe opens exactly one
   file — the one on its command line.
 - **Structured properties, never `work.bibtex`.** That record is an opaque
   re-serialization of the entry, for a consumer to copy into a reference
@@ -132,7 +132,7 @@ appears in any field the page renders, and no demo value reaches an attribute
 carrying a character that could break out of one. So #55 names this probe as
 the renderer in this repository where escaping can be asserted, and the
 assertion needs values the demo does not supply. (#55 mentions
-siddhss5/labdata#36 alongside this; that issue is about testing a rendered
+siddhss5/sslabdata#36 alongside this; that issue is about testing a rendered
 site — snapshots, internal links, accessibility — and says nothing about
 escaping, so nothing here depends on it.)
 
@@ -225,7 +225,7 @@ described as closed. Verified against the demo output.
 
   The probe re-emits `project` nowhere, and that one field is the whole
   ignore set of its test, named there on its own with its reason: it is
-  labdata's own tag field rather than a bibliographic one, and it does reach
+  sslabdata's own tag field rather than a bibliographic one, and it does reach
   the document, as `project_ids`.
 
   Each field is looked for in **every** place it could sit — a flat property,

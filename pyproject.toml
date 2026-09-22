@@ -1,5 +1,5 @@
 [project]
-name = "labdata"
+name = "sslabdata"
 version = "3.0.0"
 description = "Renderer-agnostic academic lab data assembler: BibTeX + YAML → structured data"
 requires-python = ">=3.10"
@@ -17,11 +17,11 @@ test = [
 ]
 
 [project.scripts]
-labdata = "labdata.cli:main"
+sslabdata = "sslabdata.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/siddhss5/labdata"
-Repository = "https://github.com/siddhss5/labdata"
+Homepage = "https://github.com/siddhss5/sslabdata"
+Repository = "https://github.com/siddhss5/sslabdata"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
@@ -29,13 +29,13 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["labdata*"]
+include = ["sslabdata*"]
 
 [tool.pytest.ini_options]
 addopts = "--cov --cov-report=term-missing"
 
 [tool.coverage.run]
-source = ["labdata"]
+source = ["sslabdata"]
 branch = true
 
 [tool.coverage.report]

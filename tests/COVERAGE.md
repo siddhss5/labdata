@@ -1,6 +1,6 @@
 # Supported cases
 
-Every case labdata supports, and every case it does not, with the fixture that
+Every case sslabdata supports, and every case it does not, with the fixture that
 holds the input and the test that checks the behavior. The corpus is fictional
 throughout (`tests/corpus/`); no real lab data is used anywhere.
 
@@ -10,12 +10,12 @@ throughout (`tests/corpus/`); no real lab data is used anywhere.
 |---|---|
 | Case | A stable ID. Fixtures mark it with `% CASE <id>` in a `.bib` file, or `# CASE <id>` in a YAML file. |
 | Input | The input form, as it appears in the fixture. |
-| Expected | What labdata is expected to do with it. |
+| Expected | What sslabdata is expected to do with it. |
 | Fixture | The file holding the input. |
-| Test | The assertion. `tests/conformance/` runs labdata only through `cli.main()` and the assembler. |
+| Test | The assertion. `tests/conformance/` runs sslabdata only through `cli.main()` and the assembler. |
 | Status | `pass` today, or `xfail #N` when the row describes behavior that issue #N still has to deliver. |
 
-Input labdata does not support has a row too, and its expected behavior is a
+Input sslabdata does not support has a row too, and its expected behavior is a
 warning or an error. Silently ignoring an input is never correct.
 
 `tests/conformance/test_coverage_table.py` fails if a row's fixture has no
@@ -48,7 +48,7 @@ Cases that fail today are not fixed here (that is the linked issue's job):
 (`keywords` project tags). #18 is still open for
 renderers — escaping, attribute-safe escaping and the checks on rendered
 output — but every LaTeX-to-text row below passes, and the one place
-labdata generated Markdown of its own, the composed `venue`, is gone.
+sslabdata generated Markdown of its own, the composed `venue`, is gone.
 
 ## `@string` macros and BibTeX structure
 Rule: when a macro is defined more than once, **the last definition wins**, as
@@ -86,7 +86,7 @@ the second definition is the one that reaches the output.
 | `structure.missing_booktitle` | An `@inproceedings` with no `booktitle` | Warning naming the file, key and field; the entry is kept | `tests/corpus/invalid/missing_booktitle/nobooktitle.bib` | `test_invalid_corpus.py::test_locates` | pass |
 
 ## Entry types
-Every type labdata has a venue rule for, plus one it does not.
+Every type sslabdata has a venue rule for, plus one it does not.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
@@ -95,17 +95,17 @@ Every type labdata has a venue rule for, plus one it does not.
 | `types.phdthesis` | `@phdthesis` with `school` | Venue `{kind: institution, name: <school>}` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `types.mastersthesis` | `@mastersthesis` with `school` | Venue `{kind: institution, name: <school>}` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `types.techreport` | `@techreport` with `type`, `number`, `institution` | Venue `{kind: institution, name: <institution>}`; `type` and `number` are properties of the work, with BibTeX's meanings | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `types.techreport_default` | `@techreport` with only `institution` | The same venue; `type` is null rather than a label labdata invented | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `types.techreport_default` | `@techreport` with only `institution` | The same venue; `type` is null rather than a label sslabdata invented | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `types.misc_arxiv` | `@misc` with `eprint` | Venue `{kind: repository, name: arXiv}`; the identifier is `identifiers.arxiv` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `types.misc` | `@misc` with no venue fields | Venue is null: nothing names a container, so the work declares none | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `types.unsupported` | `@unpublished`, a type labdata has no venue rule for | Warning naming the file, key and type; the entry is kept | `tests/corpus/invalid/unsupported_entry_type/entry.bib` | `test_invalid_corpus.py::test_locates` | pass |
+| `types.unsupported` | `@unpublished`, a type sslabdata has no venue rule for | Warning naming the file, key and type; the entry is kept | `tests/corpus/invalid/unsupported_entry_type/entry.bib` | `test_invalid_corpus.py::test_locates` | pass |
 | `types.incollection` | `@incollection` with `booktitle`, `editor`, `chapter`, `pages`, `publisher`, `series`, `isbn` and `month` | The `booktitle` naming the collection is the venue's name, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
 | `types.inbook` | `@inbook` with `chapter`, `pages`, `publisher`, `address`, `edition` and `isbn` | The `publisher` of the book is a property of the work, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
 | `types.book` | `@book` with `publisher`, `address`, `series`, `edition` and `isbn` | The `publisher` is a property of the work, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
 | `types.manual` | `@manual` with `organization`, `address`, `edition` and `month` | The issuing `organization` is a property of the work, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
 
 ## Fields read
-Every BibTeX field labdata reads. A field it emits no property for is still
+Every BibTeX field sslabdata reads. A field it emits no property for is still
 preserved in the copyable `bibtex` output field.
 
 | Case | Input | Expected | Fixture | Test | Status |
@@ -127,7 +127,7 @@ preserved in the copyable `bibtex` output field.
 | `fields.doi` | `doi`, bare or written as a resolver URL | `identifiers.doi`, with the resolver prefix off | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.url` | `url` | A link of kind `video` for a known video host, otherwise `url`, with `origin: input` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.project` | `project = {homebot}` | Becomes `project_ids` | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.unread` | `keywords`, which labdata emits no property for | Not dropped: it stays in the `bibtex` field | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_structure` | pass |
+| `fields.unread` | `keywords`, which sslabdata emits no property for | Not dropped: it stays in the `bibtex` field | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_structure` | pass |
 
 ## Fields the demo carries, and the property each reaches
 The fields #69 required a fixture for. Under `schema_version` 3 each of them
@@ -251,7 +251,7 @@ the source text are not markup and must survive unchanged.
 | `links.youtube` | `url` on youtube.com | A link of kind `video`, and none of kind `url` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.vimeo` | `url` on vimeo.com | A link of kind `video`, and none of kind `url` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.url` | `url` on any other host | A link of kind `url`, and none of kind `video` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
-| `links.origin` | A link from the entry's own `url`, and one labdata built from an identifier | `origin: input` for the first, `origin: derived` for the second | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
+| `links.origin` | A link from the entry's own `url`, and one sslabdata built from an identifier | `origin: input` for the first, `origin: derived` for the second | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.pdf.local_present` | `pdf_base_url` is a local directory holding `<key>.pdf` | A link of kind `pdf` with `verification.status: verified` and `checked_at: null` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.pdf.local_missing` | `pdf_base_url` is a local directory with no `<key>.pdf` | The link is kept with `verification.status: missing`, not deleted: a broken link and an absent one are different answers | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_links` | pass |
 | `links.pdf.remote_guess` | `pdf_base_url` is a remote URL, nothing says the PDF exists | The link says `verified` or `missing` rather than `unchecked`; a build never fetches, so this needs a committed cache | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_remote_pdf_url_not_verified` | xfail #20 |
@@ -277,7 +277,7 @@ the source text are not markup and must survive unchanged.
 | `people.invalid_role` | A `role` that is missing, empty, or not a string | Warning naming the file, person and field | `tests/corpus/invalid/invalid_person_role/people.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 | `people.invalid_status` | `status: retired`, neither current nor alumni | Warning naming the file, person and field | `tests/corpus/invalid/invalid_person_status/people.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 | `people.missing_name` | A person with an `id` but no `name` | Error naming the file, the person and the missing field | `tests/corpus/invalid/people_missing_name/people.yaml` | `test_invalid_corpus.py::test_locates` | pass |
-| `people.not_a_list` | A mapping where labdata expects a list of people | Error naming the file | `tests/corpus/invalid/people_not_a_list/people.yaml` | `test_invalid_corpus.py::test_locates` | pass |
+| `people.not_a_list` | A mapping where sslabdata expects a list of people | Error naming the file | `tests/corpus/invalid/people_not_a_list/people.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 
 ## Config keys
 Every key of `lab.yaml`, present, missing and wrong-typed. Wrong-typed and
@@ -288,7 +288,7 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 | `config.lab.present` | A `lab:` section | Copied into the output as `lab` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
 | `config.lab.missing` | No `lab:` section | Accepted; `lab` is emitted as `{}`, so no header and an empty header are the same document | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_lab_missing` | pass |
 | `config.lab.wrong_type` | `lab: "Corpus Lab"`, a string | Error naming the file and the key | `tests/corpus/invalid/config_lab_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
-| `config.site` | A `site:` section, read by downstream renderers | Accepted by labdata and not copied into the output | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
+| `config.site` | A `site:` section, read by downstream renderers | Accepted by sslabdata and not copied into the output | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
 | `config.bib_dir.present` | `bib_dir: "."` | The `.bib` files are read from that directory | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_config_present` | pass |
 | `config.bib_dir.missing` | No `bib_dir` | Error naming the missing key | `tests/corpus/invalid/config_bib_dir_missing/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
 | `config.bib_dir.wrong_type` | `bib_dir` as a list | Error naming the file and the key | `tests/corpus/invalid/config_bib_dir_type/lab.yaml` | `test_invalid_corpus.py::test_locates` | pass |
@@ -318,7 +318,7 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `cli.config` | `labdata` with no `--config` | Usage error naming `--config` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_config_required` | pass |
+| `cli.config` | `sslabdata` with no `--config` | Usage error naming `--config` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_config_required` | pass |
 | `cli.config_not_found` | `--config` naming a file that is not there | Error naming the file; exits non-zero | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_config_not_found` | pass |
 | `cli.mode.required` | `--config` alone, with no mode flag | Usage error naming `--output`, `--validate` and `--unresolved` | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_mode_required` | pass |
 | `cli.output` | `--output out/nested/lab.yml` | Writes the file, creating parent directories | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_output_creates_parent_dirs` | pass |
@@ -330,8 +330,8 @@ missing-file cases each live in their own `tests/corpus/invalid/` folder.
 | `cli.unresolved_none` | `--unresolved` when every author resolves | Lists nobody | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_unresolved_none` | pass |
 | `cli.help` | `--help` | Names every flag | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_help` | pass |
 
-## Messages labdata prints
-Every message labdata can print on its own behalf. Tests match on the file,
+## Messages sslabdata prints
+Every message sslabdata can print on its own behalf. Tests match on the file,
 key, field and value in a message, never on its English wording, so rewording
 a message does not break them.
 
@@ -344,7 +344,7 @@ a message does not break them.
 | `diag.all_resolved` | `--unresolved` with nothing to report | Prints exactly one line and lists nobody | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_unresolved_none` | pass |
 | `diag.unknown_projects` | `--validate` with a tag no project defines | Error listing the tag; exits non-zero | `tests/corpus/invalid/undefined_project/lab.yaml` | `test_invalid_corpus.py::test_reports` | pass |
 | `diag.ambiguous_alias` | Two people declaring one alias | One warning naming both person ids | `tests/corpus/invalid/ambiguous_alias/people.yaml` | `test_invalid_corpus.py::test_reports` | pass |
-| `diag.config_error` | A `lab.yaml` labdata cannot load | One error message, no traceback; exits non-zero | `tests/corpus/invalid/config_not_a_mapping/lab.yaml` | `test_invalid_corpus.py::test_exit` | pass |
+| `diag.config_error` | A `lab.yaml` sslabdata cannot load | One error message, no traceback; exits non-zero | `tests/corpus/invalid/config_not_a_mapping/lab.yaml` | `test_invalid_corpus.py::test_exit` | pass |
 | `diag.config_not_found` | `--config` naming a file that is not there | Names the file; exits non-zero | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_config_not_found` | pass |
 | `diag.mode_required` | No mode flag | Names the flags that would be valid | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_mode_required` | pass |
 | `diag.format_invalid` | `--format xml` | Names the bad value and the valid ones | `tests/corpus/valid/lab.yaml` | `test_config_cli.py::test_cli_format_invalid` | pass |
@@ -377,10 +377,10 @@ because emitting nulls over an unbounded key set says nothing.
 | `output.work.abstract` | `abstract` | `abstract`, or null | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.work.note` | `note` | `note`, or null | `tests/corpus/valid/latex.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.work.identifiers` | `doi`, `eprint`, `isbn`, `issn` | `identifiers`, an open map from scheme to a list of identifiers; `{}` when the entry carries none | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.work.links` | `url`, `pdf_base_url`, and the identifiers labdata builds links from | `links`, an open map from kind to a list of `{url, label, origin, verification}` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.links` | `url`, `pdf_base_url`, and the identifiers sslabdata builds links from | `links`, an open map from kind to a list of `{url, label, origin, verification}` | `tests/corpus/valid/links.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.work.project_ids` | `project` or namespaced `keywords` | `project_ids` | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.work.bibtex` | The whole entry | `bibtex`, the copyable source, including fields labdata emits no property for; null when it could not be written back out | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
-| `output.work.derived` | Any run | `derived`, an open bag reserved for labdata, `{}` today | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.bibtex` | The whole entry | `bibtex`, the copyable source, including fields sslabdata emits no property for; null when it could not be written back out | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
+| `output.work.derived` | Any run | `derived`, an open bag reserved for sslabdata, `{}` today | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.id` | `id` in `people.yaml` | `id` | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.name` | `name` | `name` | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.person.role` | `role` | `role`, or null | `tests/corpus/valid/people.yaml` | `test_valid_corpus.py::test_output_fields` | pass |
@@ -417,7 +417,7 @@ because emitting nulls over an unbounded key set says nothing.
 | `output.collaborator.last_year` | The most recent of those works | `last_year`, or null when none of them has a year | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.collaborator.derived` | Any run | `derived`, `{}` today | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_output_fields` | pass |
 | `output.collaborators.order` | Several collaborators, including three that share a year and a work count whose name order and key order disagree, two of them sharing a readable name | Sorted by last year descending with null last, then work count descending, then name ascending, then key ascending. `key` is appended after `name`, not a replacement for it | `tests/corpus/valid/names.bib` | `test_valid_corpus.py::test_collaborators_order` | pass |
-| `output.no_markup` | A title carrying Markdown punctuation, and the demo | Nothing labdata composes is Markdown or HTML; punctuation that survives is input text | `tests/corpus/valid/latex.bib` | `test_output_format.py::test_markup_in_the_corpus_is_only_text_the_input_wrote` | pass |
+| `output.no_markup` | A title carrying Markdown punctuation, and the demo | Nothing sslabdata composes is Markdown or HTML; punctuation that survives is input text | `tests/corpus/valid/latex.bib` | `test_output_format.py::test_markup_in_the_corpus_is_only_text_the_input_wrote` | pass |
 | `output.derived_is_empty` | The corpus and the demo | Every `derived` bag is `{}`, so the region cannot quietly fill | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_every_derived_bag_is_empty` | pass |
 | `output.schema` | The valid corpus output | Validates against the JSON Schema, which rejects unknown fields and an authorship carrying two contributor references or none | `tests/corpus/valid/lab.yaml` | `test_output_format.py::test_valid_corpus_matches_schema` | pass |
 | `output.versioned_schema` | The published schemas | v4 lives at its own path and v3 stays reachable unchanged, still saying 3 | `schema/v3/output.schema.json` | `test_output_format.py::test_the_previous_schema_stays_reachable_unchanged` | pass |
@@ -435,7 +435,7 @@ scenarios asserted over the node and edge sets `graph.py` builds.
 The field-loss probe is a **field-loss detector, not a value round trip**:
 LaTeX-to-Unicode conversion is one-way, so comparing values would assert
 something false. Its one ignore set member, `project`, is named on its own in
-the test with the reason it is not a loss: it is labdata's own tag field
+the test with the reason it is not a loss: it is sslabdata's own tag field
 rather than a bibliographic one, and it does reach the document, as
 `project_ids`.
 

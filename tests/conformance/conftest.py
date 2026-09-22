@@ -2,7 +2,7 @@
 
 import pytest
 
-from .support import VALID, export, run_labdata
+from .support import VALID, export, run_sslabdata
 
 
 @pytest.fixture(scope="session")
@@ -22,11 +22,11 @@ def valid_output(valid_export):
 
 @pytest.fixture(scope="session")
 def valid_validate():
-    """The result of ``labdata --validate`` on the valid corpus."""
-    return run_labdata(["--config", "lab.yaml", "--validate"], VALID)
+    """The result of ``sslabdata --validate`` on the valid corpus."""
+    return run_sslabdata(["--config", "lab.yaml", "--validate"], VALID)
 
 
 @pytest.fixture(scope="session")
 def valid_unresolved():
-    """The result of ``labdata --unresolved`` on the valid corpus."""
-    return run_labdata(["--config", "lab.yaml", "--unresolved"], VALID)
+    """The result of ``sslabdata --unresolved`` on the valid corpus."""
+    return run_sslabdata(["--config", "lab.yaml", "--unresolved"], VALID)

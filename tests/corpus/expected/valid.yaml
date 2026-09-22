@@ -2,16 +2,16 @@
 # tests/conformance/test_output_format.py::test_full_output. The entries
 # here are the ones no open issue is expected to change; SNAPSHOT in that
 # file says which they are and why the rest is left out. Regenerate with
-#   LABDATA_REGENERATE_EXPECTED=1 uv run pytest tests/conformance/test_output_format.py
+#   SSLABDATA_REGENERATE_EXPECTED=1 uv run pytest tests/conformance/test_output_format.py
 # and review the diff before committing.
 schema_version: 4
 generator:
-  name: labdata
+  name: sslabdata
   version: 3.0.0
   schema_version: 4
 lab:
   name: Corpus Lab
-  description: A fictional lab used only by the labdata conformance tests.
+  description: A fictional lab used only by the sslabdata conformance tests.
   university: Example University
   website: https://example.org/corpus
 works:

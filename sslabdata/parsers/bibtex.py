@@ -2,13 +2,13 @@
 BibTeX parsing pipeline.
 
 pybtex reads the files — @string macros, BibTeX's own name splitting, entry
-order — and this module maps its Entry and Person objects onto labdata's
+order — and this module maps its Entry and Person objects onto sslabdata's
 Work model: per-field LaTeX conversion (latex.py), the structured venue,
 identifiers, links and diagnostics.
 
 Together with latex.py this is the adapter: no other module imports pybtex or
 pylatexenc, and nothing here lets a library object or a library message reach
-the rest of labdata.
+the rest of sslabdata.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
 Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
@@ -77,7 +77,7 @@ SYNTAX_ERROR = "BIB-SYNTAX-ERROR"
 # does carry.
 VENUE_MISSING = "BIB-VENUE-MISSING"
 
-# An entry of a type labdata does not document. It is kept, and its venue is
+# An entry of a type sslabdata does not document. It is kept, and its venue is
 # read by the field rules alone.
 ENTRY_TYPE_UNSUPPORTED = "BIB-ENTRY-TYPE-UNSUPPORTED"
 
@@ -141,7 +141,7 @@ _COMMENT_COMMAND = re.compile(r'\s*comment\s*[{(]', re.IGNORECASE)
 
 
 def _warn(message: str) -> None:
-    """Report a problem with an input file in labdata's own voice.
+    """Report a problem with an input file in sslabdata's own voice.
 
     Parser messages are relayed as the library phrased them: naming the file,
     entry key and field of every diagnostic is #26.
@@ -161,7 +161,7 @@ def _redefined_macros(text: str,
     is not one. Names compare without case, as the parser's macros do.
 
     pybtex takes the last definition, as BibTeX does, and says nothing about
-    it. labdata reports it instead of letting a redefinition pass unnoticed.
+    it. sslabdata reports it instead of letting a redefinition pass unnoticed.
     """
     seen: set = set()
     repeated: List[Tuple[str, int]] = []
@@ -199,10 +199,10 @@ class _CommentSkippingParser(LowLevelParser):
 
     pybtex raises ``SkipEntry`` for ``@comment`` before reading the body, so
     the scanner resumes just inside the group and an entry written there is a
-    real entry to it — BibTeX behaves the same way. labdata treats a
+    real entry to it — BibTeX behaves the same way. sslabdata treats a
     commented-out entry as commented out, so the group is consumed here, at
     the parser's own position and with the parser's own scanner. Nothing else
-    in the file is read by labdata, which is why the shape of a value or of a
+    in the file is read by sslabdata, which is why the shape of a value or of a
     neighbouring command cannot be got wrong.
 
     Only a *balanced* group is consumed. Prose that merely mentions
@@ -256,7 +256,7 @@ class _Parser(PybtexParser):
     """pybtex's BibTeX parser, reading ``@comment`` groups as comments.
 
     ``Parser.parse_string`` names ``LowLevelParser`` directly, so swapping the
-    tokenizer means restating that loop. It is the one place labdata touches a
+    tokenizer means restating that loop. It is the one place sslabdata touches a
     pybtex internal; ``pybtex~=0.26`` is pinned, which is the mitigation #23
     already names for this.
     """
@@ -288,7 +288,7 @@ class _Parser(PybtexParser):
         """Remember duplicate keys before pybtex discards the later entry.
 
         ``BibliographyData.add_entry`` reports a parser-library warning and
-        keeps the first entry. Recording the key here lets labdata surface a
+        keeps the first entry. Recording the key here lets sslabdata surface a
         stable, file-qualified diagnostic instead of exposing that wording.
         """
         if key is not None and key in self.data.entries:
@@ -352,7 +352,7 @@ def _on_comment_line(text: str, position: Optional[int]) -> bool:
 
 def _syntax_diagnostic(path: str, error: PybtexSyntaxError,
                        key: Optional[str], field_name: Optional[str]) -> str:
-    """One parser-library syntax error, in labdata's voice and located."""
+    """One parser-library syntax error, in sslabdata's voice and located."""
     if isinstance(error, UndefinedMacro):
         macro = str(error).rsplit(": ", 1)[-1]
         return diagnostic(
@@ -380,7 +380,7 @@ def parse_bibtex_file(
 ) -> Dict[str, Entry]:
     """Parse one BibTeX file into pybtex entries, keyed by citation key.
 
-    Anything the parser has to say is captured and reported by labdata, so no
+    Anything the parser has to say is captured and reported by sslabdata, so no
     library logging reaches the user. Syntax errors and undefined macros go
     to ``warnings``, located at the entry and field they were found in, or to
     standard error when no list is given. Redefined ``@string`` macros are
@@ -419,7 +419,7 @@ def parse_bibtex_file(
         else:
             duplicate_errors.append(message)
     for error in errors:
-        # The duplicate has already been recorded with labdata's stable code.
+        # The duplicate has already been recorded with sslabdata's stable code.
         if str(error).startswith("repeated bibliography entry:"):
             continue
         message = diagnostic(PARSER_MESSAGE, path,
@@ -433,7 +433,7 @@ def parse_bibtex_file(
     return data.entries
 
 
-# --- pybtex objects → labdata values ----------------------------------------
+# --- pybtex objects → sslabdata values ----------------------------------------
 
 _UNREADABLE_LATEX = ("could not read the LaTeX in this field; keeping the text "
                      "as written")
@@ -474,7 +474,7 @@ def _unknown_command_reporter(report, file: str, key: str):
             reported.add((field_name, command))
             report(diagnostic(
                 LATEX_COMMAND_UNKNOWN, file, key, field_name,
-                f"the LaTeX command '\\{command}' is not one labdata "
+                f"the LaTeX command '\\{command}' is not one sslabdata "
                 "converts; it is dropped, and a braced argument after it is "
                 "kept as plain text"))
 
@@ -540,7 +540,7 @@ def marks_equal_contribution(person: Person) -> bool:
     """True when any part of this name carries an equal-contribution marker.
 
     Given, family, von and suffix are all read: BibTeX splits the name before
-    labdata sees it, so which part the star landed on is the author's choice
+    sslabdata sees it, so which part the star landed on is the author's choice
     of where to write it, not a different meaning.
     """
     return any(_without_marker(part) != part for part in _name_parts(person))
@@ -608,7 +608,7 @@ def readable_name(parts: Dict[str, Optional[str]]) -> str:
     not abbreviate, expand or normalise anything, so an entry writing
     ``Brown, B.`` yields ``B. Brown`` and one writing ``Brown, Bob`` yields
     ``Bob Brown``. The resolver matches on the structured parts rather than
-    on this string (`labdata.resolver`), so matching can change without
+    on this string (`sslabdata.resolver`), so matching can change without
     changing what the document displays.
 
     A name written as one brace-protected unit keeps its full form, because
@@ -697,9 +697,9 @@ def format_bibtex(bib_id: str, entry: Entry, source: Optional[str] = None,
     """The entry written back out as BibTeX, for readers to copy.
 
     This is the entry as it was read, before LaTeX conversion, so fields
-    labdata does not emit as properties are preserved rather than rewritten.
+    sslabdata does not emit as properties are preserved rather than rewritten.
     It is a re-serialization of the entry's data and explicitly not a source
-    of properties: nothing in labdata reads a value back out of it.
+    of properties: nothing in sslabdata reads a value back out of it.
     """
     try:
         return entry.to_string("bibtex").strip()
@@ -712,7 +712,7 @@ def format_bibtex(bib_id: str, entry: Entry, source: Optional[str] = None,
 
 # --- The structured bibliography ---------------------------------------------
 
-# The one place labdata normalises across entry types: the field that names
+# The one place sslabdata normalises across entry types: the field that names
 # the container a work appeared in. Everything else bibliographic is flat on
 # the work, because it describes the work's placement rather than the
 # container. The order is the precedence, so an entry carrying more than one
@@ -738,12 +738,12 @@ REPOSITORY_KIND = "repository"
 # The bibliographic fields carried flat on the work, under BibTeX's own names
 # and with BibTeX's own meanings. `number` in particular is an issue number
 # for an @article and a report number for a @techreport; reinterpreting it is
-# not labdata's job, and `venue.kind` gives a consumer the branch it needs.
+# not sslabdata's job, and `venue.kind` gives a consumer the branch it needs.
 FLAT_FIELDS = ("volume", "number", "pages", "series", "edition", "publisher",
                "address", "organization", "chapter", "month", "howpublished",
                "type")
 
-# The identifier schemes labdata reads out of an entry, and the field each
+# The identifier schemes sslabdata reads out of an entry, and the field each
 # comes from. The registry is open: a scheme is documented, never enumerated
 # in the schema, so #25 and #27 can add one without a version bump.
 IDENTIFIER_FIELDS = {"doi": "doi", "isbn": "isbn", "issn": "issn"}
@@ -758,7 +758,7 @@ DOI_BASE = "https://doi.org/"
 ARXIV_BASE = "https://arxiv.org/abs/"
 
 # Link kinds, and the origin of each. Only `input` means the entry's own
-# field supplied the link; a link labdata built from an identifier or from
+# field supplied the link; a link sslabdata built from an identifier or from
 # `pdf_base_url` is `derived`, and says so.
 FROM_INPUT = "input"
 DERIVED = "derived"
@@ -829,7 +829,7 @@ def build_identifiers(entry: dict) -> Dict[str, List[str]]:
 
 
 def is_video_url(url: str) -> bool:
-    """True when a URL names one of the video hosts labdata files separately."""
+    """True when a URL names one of the video hosts sslabdata files separately."""
     return any(host in url for host in VIDEO_HOSTS)
 
 
@@ -919,7 +919,7 @@ def entry_year(entry: dict, source: str, report) -> Optional[int]:
         return None
 
 
-# The container field checked for an entry type, and the entry types labdata
+# The container field checked for an entry type, and the entry types sslabdata
 # documents (tests/COVERAGE.md, *Entry types*, with `@conference` and
 # `@proceedings`, which the venue rule names). Any other type is kept and
 # reported.
@@ -931,12 +931,12 @@ SUPPORTED_TYPES = frozenset({
 
 
 def check_entry_type(entry: dict, source: str, report) -> None:
-    """Report an entry type labdata does not document, or a missing container."""
+    """Report an entry type sslabdata does not document, or a missing container."""
     entry_type, key = entry["ENTRYTYPE"], entry["ID"]
     if entry_type not in SUPPORTED_TYPES:
         report(diagnostic(
             ENTRY_TYPE_UNSUPPORTED, source, key, "entry_type",
-            f"@{entry_type} is not an entry type labdata documents; the "
+            f"@{entry_type} is not an entry type sslabdata documents; the "
             "entry is kept, with its venue read from whichever container "
             "field it carries"))
         return

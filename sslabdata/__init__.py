@@ -1,5 +1,5 @@
 """
-labdata - Renderer-agnostic academic lab data assembler.
+sslabdata - Renderer-agnostic academic lab data assembler.
 
 Transforms BibTeX files and YAML configuration into structured data
 (YAML/JSON) for academic lab websites. Framework-agnostic: works with

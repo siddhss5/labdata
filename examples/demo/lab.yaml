@@ -1,9 +1,9 @@
-# Example Lab: a fictional lab used as the labdata demo.
+# Example Lab: a fictional lab used as the sslabdata demo.
 # Its people, works and projects, and their example.org, DOI, arXiv
 # and video links, are invented.
 #
-# Paths are relative to the repository root, so run labdata from there:
-#   labdata --config examples/demo/lab.yaml --validate
+# Paths are relative to the repository root, so run sslabdata from there:
+#   sslabdata --config examples/demo/lab.yaml --validate
 
 lab:
   name: "Example Lab"

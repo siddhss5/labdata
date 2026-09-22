@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from labdata.assembler import assemble
-from labdata.cli import main
-from labdata.config import LabDataConfig
+from sslabdata.assembler import assemble
+from sslabdata.cli import main
+from sslabdata.config import LabDataConfig
 
 
 REPO_ROOT = Path(__file__).parent.parent

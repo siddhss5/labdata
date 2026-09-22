@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-from labdata.cli import main
+from sslabdata.cli import main
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -17,7 +17,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 @pytest.fixture
 def run_cli(capsys):
-    """Run the labdata CLI in-process; return its exit code and captured output."""
+    """Run the sslabdata CLI in-process; return its exit code and captured output."""
     def run(*args):
         try:
             main(list(args))
@@ -30,9 +30,9 @@ def run_cli(capsys):
 
 
 def test_installed_command_smoke():
-    """The installed `labdata` console script runs end to end."""
-    exe = shutil.which("labdata", path=str(Path(sys.executable).parent)) or shutil.which("labdata")
-    assert exe, "labdata console script is not installed"
+    """The installed `sslabdata` console script runs end to end."""
+    exe = shutil.which("sslabdata", path=str(Path(sys.executable).parent)) or shutil.which("sslabdata")
+    assert exe, "sslabdata console script is not installed"
     result = subprocess.run(
         [exe, "--config", str(FIXTURES / "lab.yaml"), "--validate"],
         capture_output=True, text=True,

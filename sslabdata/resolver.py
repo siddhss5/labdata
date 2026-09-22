@@ -50,7 +50,7 @@ SUGGESTION = "RESOLVE-SUGGESTION"
 ALIAS_AMBIGUOUS = "PEOPLE-ALIAS-AMBIGUOUS"
 
 # A work tagged with a project id that `projects_file` does not define. It
-# fails `--validate`: the id is a typo in data labdata owns (SPEC.md section 1).
+# fails `--validate`: the id is a typo in data sslabdata owns (SPEC.md section 1).
 PROJECT_UNKNOWN = "RESOLVE-PROJECT-UNKNOWN"
 
 # One part of a given name that is an initial rather than a name: a letter,

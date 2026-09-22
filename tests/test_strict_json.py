@@ -11,7 +11,7 @@ import jsonschema
 import pytest
 import yaml
 
-from .conformance.support import INVALID, REPO_ROOT, VALID, run_labdata
+from .conformance.support import INVALID, REPO_ROOT, VALID, run_sslabdata
 
 SPEC = (REPO_ROOT / "SPEC.md").read_text(encoding="utf-8")
 CODE = r"[A-Z]+(?:-[A-Z]+)+"
@@ -73,7 +73,7 @@ def test_every_line_on_standard_error_carries_a_code(tmp_path, cwd, config,
                                                      mode, strict, fmt):
     args = ["--config", config, "--format", fmt, *strict]
     args += [mode, tmp_path / f"out.{fmt}"] if mode == "--output" else [mode]
-    run = run_labdata(args, cwd)
+    run = run_sslabdata(args, cwd)
     assert run.crash is None, run.crash
     for line in run.stderr.splitlines():
         found = LINE.match(line)
@@ -91,7 +91,7 @@ def test_every_line_on_standard_error_carries_a_code(tmp_path, cwd, config,
 # --- --strict ----------------------------------------------------------------
 
 def strict_run(folder, *mode):
-    return run_labdata(["--config", "lab.yaml", "--strict", *mode], INVALID / folder)
+    return run_sslabdata(["--config", "lab.yaml", "--strict", *mode], INVALID / folder)
 
 
 @pytest.mark.parametrize("folder, code", [
@@ -114,15 +114,15 @@ def test_strict_fails_every_mode_on_each_error_class(tmp_path, folder, code):
                                     "ambiguous_alias"])
 def test_without_strict_the_exit_codes_are_unchanged(tmp_path, folder):
     """A validation error fails only --validate; a warning fails nothing."""
-    unresolved = run_labdata(["--config", "lab.yaml", "--unresolved"], INVALID / folder)
-    export = run_labdata(["--config", "lab.yaml", "--output", tmp_path / "o.yaml"],
+    unresolved = run_sslabdata(["--config", "lab.yaml", "--unresolved"], INVALID / folder)
+    export = run_sslabdata(["--config", "lab.yaml", "--output", tmp_path / "o.yaml"],
                          INVALID / folder)
     assert unresolved.code == 0 and export.code == 0
 
 
 def test_the_demo_passes_every_mode_under_strict(tmp_path):
     for mode in (["--validate"], ["--unresolved"], ["--output", tmp_path / "d.yaml"]):
-        run = run_labdata(["--config", "examples/demo/lab.yaml", "--strict", *mode],
+        run = run_sslabdata(["--config", "examples/demo/lab.yaml", "--strict", *mode],
                           REPO_ROOT)
         assert run.code == 0 and run.crash is None, (mode, run.output)
 
@@ -142,12 +142,12 @@ def write_lab(tmp_path, bib, people=None, collaborators=None):
 
 def strict_codes(tmp_path):
     """The codes of a --validate --strict run as JSON, and each mode's exit."""
-    run = run_labdata(["--config", "lab.yaml", "--validate", "--strict",
+    run = run_sslabdata(["--config", "lab.yaml", "--validate", "--strict",
                        "--format", "json"], tmp_path)
     records = json.loads(run.stdout)
     exits = {run.code}
     for mode in (["--validate"], ["--unresolved"], ["--output", tmp_path / "o.yaml"]):
-        exits.add(run_labdata(["--config", "lab.yaml", "--strict", *mode],
+        exits.add(run_sslabdata(["--config", "lab.yaml", "--strict", *mode],
                               tmp_path).code)
     return records, exits
 
@@ -223,13 +223,13 @@ def boundary_runs(tmp_path):
     records, text, exits = {}, {}, set()
     for strict in ((), ("--strict",)):
         for mode in ("--validate", "--unresolved"):
-            run = run_labdata(["--config", "lab.yaml", mode, "--format", "json",
+            run = run_sslabdata(["--config", "lab.yaml", mode, "--format", "json",
                                *strict], tmp_path)
             records[(mode, bool(strict))] = [
                 (r["code"], r["severity"]) for r in json.loads(run.stdout)]
             if strict:
                 exits.add(run.code)
-        run = run_labdata(["--config", "lab.yaml", "--validate", *strict], tmp_path)
+        run = run_sslabdata(["--config", "lab.yaml", "--validate", *strict], tmp_path)
         sections = {}
         for heading in ("Warnings", "Bibliography errors"):
             part = run.stdout.split(f"\n{heading} (", 1)
@@ -239,7 +239,7 @@ def boundary_runs(tmp_path):
         if strict:
             exits.add(run.code)
     for mode in (["--unresolved"], ["--output", tmp_path / "o.yaml"]):
-        exits.add(run_labdata(["--config", "lab.yaml", "--strict", *mode],
+        exits.add(run_sslabdata(["--config", "lab.yaml", "--strict", *mode],
                               tmp_path).code)
     return records, text, exits
 
@@ -320,7 +320,7 @@ def test_strict_validate_lists_promoted_codes_as_errors():
 # --- JSON ----------------------------------------------------------------------
 
 def json_run(cwd, *mode, config="lab.yaml"):
-    run = run_labdata(["--config", config, "--format", "json", *mode], cwd)
+    run = run_sslabdata(["--config", config, "--format", "json", *mode], cwd)
     assert run.crash is None and run.stderr == "", run.output
     records = json.loads(run.stdout)
     jsonschema.validate(records, spec_schema())
@@ -349,7 +349,7 @@ def test_unresolved_names_are_records_only_under_unresolved_json():
     run, records = json_run(REPO_ROOT, "--unresolved",
                             config="examples/demo/lab.yaml")
     names = [r for r in records if r["code"] == "RESOLVE-UNRESOLVED-NAME"]
-    text = run_labdata(["--config", "examples/demo/lab.yaml", "--unresolved"],
+    text = run_sslabdata(["--config", "examples/demo/lab.yaml", "--unresolved"],
                        REPO_ROOT)
     listed = [line.strip() for line in text.stdout.splitlines()[1:]]
     assert [r["message"] for r in names] == listed
@@ -380,7 +380,7 @@ def test_a_configuration_that_does_not_load_is_still_one_array(tmp_path):
 
 def test_export_keeps_the_document_meaning_of_format(tmp_path):
     out = tmp_path / "lab.json"
-    run = run_labdata(["--config", "lab.yaml", "--format", "json", "--output", out],
+    run = run_sslabdata(["--config", "lab.yaml", "--format", "json", "--output", out],
                       INVALID / "year_not_number")
     assert run.code == 0
     assert "works" in json.loads(out.read_text(encoding="utf-8"))
@@ -390,12 +390,12 @@ def test_export_keeps_the_document_meaning_of_format(tmp_path):
 # --- The five codes that were uncoded -------------------------------------------
 
 def test_a_missing_or_unreadable_configuration_is_coded_as_text(tmp_path):
-    run = run_labdata(["--config", "missing.yaml", "--validate"], tmp_path)
+    run = run_sslabdata(["--config", "missing.yaml", "--validate"], tmp_path)
     assert run.code == 1
     assert run.stderr == ("Error: CONFIG-NOT-FOUND missing.yaml::: "
                           "configuration file not found\n")
     (tmp_path / "bad.yaml").write_text("lab: {name: L\n", encoding="utf-8")
-    run = run_labdata(["--config", "bad.yaml", "--validate"], tmp_path)
+    run = run_sslabdata(["--config", "bad.yaml", "--validate"], tmp_path)
     assert run.code == 1
     [line] = run.stderr.splitlines()
     assert line.startswith("Error loading configuration: CONFIG-UNREADABLE bad.yaml::: ")
@@ -404,7 +404,7 @@ def test_a_missing_or_unreadable_configuration_is_coded_as_text(tmp_path):
 def test_a_library_message_keeps_its_wording_after_the_code(tmp_path):
     write_lab(tmp_path, "@article{e, title = {A}, title = {B}, journal = {J},"
                         " year = 2024}\n")
-    run = run_labdata(["--config", "lab.yaml", "--output", tmp_path / "o.yaml"],
+    run = run_sslabdata(["--config", "lab.yaml", "--output", tmp_path / "o.yaml"],
                       tmp_path)
     assert run.stderr == ("Warning: BIB-PARSER-MESSAGE ./w.bib:e:: entry with "
                           "key e has a duplicate title field\n")

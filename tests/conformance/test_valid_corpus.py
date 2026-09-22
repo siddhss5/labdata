@@ -39,7 +39,7 @@ def test_strings(valid_output, case_id, bib_key, path, expected):
 
 @covers("strings.redefined_report")
 def test_redefined_strings_reported_once(valid_validate):
-    """The three redefined macros are reported together by labdata, not one by one.
+    """The three redefined macros are reported together by sslabdata, not one by one.
 
     One warning line names the code, the file, the macros and the line of
     each redefinition in strings.bib.
@@ -509,7 +509,7 @@ STRUCTURE = [
     case("fields.url", "link-url", "links.url.0.url",
          "https://example.org/papers/link-url"),
     case("fields.project", "proj-single", "project_ids", ["homebot"]),
-    # A field labdata emits no property for is still not dropped.
+    # A field sslabdata emits no property for is still not dropped.
     case("fields.unread", "proj-keywords", "bibtex", Contains("keywords")),
 ]
 
@@ -595,7 +595,7 @@ def test_project_backlinks(valid_output):
 
 OUTPUT_FIELDS = [
     case("output.schema_version", "", "", "", "schema_version", 4),
-    case("output.generator", "", "", "", "generator.name", "labdata"),
+    case("output.generator", "", "", "", "generator.name", "sslabdata"),
     case("output.generator", "", "", "", "generator.schema_version", 4),
     case("output.lab", "", "", "", "lab.name", "Corpus Lab"),
     case("output.work.bib_id", "works", "bib_id", "type-article", "bib_id",
@@ -796,7 +796,7 @@ def test_two_authorships_written_alike_stay_apart(valid_output):
 
 # The two codes, restated rather than imported: a published code is a
 # permanent interface (SPEC.md, "Diagnostic codes"), and outside tests/unit
-# the suite uses only labdata's public names.
+# the suite uses only sslabdata's public names.
 SPANS_SPELLINGS = "ID-GROUPING-SPANS-SPELLINGS"
 INITIALS_AMBIGUOUS = "ID-GROUPING-INITIALS-AMBIGUOUS"
 
