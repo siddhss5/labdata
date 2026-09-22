@@ -322,7 +322,7 @@ change without a version bump.
 [sslabdata-site](https://github.com/siddhss5/sslabdata-site) renders the Example
 Lab document as a website ([what it looks like](https://siddhss5.github.io/sslabdata-site/)).
 It is an **optional downstream consumer**, not part of sslabdata and not part of
-what sslabdata promises; it installs sslabdata from a pinned tag and keeps its own
+what sslabdata promises; it installs sslabdata from a pinned tag or commit and keeps its own
 copy of the demo. sslabdata ignores a `site:` section in `lab.yaml`, so a
 renderer can keep its own settings there.
 

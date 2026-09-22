@@ -1074,8 +1074,9 @@ called `labdata` until #82 renamed it, and its repository with it, to
 `sslabdata`. The v3 and v4 schema files were published before the rename, so
 their `$id`s, and the titles and descriptions inside them, still say
 `labdata`, and they are left byte for byte as published rather than
-rewritten. Those addresses still resolve: GitHub redirects the old repository
-name to the new one. The first schema published under the new name will be
+rewritten. v4's raw `$id` still resolves: GitHub redirects the old repository
+name to the new one. v3's `blob/main` `$id` still does not resolve, as above.
+The first schema published under the new name will be
 the next one, set up by #37.
 
 **Version history**, as recorded in the comment above
