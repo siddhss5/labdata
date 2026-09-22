@@ -24,8 +24,9 @@ from .loaders import (
     DeclaredCollaborator, load_collaborators, load_people, load_projects,
 )
 from .resolver import (
-    AMBIGUOUS, RESOLVED, Candidates, compute_backlinks, given_initials,
-    initials_only, match, normalize_name, person_candidates,
+    AMBIGUOUS, RESOLVED, Candidates, compute_backlinks, declared_form,
+    given_initials, initials_only, match, normalize_name,
+    written_form,
     resolve_authors, resolve_projects, shared_declarations,
 )
 
@@ -233,13 +234,16 @@ def declared_collaborators(declared: List[DeclaredCollaborator],
     `COLLABORATOR_ALIAS_IS_MEMBER` and left out, so the member is never
     shadowed and the collaborator never silently chosen.
     """
-    members = person_candidates(people)
+    members: Dict[str, set] = {}
+    for person in people:
+        for name in [person.name] + list(person.aliases):
+            members.setdefault(declared_form(name), set()).add(person.id)
     entries = []
     for collaborator in declared:
         kept = []
         for field_name, name in [("name", collaborator.name)] + [
                 ("aliases", alias) for alias in collaborator.aliases]:
-            owners = members.ids_for(normalize_name(name))
+            owners = members.get(declared_form(name), set())
             if owners:
                 warnings.append(diagnostic(
                     COLLABORATOR_ALIAS_IS_MEMBER, source, collaborator.name,
@@ -249,7 +253,7 @@ def declared_collaborators(declared: List[DeclaredCollaborator],
                     "used for it"))
             else:
                 kept.append(name)
-        entries.append((normalize_name(collaborator.name), kept))
+        entries.append((declared_form(collaborator.name), kept))
     return entries
 
 
@@ -281,7 +285,7 @@ def group_collaborators(works: List[Work], bib_dir: str,
         for author in work.authors:
             if author.person_id:
                 continue
-            normalized = normalize_name(author.name)
+            normalized = written_form(author)
             kind = LITERAL if author.literal else PERSONAL
             grouped_by = GROUPED_BY_NORMALIZED_NAME
             if rivals is not None:

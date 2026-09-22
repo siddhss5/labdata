@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Tuple
 
 import pybtex.errors
 from pybtex.database import Entry, Person
+from pybtex.exceptions import PybtexError
 from pybtex.database.input.bibtex import (
     LowLevelParser, Parser as PybtexParser, SkipEntry, UndefinedMacro,
 )
@@ -588,6 +589,16 @@ def person_name_parts(person: Person, where: str,
         "suffix": text(person.lineage_names),
         "literal": None,
     }
+
+
+def given_words(name: str) -> List[str]:
+    """The words BibTeX reads as the given name of a plain string: its first
+    and middle names, as written. Empty when BibTeX cannot read it."""
+    try:
+        person = Person(name)
+    except PybtexError:
+        return []
+    return list(person.first_names) + list(person.middle_names)
 
 
 def readable_name(parts: Dict[str, Optional[str]]) -> str:

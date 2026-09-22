@@ -759,8 +759,52 @@ function does exactly this, in this order:
 5. Replaces each run of whitespace with one space and strips both ends.
 
 Nothing else is changed. A `*` that is not an equal-contribution marker
-stays part of the name unless step 4 removed it with a `<sup>` span. The
-match decides in this order:
+stays part of the name unless step 4 removed it with a `<sup>` span.
+
+**Run-together initials in a given name.** A given-name part written as two
+or more letters, each but the last followed by a full stop and the last
+one's optional, is read as one initial per letter before it is normalised:
+`S.S.` and `S.S` are `S. S.`, and `T.A.K.` is `T. A. K.` The test is made
+once combining marks are removed, so `Š.S.` is read alike whether its accent
+is precomposed or decomposed. So a given name written `S.S.`, `S.S`, `S S`
+or `S. S.` matches any of the others. A part with no full stop between its
+letters is a name and is never split: `SS`, `Ed`, `Jo`, `Al.` and `Ng` stay
+whole, so `E.D. Quill` is not `Ed Quill`. Hyphenated initials are left as
+written and go through the steps above like any other part: step 3 still
+removes their full stops, so `J.-P.` equals `J-P`, but it is not equal to
+`J.P.`, `J. P.` or `JP`. The rule applies only to a given name:
+
+- On the `.bib` side, to the structured given name, never to the family
+  name, a particle, a suffix or a brace-protected name.
+- Matching a `.bib` name against a declared name or alias in `people_file`
+  or `collaborators_file`: the declaration is not parsed; its given name is
+  what is left once the compared name's particles, family name and suffix
+  are taken off its end.
+- Comparing two declarations with each other (`PEOPLE-ALIAS-AMBIGUOUS`, and
+  `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`): a declaration is read as
+  `Given von Family, Suffix`, the form `full_form()` joins a name in, so
+  only the text before its first comma is read with BibTeX's own name
+  parsing, and the given name is the leading words it reads as first and
+  middle names. Particles, the family name and everything after the comma
+  are never spaced, so `S.S. Ivers, Jr.` equals `S. S. Ivers, Jr.`, while
+  `S.S. S.S.` equals `S. S. S.S.` but not `S. S. S. S.`, and
+  `Alice Ivers, S.S.` does not equal `Alice Ivers, S. S.` labdata has no
+  way to tell a suffix from a given name after a comma, so a declaration
+  written `Family, Given` is not spaced at all: `Ivers, S.S.` and
+  `Ivers, S. S.` stay two spellings, as on `main`. Where the parse does not
+  line up with the words, the declaration is compared through
+  `normalize_name()` alone.
+- Grouping an unresolved author into a collaborator: the grouping key is
+  built from the readable name with its structured given name spaced, so
+  `S.S. Quinn` and `S. S. Quinn` are one key (a key spanning two spellings,
+  reported as such), and a `collaborators_file` entry's key from its name
+  spaced the same way as between declarations. A name with nothing to space
+  keeps the key it had.
+
+The emitted `name` and name parts keep what the entry wrote, and
+`normalize_name()` itself is unchanged.
+
+The match decides in this order:
 
 1. **The full name.** The parts joined as `given von family, suffix`, equal to
    exactly one person's name or alias: resolved, `method: exact`. Equal to two

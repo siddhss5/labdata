@@ -209,6 +209,63 @@
   year    = {2022}
 }
 
+% Run-together initials (#81): `S.S.` is `S. S.`, one initial per letter, on
+% both sides of the comparison.
+% CASE names.initials_run_together
+@article{name-initials-run-together,
+  title   = {Initials Written Together},
+  author  = {Ivers, S.S.},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.initials_run_together_alias
+@article{name-initials-run-together-alias,
+  title   = {Initials Declared Together},
+  author  = {Lark, T. R.},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% CASE names.initials_run_together_three
+@article{name-initials-run-together-three,
+  title   = {Three Initials Written Together},
+  author  = {Moss, U.A.K.},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% `S.T.` is `S. T.`, which no one declares and Stella Sky Ivers is not.
+% `E.D.` is `E. D.`, two initials, and not the given name `Ed`: removing
+% the periods alone would read it as Ed Quill's name.
+% CASE names.initials_run_together_unmatched
+@article{name-initials-run-together-unmatched,
+  title   = {Initials Written Together That Fit No One},
+  author  = {Ivers, S.T. and Quill, E.D.},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% A part with no period inside it is a name, not initials: `Jo` is not
+% `J. O.`, and `TR` is not `T. R.`
+% CASE names.initials_multiletter_whole
+@article{name-initials-multiletter,
+  title   = {Short Given Names Are Not Initials},
+  author  = {Nash, Jo and Lark, TR},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
+% Hyphenated initials are left as written: `J.-P.` is equal to itself and
+% not to `J.P.`
+% CASE names.initials_hyphenated
+@article{name-initials-hyphenated,
+  title   = {Hyphenated Initials},
+  author  = {Wren, J.-P. and Wren, J.P.},
+  journal = {Journal of Fictional Robots},
+  year    = {2022}
+}
+
 % CASE identity.full_name
 @article{id-full-name,
   title   = {Member Without Aliases},
