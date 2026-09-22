@@ -1,17 +1,17 @@
 """Smoke tests to verify the package loads and basic functionality works."""
 
-import labdata
+import sslabdata
 
 
 def test_package_imports():
     """Verify the package can be imported and has expected attributes."""
-    assert hasattr(labdata, '__version__')
-    assert labdata.__version__ == "3.0.0"
+    assert hasattr(sslabdata, '__version__')
+    assert sslabdata.__version__ == "3.0.0"
 
 
 def test_core_classes_importable():
     """Verify core classes are importable from the package."""
-    from labdata import (
+    from sslabdata import (
         LabDataConfig,
         BibFile,
         LabData,
@@ -31,7 +31,7 @@ def test_core_classes_importable():
 
 def test_work_dataclass():
     """Verify Work dataclass works."""
-    from labdata import Author, Venue, Work
+    from sslabdata import Author, Venue, Work
 
     work = Work(
         bib_id="test2024",

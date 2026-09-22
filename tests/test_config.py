@@ -1,12 +1,12 @@
 """Tests for the new LabDataConfig."""
 
-import labdata
+import sslabdata
 import pytest
 import yaml
 import tempfile
 from pathlib import Path, PureWindowsPath
 
-from labdata import (
+from sslabdata import (
     BibFile, ConfigurationError, LabData, LabDataConfig, Work, assemble,
     export_to_json,
 )
@@ -100,7 +100,7 @@ class TestLabDataConfig:
 
 def is_absolute(name):
     """Rooted under either flavour. Restated rather than imported: outside
-    tests/unit/ the suite uses only labdata's public names."""
+    tests/unit/ the suite uses only sslabdata's public names."""
     return name.startswith(("/", "\\")) or PureWindowsPath(name).is_absolute()
 
 
@@ -116,7 +116,7 @@ def test_configuration_error_is_its_own_type_under_value_error():
     """
     assert issubclass(ConfigurationError, ValueError)
     assert ConfigurationError is not ValueError
-    assert "ConfigurationError" in labdata.__all__
+    assert "ConfigurationError" in sslabdata.__all__
 
 
 class TestBibFileNameIsNeverAbsolute:
@@ -126,7 +126,7 @@ class TestBibFileNameIsNeverAbsolute:
     The guarantee is kept by rejecting the input rather than by rewriting it:
     rewriting would quietly drop a relative directory the user meant. Checked
     through `from_yaml()` rather than against the predicate behind it, because
-    outside `tests/unit/` the suite uses only labdata's public names.
+    outside `tests/unit/` the suite uses only sslabdata's public names.
     """
 
     # Both path flavours, so the same configuration is accepted or rejected

@@ -1,18 +1,18 @@
-# labdata
+# sslabdata
 
-labdata compiles BibTeX and a little YAML into one schema-specified document —
+sslabdata compiles BibTeX and a little YAML into one schema-specified document —
 works, people, projects and the links between them — that any website, CV or
 script can read.
 
 Most academics already keep good BibTeX. What they do not have is that
 bibliography as *data*: authors linked to the people in the group, papers
 linked to the projects they belong to, names normalised, LaTeX resolved to
-plain Unicode text. labdata does that one job and writes the result to a
+plain Unicode text. sslabdata does that one job and writes the result to a
 single YAML or JSON file, specified by a published JSON Schema you can check
 it against.
 
 ```bash
-labdata --config lab.yaml --output lab.yml
+sslabdata --config lab.yaml --output lab.yml
 ```
 
 - [`SPEC.md`](SPEC.md) — the normative contract: what the strings are, what
@@ -20,24 +20,24 @@ labdata --config lab.yaml --output lab.yml
 - [`schema/v4/output.schema.json`](schema/v4/output.schema.json) — the
   document's JSON Schema. Published versions are immutable and live at their
   own paths; [`schema/v3/`](schema/v3/output.schema.json) is still there.
-- [`tests/COVERAGE.md`](tests/COVERAGE.md) — every input case labdata
+- [`tests/COVERAGE.md`](tests/COVERAGE.md) — every input case sslabdata
   supports, and every case it does not, with the fixture and test for each.
 
-## What labdata is not
+## What sslabdata is not
 
-**labdata is not a CMS and not a site generator.** It does not build a
+**sslabdata is not a CMS and not a site generator.** It does not build a
 website, own your pages or manage your content. News, openings, teaching
 pages, press and galleries are prose with no shared structure to compile, and
 they belong in your site repository. [`SPEC.md` §8](SPEC.md) gives the
 evidence for that boundary and the destination for each content type it
 leaves out.
 
-labdata emits data. Rendering it is your renderer's job.
+sslabdata emits data. Rendering it is your renderer's job.
 
 ## Install
 
 ```bash
-pip install git+https://github.com/siddhss5/labdata.git
+pip install git+https://github.com/siddhss5/sslabdata.git
 ```
 
 ## Write `lab.yaml`
@@ -64,22 +64,22 @@ collaborators_file: "data/collaborators.yaml"  # optional
 
 Each `bib_files` entry's `name` is a name under `bib_dir`, and must not be an
 absolute path: it is emitted as the work's `source.file`, so an absolute one
-would put your directory layout in a document you share. labdata rejects it
+would put your directory layout in a document you share. sslabdata rejects it
 rather than rewriting it.
 
-Paths are relative to the directory you run `labdata` from.
+Paths are relative to the directory you run `sslabdata` from.
 [`examples/demo/lab.yaml`](examples/demo/lab.yaml) is a complete example,
 built from the fictional Example Lab in [`examples/demo/`](examples/demo/).
 
 Then compile it:
 
 ```bash
-labdata --config lab.yaml --validate            # report counts and problems
-labdata --config lab.yaml --unresolved          # list unmatched author names
-labdata --config lab.yaml --output lab.yml      # write the document
-labdata --config lab.yaml --format json --output lab.json
-labdata --config lab.yaml --validate --strict   # fail on every problem
-labdata --config lab.yaml --validate --format json   # problems as JSON
+sslabdata --config lab.yaml --validate            # report counts and problems
+sslabdata --config lab.yaml --unresolved          # list unmatched author names
+sslabdata --config lab.yaml --output lab.yml      # write the document
+sslabdata --config lab.yaml --format json --output lab.json
+sslabdata --config lab.yaml --validate --strict   # fail on every problem
+sslabdata --config lab.yaml --validate --format json   # problems as JSON
 ```
 
 `--validate` exits `0` when it finds no errors and `1` when it does, or when
@@ -91,7 +91,7 @@ entry, and reports every problem under a stable code that
 [`SPEC.md`](SPEC.md) registers, with its class.
 
 `--strict` combines with any mode and turns every coded problem into an
-error, except the ones about authors who matched no lab member (labdata
+error, except the ones about authors who matched no lab member (sslabdata
 cannot yet tell an outside co-author from a misspelt member) and redefined
 `@string` macros; any error exits `1`, and an export then writes nothing.
 With `--validate` or `--unresolved`, `--format json` prints the problems as
@@ -104,7 +104,7 @@ lists them, along with the precedence rule when you pass more than one mode.
 
 ### BibTeX (required)
 
-Standard `.bib` files. These are the fields labdata interprets. A field not
+Standard `.bib` files. These are the fields sslabdata interprets. A field not
 listed here is carried through in `bibtex` but is not interpreted and affects
 nothing else:
 
@@ -114,16 +114,16 @@ nothing else:
 | `author` | `authors`, one authorship per name, each with its `position`, a readable `name`, its `given` / `von` / `family` / `suffix` parts (or `literal` for a brace-protected name), `equal_contribution`, a `resolution` record, and exactly one of `person_id` and `collaborator_key` |
 | `editor` | `editors`, read by the same machinery. Editing a volume is not an authorship: editors count towards nobody's `work_count` and produce no collaborator |
 | `year` | `year`, and the sort order of the works list. `null`, with a diagnostic, when the entry has none |
-| `journal` / `booktitle` / `school` / `institution` | `venue`, as `{kind, name}` — the one place labdata normalises across entry types. `null` when the entry names no container |
+| `journal` / `booktitle` / `school` / `institution` | `venue`, as `{kind, name}` — the one place sslabdata normalises across entry types. `null` when the entry names no container |
 | `volume`, `number`, `pages`, `series`, `edition`, `publisher`, `address`, `organization`, `chapter`, `month`, `howpublished`, `type` | Properties of the work, under BibTeX's own names and with BibTeX's own meanings |
 | `doi`, `isbn`, `issn`, `eprint` + `archivePrefix` | `identifiers`, an open map from scheme to a list of identifiers, plus the links built from them. An `eprint`'s scheme is the repository `archivePrefix` named, lower-cased, so that field needs no property of its own — and an `eprint` in a repository other than arXiv gets no arXiv link |
 | `abstract` | `abstract` |
 | `note` | `note` |
 | `url` | A link of kind `video` when it points at YouTube or Vimeo, otherwise of kind `url` |
 | `project` | `project_ids` (see below) |
-| `crossref` | **An error.** Partial inheritance dropped every author a child entry did not write itself, silently; labdata rejects the field instead, names the file, the key and the parent, and fails the run. Write the fields out on the entry itself |
+| `crossref` | **An error.** Partial inheritance dropped every author a child entry did not write itself, silently; sslabdata rejects the field instead, names the file, the key and the parent, and fails the run. Write the fields out on the entry itself |
 
-The entry is also re-serialized into a `bibtex` field, so fields labdata does
+The entry is also re-serialized into a `bibtex` field, so fields sslabdata does
 not interpret are still carried. It is a re-serialization, not a copy: field
 order, braces and quoting are normalised and `@string` macros are expanded.
 That every field name in the demo's input reaches a first-class property is
@@ -133,7 +133,7 @@ that reached none.
 
 ### The `project` tag
 
-labdata adds one custom BibTeX field, `project`, to link a paper to a research
+sslabdata adds one custom BibTeX field, `project`, to link a paper to a research
 project:
 
 ```bibtex
@@ -154,7 +154,7 @@ back-links the works tagged with it, and the people who wrote them.
 
 ### People (optional, `data/people.yaml`)
 
-A list of lab members and alumni. `aliases` tells labdata how to match BibTeX
+A list of lab members and alumni. `aliases` tells sslabdata how to match BibTeX
 author names to people:
 
 ```yaml
@@ -213,7 +213,7 @@ reported under `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` and left to the member.
 
 ## How author matching works
 
-labdata matches the **structured parts** of each BibTeX author name — given,
+sslabdata matches the **structured parts** of each BibTeX author name — given,
 von, family, suffix — to lab members, in this order:
 
 1. **The full name**, against each person's `name` and any alias written in
@@ -242,7 +242,7 @@ and still exits `0`. To resolve one, add the spelling to that person's
 
 A name that matches nobody keeps `person_id: null` and its authorship
 references a `collaborators` entry instead, by `collaborator_key`.
-`labdata --config lab.yaml --unresolved` lists those names so you can add
+`sslabdata --config lab.yaml --unresolved` lists those names so you can add
 aliases — or, if you have configured no `people_file`, tells you resolution
 was never attempted.
 
@@ -254,7 +254,7 @@ the `authorships` it grouped, by `(work_id, position)`: a consumer that
 distrusts the grouping can ignore it and work from the occurrences. The
 grouping is keyed on the normalised full name, which over-splits — one person
 written `Priya Patel` on two papers and `P. Patel` on a third is two keys
-unless `collaborators_file` declares the alias — and labdata reports both
+unless `collaborators_file` declares the alias — and sslabdata reports both
 risks rather than leaving them silent: a key that spans more than one
 spelling, and an initials-only key that could be any of several fuller ones.
 
@@ -269,19 +269,19 @@ exception and stays delimited by `$…$`.
 
 One string sits outside that rule: `bibtex` is a machine-oriented BibTeX
 record that deliberately keeps its LaTeX — copy it, do not display it as
-text. Identifiers and URLs are not display text either. labdata itself
+text. Identifiers and URLs are not display text either. sslabdata itself
 generates no markup anywhere; where the document carries Markdown
 punctuation, an author wrote it. [`SPEC.md` §2](SPEC.md) treats all of this
 properly.
 
-labdata *enforces* that rule only where it converts: the BibTeX prose fields
+sslabdata *enforces* that rule only where it converts: the BibTeX prose fields
 it reads. Strings you supply directly in YAML — names and roles in
 `people.yaml`, titles and descriptions in `projects.yaml`, the `category` of
 each `bib_files` entry, and everything under `lab` — are copied through
 exactly as written and are never checked. Keeping them plain is on you.
 [`SPEC.md` §2](SPEC.md) draws the line precisely.
 
-Validate a document against the schema with any JSON Schema tool. labdata
+Validate a document against the schema with any JSON Schema tool. sslabdata
 does not do this for you, and does not depend on a validator — `jsonschema`
 is a test-only dependency, so install it first:
 
@@ -301,7 +301,7 @@ The CLI is the reference compiler. The Python API is a convenience wrapper
 over the same pipeline:
 
 ```python
-from labdata import LabDataConfig, assemble, export_to_yaml
+from sslabdata import LabDataConfig, assemble, export_to_yaml
 
 config = LabDataConfig.from_yaml("lab.yaml")
 data = assemble(config)
@@ -313,22 +313,22 @@ for work in data.works:
     print(f"{work.title} ({authors})")
 ```
 
-Public: the names exported from `labdata/__init__.py`. Everything else —
-`labdata.parsers`, `labdata.loaders`, `labdata.resolver` — is private and may
+Public: the names exported from `sslabdata/__init__.py`. Everything else —
+`sslabdata.parsers`, `sslabdata.loaders`, `sslabdata.resolver` — is private and may
 change without a version bump.
 
 ## The demo renderer
 
-[labdata-site](https://github.com/siddhss5/labdata-site) renders the Example
-Lab document as a website ([what it looks like](https://siddhss5.github.io/labdata-site/)).
-It is an **optional downstream consumer**, not part of labdata and not part of
-what labdata promises; it installs labdata from a pinned tag and keeps its own
-copy of the demo. labdata ignores a `site:` section in `lab.yaml`, so a
+[sslabdata-site](https://github.com/siddhss5/sslabdata-site) renders the Example
+Lab document as a website ([what it looks like](https://siddhss5.github.io/sslabdata-site/)).
+It is an **optional downstream consumer**, not part of sslabdata and not part of
+what sslabdata promises; it installs sslabdata from a pinned tag or commit and keeps its own
+copy of the demo. sslabdata ignores a `site:` section in `lab.yaml`, so a
 renderer can keep its own settings there.
 
-Before publishing a labdata release, build labdata-site against the candidate:
+Before publishing a sslabdata release, build sslabdata-site against the candidate:
 run its **Release gate** workflow with the candidate's git ref as
-`labdata_ref`. It builds without deploying, and keeps the renderer's toolchain
+`sslabdata_ref`. It builds without deploying, and keeps the renderer's toolchain
 out of this repository's CI.
 
 ## Dependencies

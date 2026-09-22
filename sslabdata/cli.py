@@ -1,5 +1,5 @@
 """
-Command-line interface for labdata.
+Command-line interface for sslabdata.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
 Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
@@ -15,7 +15,7 @@ from .assembler import assemble, unresolved_name_diagnostics
 from .diagnostics import ERROR, diagnostic, record, severity
 from .exporters import export_to_yaml, export_to_json
 
-# A configuration labdata cannot open or cannot read at all. Both are fatal
+# A configuration sslabdata cannot open or cannot read at all. Both are fatal
 # at load; the second keeps the reading library's words as its prose.
 CONFIG_NOT_FOUND = "CONFIG-NOT-FOUND"
 CONFIG_UNREADABLE = "CONFIG-UNREADABLE"
@@ -29,19 +29,19 @@ def main(argv=None):
         epilog="""
 Examples:
   # Generate YAML output
-  labdata --config lab.yaml --output lab.yml
+  sslabdata --config lab.yaml --output lab.yml
 
   # Generate JSON output
-  labdata --config lab.yaml --format json --output lab.json
+  sslabdata --config lab.yaml --format json --output lab.json
 
   # Validate configuration and data
-  labdata --config lab.yaml --validate
+  sslabdata --config lab.yaml --validate
 
   # Show unresolved author names
-  labdata --config lab.yaml --unresolved
+  sslabdata --config lab.yaml --unresolved
 
   # Fail on every coded diagnostic that can be an error, as JSON records
-  labdata --config lab.yaml --validate --strict --format json
+  sslabdata --config lab.yaml --validate --strict --format json
         """
     )
 

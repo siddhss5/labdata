@@ -2,7 +2,7 @@
 
 Each case in tests/corpus/expected/diagnostics.yaml is run in its own folder,
 so one broken input cannot hide another. Checks look at the exit status and
-at tokens (file, entry key, field, value) in labdata's output, never at exact
+at tokens (file, entry key, field, value) in sslabdata's output, never at exact
 wording or at parser-library messages.
 """
 
@@ -10,7 +10,7 @@ import pytest
 import yaml
 
 from .support import (
-    EXPECTED, EXPECTED_FAILURE, INVALID, covers, export, run_labdata,
+    EXPECTED, EXPECTED_FAILURE, INVALID, covers, export, run_sslabdata,
 )
 
 with open(EXPECTED / "diagnostics.yaml", encoding="utf-8") as f:
@@ -34,13 +34,13 @@ def params(check):
 
 
 def validate(spec):
-    return run_labdata(["--config", "lab.yaml", "--validate"], INVALID / spec["dir"])
+    return run_sslabdata(["--config", "lab.yaml", "--validate"], INVALID / spec["dir"])
 
 
 @pytest.mark.parametrize("case_id, spec", params("exit"))
 def test_exit(case_id, spec):
     run = validate(spec)
-    assert run.crash is None, f"labdata crashed: {run.crash}"
+    assert run.crash is None, f"sslabdata crashed: {run.crash}"
     if spec["exit"] == "error":
         assert run.code != 0, run.output
         assert run.output.strip(), "exited non-zero without a message"
@@ -71,7 +71,7 @@ def test_locates(case_id, spec):
 def test_duplicate_keys_warn_but_do_not_block_nonvalidation_modes(tmp_path, case_id):
     """Exports and author reports stay available while naming malformed input."""
     spec = DIAGNOSTICS[case_id]
-    unresolved = run_labdata(["--config", "lab.yaml", "--unresolved"],
+    unresolved = run_sslabdata(["--config", "lab.yaml", "--unresolved"],
                               INVALID / spec["dir"])
     assert unresolved.code == 0 and unresolved.crash is None, unresolved.output
     assert "BIB-DUPLICATE-KEY" in unresolved.stderr
@@ -98,7 +98,7 @@ def test_a_fatal_at_load_code_goes_to_standard_error_in_every_mode(tmp_path):
     for args in (["--validate"],
                  ["--unresolved"],
                  ["--format", "json", "--output", out]):
-        run = run_labdata(["--config", "lab.yaml", *args], where)
+        run = run_sslabdata(["--config", "lab.yaml", *args], where)
         assert run.crash is None, (args, run.crash)
         assert run.code == 1, (args, run.output)
         assert "CONFIG-BIB-FILE-ABSOLUTE" in run.stderr, (args, run.output)
@@ -116,7 +116,7 @@ def test_a_fatal_diagnostic_stops_a_normal_compile(tmp_path):
     silent path #65 removed, one step further along.
     """
     out = tmp_path / "lab.json"
-    run = run_labdata(["--config", "lab.yaml", "--format", "json", "--output", out],
+    run = run_sslabdata(["--config", "lab.yaml", "--format", "json", "--output", out],
                       INVALID / DIAGNOSTICS["structure.crossref"]["dir"])
     assert run.crash is None, run.crash
     assert run.code != 0, run.output
@@ -127,7 +127,7 @@ def test_a_fatal_diagnostic_stops_a_normal_compile(tmp_path):
 @pytest.mark.parametrize("case_id, spec", params("kept"))
 def test_kept(tmp_path, case_id, spec):
     run, data = export(INVALID / spec["dir"], tmp_path)
-    assert run.crash is None, f"labdata crashed: {run.crash}"
+    assert run.crash is None, f"sslabdata crashed: {run.crash}"
     assert data is not None, run.output
     keys = [w["bib_id"] for w in data["works"]]
     missing = [k for k in spec["kept"] if k not in keys]

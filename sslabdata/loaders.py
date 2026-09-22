@@ -99,7 +99,7 @@ def load_people(path: str, errors: Optional[List[str]] = None,
           ...
 
     ``errors``, ``diagnostics`` and ``warnings`` receive what is wrong with
-    the file, in the three classes `labdata.assembler.AssemblyResult` keeps;
+    the file, in the three classes `sslabdata.assembler.AssemblyResult` keeps;
     without a list, a problem is printed to standard error.
     """
     warn = _to(warnings)

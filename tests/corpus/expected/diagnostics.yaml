@@ -1,10 +1,10 @@
 # Expected diagnostics for each case in tests/corpus/invalid/<dir>/.
-# test_invalid_corpus.py runs `labdata --config lab.yaml --validate` in that
+# test_invalid_corpus.py runs `sslabdata --config lab.yaml --validate` in that
 # folder, and `--format json --output` for `kept`. Checks:
 #
-#   exit     error: labdata exits non-zero with a message (no traceback).
-#            ok:    labdata exits zero (a warning at most).
-#            any:   either, as long as labdata does not crash.
+#   exit     error: sslabdata exits non-zero with a message (no traceback).
+#            ok:    sslabdata exits zero (a warning at most).
+#            any:   either, as long as sslabdata does not crash.
 #   reports  what is wrong: tokens (a value, a config key) the output must name.
 #   locates  where it is: the file, entry key and field, per #26.
 #   kept     bib keys that must still be in the exported output.
@@ -256,7 +256,7 @@ config.not_a_mapping:
   exit: error
   locates: [lab.yaml]
 
-# --- Messages labdata prints today --------------------------------------------
+# --- Messages sslabdata prints today --------------------------------------------
 
 diag.config_error:
   dir: config_not_a_mapping

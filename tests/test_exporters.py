@@ -5,7 +5,7 @@ import yaml
 import pytest
 from pathlib import Path
 
-from labdata import (
+from sslabdata import (
     Author, ConfigurationError, LabData, Person, Project, Venue, Work,
     export_to_json, export_to_yaml,
 )
@@ -116,7 +116,7 @@ class TestExportToJson:
         assert Path(out).exists()
 
     def test_empty_data(self, tmp_path):
-        import labdata
+        import sslabdata
 
         data = LabData()
         out = str(tmp_path / "empty.json")
@@ -125,7 +125,7 @@ class TestExportToJson:
             loaded = json.load(f)
         assert loaded == {
             "schema_version": 4,
-            "generator": {"name": "labdata", "version": labdata.__version__,
+            "generator": {"name": "sslabdata", "version": sslabdata.__version__,
                           "schema_version": 4},
             "lab": {}, "works": [], "people": [], "projects": [],
             "collaborators": [],
@@ -133,7 +133,7 @@ class TestExportToJson:
 
 
 class TestARefusedDocumentLeavesTheOutputAlone:
-    """A document labdata will not emit must not destroy the last one.
+    """A document sslabdata will not emit must not destroy the last one.
 
     The exporters build the whole document before opening the file. Opening
     first truncates it, so a run that then refuses to serialize -- a `Work`

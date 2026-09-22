@@ -31,7 +31,7 @@ construction.
 
 What the static checks catch, and where they stop.
 
-`test_no_probe_imports_labdata` and
+`test_no_probe_imports_sslabdata` and
 `test_no_probe_reads_the_inputs_or_the_reserialized_export` read ordinary
 Python and assume it was written in good faith, in the same spirit as
 `coverage_check.py`. They catch the honest mistake: a probe that imports the
@@ -267,7 +267,7 @@ def test_plain_html_page_is_complete(probe_output, demo_document):
 # the Markdown the page deliberately renders.) So these values are put into a
 # copy of the document instead, and the unmodified probe is run on that. #55
 # names this probe as the renderer in this repository where escaping behaviour
-# can be asserted. It mentions siddhss5/labdata#36 alongside, but that issue
+# can be asserted. It mentions siddhss5/sslabdata#36 alongside, but that issue
 # is about testing a rendered site and says nothing about escaping, so nothing
 # here relies on it.
 
@@ -802,7 +802,7 @@ def test_bibtex_roundtrip_entry_is_well_formed(probe_output, demo_document):
 # own, never matched by a pattern, so a field that stops reaching the document
 # has to show up in the failure below rather than be absorbed by a wildcard.
 #
-#   project   labdata's own tag field, not part of BibTeX. It does reach the
+#   project   sslabdata's own tag field, not part of BibTeX. It does reach the
 #             document, as `project_ids`, and the `fields.project` row of
 #             tests/COVERAGE.md asserts that; this probe re-emits
 #             bibliographic fields, so it is not expected back here.
@@ -1438,16 +1438,16 @@ def imported_modules(tree):
     return names
 
 
-def test_no_probe_imports_labdata():
+def test_no_probe_imports_sslabdata():
     """A probe reads the emitted document; it does not call the compiler."""
     offenders = []
     for path in sorted(PROBES.glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         offenders += ["%s: %s" % (path.name, m) for m in imported_modules(tree)
-                      if m.split(".")[0] == "labdata"]
+                      if m.split(".")[0] == "sslabdata"]
     assert offenders == []
     # An empty list has to mean "looked and found none".
-    assert imported_modules(ast.parse("import labdata.cli")) == {"labdata.cli"}
+    assert imported_modules(ast.parse("import sslabdata.cli")) == {"sslabdata.cli"}
 
 
 def code_strings(tree):

@@ -3,8 +3,8 @@
 import pytest
 from pathlib import Path
 
-from labdata.config import BIB_FILE_ABSOLUTE as CONFIG_BIB_FILE_ABSOLUTE
-from labdata.parsers.bibtex import (
+from sslabdata.config import BIB_FILE_ABSOLUTE as CONFIG_BIB_FILE_ABSOLUTE
+from sslabdata.parsers.bibtex import (
     CROSSREF_UNSUPPORTED,
     DUPLICATE_CITATION_KEY,
     ENTRY_TYPE_UNSUPPORTED,
@@ -31,9 +31,9 @@ from labdata.parsers.bibtex import (
     parse_bibtex_file,
     pdf_link,
 )
-from labdata.config import ConfigurationError
-from labdata.models import Author
-from labdata.parsers.latex import unknown_commands
+from sslabdata.config import ConfigurationError
+from sslabdata.models import Author
+from sslabdata.parsers.latex import unknown_commands
 
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
@@ -414,7 +414,7 @@ def entry(key: str, title: str = "A Fictional Title") -> str:
 # I named survives" would pass just as happily while a neighbour vanished or a
 # commented-out entry leaked, which is how the quoted-value defect got through.
 #
-# labdata differs from pybtex on exactly one thing: a balanced @comment group
+# sslabdata differs from pybtex on exactly one thing: a balanced @comment group
 # is a comment, so entries inside it are not works. Everywhere else the
 # expectations below are pybtex's own reading of the file.
 #
@@ -505,7 +505,7 @@ class TestCommentHandling:
     def test_a_quoted_value_does_not_end_a_paren_entry(self, tmp_path):
         """Regression: a ) inside "..." used to end @article(...) early.
 
-        labdata read the file itself to find @comment groups, so it could be
+        sslabdata read the file itself to find @comment groups, so it could be
         wrong about where a value ended; the entry then lost every field and
         the entry after it disappeared. pybtex tokenizes the file now.
         """
@@ -541,7 +541,7 @@ class TestLatexFallback:
 class TestEntryFiltering:
     """pybtex raises SkipEntry for a filtered entry too, not only for @comment.
 
-    labdata passes ``wanted_entries`` straight through, so recovering from the
+    sslabdata passes ``wanted_entries`` straight through, so recovering from the
     wrong SkipEntry would corrupt a filtered read — and would do it silently,
     because the scanner is left somewhere quite different from a comment.
     """
@@ -706,7 +706,7 @@ class TestUnknownCommands:
 
     def test_empty_and_unreadable_values_yield_nothing(self, monkeypatch):
         assert unknown_commands("") == []
-        import labdata.parsers.latex as latex
+        import sslabdata.parsers.latex as latex
 
         def broken(*args, **kwargs):
             raise ValueError("unreadable")

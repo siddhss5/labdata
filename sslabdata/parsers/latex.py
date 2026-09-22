@@ -26,7 +26,7 @@ _CONVERTER = LatexNodes2Text(math_mode='verbatim')
 # with any braced argument after it read as a group of plain text.
 _KNOWN = get_default_latex_context_db()
 
-# Two commands outside that table whose conversion labdata documents, so they
+# Two commands outside that table whose conversion sslabdata documents, so they
 # are known rather than unknown (tests/COVERAGE.md, `names.equal_contribution`
 # and `names.equal_contribution_escaped`): `\textsuperscript{...}` becomes its
 # argument as plain text, and an escaped star `\*` is consumed.

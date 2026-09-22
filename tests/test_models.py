@@ -1,6 +1,6 @@
-"""Tests for labdata data models."""
+"""Tests for sslabdata data models."""
 
-from labdata import (
+from sslabdata import (
     Author, Collaborator, Contributor, LabData, Link, Person, Project, Venue,
     Work,
 )
@@ -204,10 +204,10 @@ class TestLabData:
         assert d["lab"] == {}
 
     def test_generator_names_the_compiler_and_carries_no_timestamp(self):
-        import labdata
+        import sslabdata
 
         generator = LabData().to_dict()["generator"]
-        assert generator == {"name": "labdata", "version": labdata.__version__,
+        assert generator == {"name": "sslabdata", "version": sslabdata.__version__,
                              "schema_version": 4}
 
     def test_to_dict(self):

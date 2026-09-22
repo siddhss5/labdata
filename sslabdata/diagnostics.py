@@ -98,7 +98,7 @@ CLASSES: Dict[str, str] = {
 # The codes `--strict` leaves as warnings. `BIB-STRING-REDEFINED` is decided
 # on #26 (decision 5). Every other one is about an author who matched no lab
 # member, and such an author is never an error under `--strict` (decision 10):
-# labdata cannot tell an outside co-author from a possible member until #25
+# sslabdata cannot tell an outside co-author from a possible member until #25
 # lets an author be declared external. The known cost is that a misspelt
 # member's name passes `--strict`, reported as a `RESOLVE-SUGGESTION` warning.
 NEVER_AN_ERROR = frozenset({

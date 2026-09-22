@@ -89,7 +89,7 @@ LAB_NAME_MISSING = "CONFIG-LAB-NAME-MISSING"
 # works, people or projects.
 FILE_NOT_FOUND = "CONFIG-FILE-NOT-FOUND"
 
-# A key `lab.yaml` holds that labdata does not read, such as a misspelt
+# A key `lab.yaml` holds that sslabdata does not read, such as a misspelt
 # `people_fil`. A warning: nothing is lost that was ever read.
 KEY_UNKNOWN = "CONFIG-KEY-UNKNOWN"
 
@@ -382,7 +382,7 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
                      If False (default), return LabData directly.
     """
     # Every configured name, checked before anything is parsed, so a
-    # configuration labdata will not compile from fails here rather than
+    # configuration sslabdata will not compile from fails here rather than
     # after the work of reading every file. This is not the check that holds
     # -- `Work.to_dict()` is, at the boundary every emitted document passes
     # through -- it is the one that fails soonest. The CLI never reaches it:
@@ -399,7 +399,7 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     for key in config.unknown_keys:
         warnings.append(diagnostic(
             KEY_UNKNOWN, source, key, None,
-            f"'{key}' is not a key labdata reads, and is ignored"))
+            f"'{key}' is not a key sslabdata reads, and is ignored"))
     if not config.bib_files:
         warnings.append(diagnostic(
             BIB_FILES_MISSING, source, 'bib_files', None,
@@ -489,7 +489,7 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
         )
 
     # Without a caller to hand them to, every diagnostic still reaches the
-    # user: nothing labdata found is dropped because of how it was called.
+    # user: nothing sslabdata found is dropped because of how it was called.
     for message in fatal_errors + bibliography_errors + warnings:
         print(f"Warning: {message}", file=sys.stderr)
     return data

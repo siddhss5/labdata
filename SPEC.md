@@ -1,6 +1,6 @@
-# labdata specification
+# sslabdata specification
 
-labdata is a compiler. It reads BibTeX and a little YAML and emits one
+sslabdata is a compiler. It reads BibTeX and a little YAML and emits one
 document describing a lab's works, people, projects and the links between
 them.
 
@@ -16,14 +16,14 @@ names the issue that will make it true. Until that issue lands, the rule is
 the intent and the note is the fact. A `Version note` marks behaviour that
 changed at a known release boundary, and states both sides.
 
-- Applies to: `schema_version` 4 (`labdata.models.SCHEMA_VERSION`), package
-  version 3.0.0 (`labdata.__version__`).
+- Applies to: `schema_version` 4 (`sslabdata.models.SCHEMA_VERSION`), package
+  version 3.0.0 (`sslabdata.__version__`).
 
 ### How this file cites the code
 
 Every rule below is grounded in a named part of the code rather than a line
 number, because line numbers rot silently: a function such as
-`labdata.parsers.bibtex.parse_all_works()`, a method such as
+`sslabdata.parsers.bibtex.parse_all_works()`, a method such as
 `Person.to_dict()`, a module-level constant such as `TEXT_FIELDS`, a JSON
 Pointer into `schema/v4/output.schema.json` such as `/$defs/person/required`, or
 a `tests/COVERAGE.md` row key such as `config.people_file.missing`. A bare
@@ -42,7 +42,7 @@ to produce that document.
 
 **When the emitted document and the schema disagree, the schema wins and the
 code is the bug.** A consumer that validates against the published schema and
-is rejected by labdata's own output has found a defect in labdata, never in
+is rejected by sslabdata's own output has found a defect in sslabdata, never in
 itself.
 
 **If a consumer probe cannot be written from the emitted document alone, that
@@ -77,7 +77,7 @@ still there, so neither prerequisite was checked only inside a marker.
 **The CLI is the reference compiler.** Its flags, its exit codes and the
 stream each kind of message goes to are public API.
 
-Flags, as `labdata.cli.main()` defines them:
+Flags, as `sslabdata.cli.main()` defines them:
 
 | Flag | Meaning |
 |---|---|
@@ -89,14 +89,14 @@ Flags, as `labdata.cli.main()` defines them:
 | `--strict` | Combines with any mode. Every coded diagnostic is an error except those the class table below marks as never an error: a redefined `@string` macro, and anything about an author who matched no lab member. Any error exits `1`, and an export writes nothing. Without it, the exit codes below are unchanged. |
 
 **At least one** of `--output`, `--validate` or `--unresolved` is required —
-not exactly one. `labdata.cli.main()` rejects only the case where all three
+not exactly one. `sslabdata.cli.main()` rejects only the case where all three
 are absent, so combinations are accepted and resolved by **precedence**:
 `--validate` is handled first and returns; `--unresolved` next; `--output`
-only if neither was given. So `labdata --config c.yaml --validate --output
+only if neither was given. So `sslabdata --config c.yaml --validate --output
 out.yml` runs validation and reports normally, but **does not write
 `out.yml`**, and exits `0`. Verified by running both combinations.
 
-Exit codes, as `labdata.cli.main()` returns them:
+Exit codes, as `sslabdata.cli.main()` returns them:
 
 | Code | Meaning |
 |---|---|
@@ -117,7 +117,7 @@ message is kept to one line. As text there are three shapes:
 | Shape | Stream | Source |
 |---|---|---|
 | `<CODE> <file>:<key>:<field>: …` | see right | A diagnostic raised **during assembly**, described under *Diagnostic codes* below. Under `--validate` it is on standard **output**, beneath `Bibliography errors` when it fails the run and beneath `Warnings` when it does not. In the other modes it is on standard **error**: prefixed `Warning: ` when it is a warning, unprefixed when it fails the run. |
-| `Error: <CODE> …` and `Error loading configuration: <CODE> …` | standard error | Configuration failures, from `labdata.cli.main()`: every fatal-at-load code. A configuration labdata cannot find, cannot read or will not compile from, in **every** mode including `--validate`, because nothing is assembled and there is no report to gather it into. `Error: ` precedes `CONFIG-NOT-FOUND`; `Error loading configuration: ` precedes the others, for example `Error loading configuration: CONFIG-BIB-FILE-ABSOLUTE lab.yaml:bib_files:name: …`. |
+| `Error: <CODE> …` and `Error loading configuration: <CODE> …` | standard error | Configuration failures, from `sslabdata.cli.main()`: every fatal-at-load code. A configuration sslabdata cannot find, cannot read or will not compile from, in **every** mode including `--validate`, because nothing is assembled and there is no report to gather it into. `Error: ` precedes `CONFIG-NOT-FOUND`; `Error loading configuration: ` precedes the others, for example `Error loading configuration: CONFIG-BIB-FILE-ABSOLUTE lab.yaml:bib_files:name: …`. |
 | `usage: …` / `…: error: …` | standard error | Argument errors, in the argument parser's own format. They are not diagnostics and carry no code. |
 
 There is no single prefix across all diagnostics. A consumer looking for a
@@ -125,7 +125,7 @@ There is no single prefix across all diagnostics. A consumer looking for a
 because of the second shape — or read `--format json`, which needs no
 parsing of text at all.
 
-**Where the severities live.** `labdata.assembler.AssemblyResult` carries the
+**Where the severities live.** `sslabdata.assembler.AssemblyResult` carries the
 diagnostics that survive assembly in three lists: `fatal_errors` fail every
 mode, `bibliography_errors` fail `--validate` and are warnings elsewhere, and
 `warnings` never fail anything. A fourth class never reaches an
@@ -136,11 +136,11 @@ table under *Diagnostic codes* below says which class each code belongs to.
 `--validate` lists them and still exits `0`. This is intended, not a gap: an author who is not in `people.yaml`
 is usually an external collaborator, and #26 states the rule (decision 10):
 **an author who matched no lab member is never an error under `--strict`**,
-because labdata cannot tell an outside co-author from a possible member
+because sslabdata cannot tell an outside co-author from a possible member
 until #25 lets an author be declared external. The known cost is that a
 misspelt member's name passes `--strict`, reported only as a
 `RESOLVE-SUGGESTION` warning; #25 revisits this. What fails the run is
-a defect in data labdata does own: a project id naming no project, a
+a defect in data sslabdata does own: a project id naming no project, a
 repeated citation key, person id or project id, and the fatal conditions in
 the class table below.
 
@@ -188,9 +188,9 @@ without depending on English wording. Codes obey three rules:
    spelling.
 
    **Under `--strict`**, in every mode, every code is an **error** except
-   six, which stay **warnings** (`labdata.diagnostics.NEVER_AN_ERROR`). Five
+   six, which stay **warnings** (`sslabdata.diagnostics.NEVER_AN_ERROR`). Five
    of them follow one rule, #26 decision 10: **an author who matched no lab
-   member is never an error under `--strict`**, because labdata cannot tell
+   member is never an error under `--strict`**, because sslabdata cannot tell
    an outside co-author from a possible member until #25 lets an author be
    declared external.
 
@@ -199,7 +199,7 @@ without depending on English wording. Codes obey three rules:
    | `BIB-STRING-REDEFINED` | Decided on #26: BibTeX's own last-wins rule settles a redefinition (§7), so it is reported and never fails a run. |
    | `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `ID-GROUPING-AMBIGUOUS-DECLARED` | Decision 10: each is about how authors who matched no lab member are grouped. |
    | `RESOLVE-UNRESOLVED-NAME` | Decision 10: it *is* an author who matched no lab member. |
-   | `RESOLVE-SUGGESTION` | Decision 10: it is an author who matched no lab member, whose name is close to a member's. It may be a misspelt member or an outside co-author with a similar name, and labdata cannot tell which. The known cost: a misspelt member's name passes `--strict` with this warning, until #25 revisits it. |
+   | `RESOLVE-SUGGESTION` | Decision 10: it is an author who matched no lab member, whose name is close to a member's. It may be a misspelt member or an outside co-author with a similar name, and sslabdata cannot tell which. The known cost: a misspelt member's name passes `--strict` with this warning, until #25 revisits it. |
 
    So a fatal code is an error in every mode with or without `--strict`; a
    validation error is an error under `--validate`, and under `--strict` in
@@ -221,8 +221,8 @@ Codes in use:
 | `BIB-YEAR-MISSING` | An entry has no `year` field. The work is emitted with `year: null` and sorts last. A warning. |
 | `ID-GROUPING-SPANS-SPELLINGS` | One collaborator key grouped more than one distinct spelling of a name. Reported against the first authorship the key grouped. A warning, in every mode including under `--strict`: an author who matched no lab member is never an error (#26 decision 10). |
 | `ID-GROUPING-INITIALS-AMBIGUOUS` | A collaborator key whose given name is nothing but initials could be one of the fuller keys under the same family name. Decided on the **structured parts** — the initials of the given name against a fuller given name, with the family name and the surname particles equal, and the shorter run of initials a prefix of the longer, and two lineage suffixes that disagree ruling the pair out — so a particle, a second initial, a hyphenated family name, a suffix and a letter outside ASCII are all seen. Reported against the first authorship the key grouped, naming every fuller key. A warning in every mode, for the same reason. |
-| `RESOLVE-AMBIGUOUS-NAME` | An author or editor name fits more than one **lab member**, so it is given no `person_id` and `resolution.status` is `ambiguous`. Located at the work — `<bib_dir>/<file>:<key>:author` or `:editor` — with the position and every id it fits in the prose. A warning; an error under `--strict`, because it is about lab members, whom labdata does own. **Narrowed** by #26 decision 6: until then it also covered an unresolved authorship that fits a declared collaborator and someone else, which is now `ID-GROUPING-AMBIGUOUS-DECLARED`. No release carried the wider meaning. |
-| `RESOLVE-SUGGESTION` | An author or editor name matched no person but is close to one: its initials fit a person's name that declares no such alias, or it is a near miss on string similarity. Nothing is linked. Located as above, naming the position and the suggested ids. A warning in every mode, including under `--strict`: an author who matched no lab member is never an error (#26 decision 10), because labdata cannot tell an outside co-author from a possible member until #25. The known cost is that a misspelt member's name passes `--strict` with only this warning. |
+| `RESOLVE-AMBIGUOUS-NAME` | An author or editor name fits more than one **lab member**, so it is given no `person_id` and `resolution.status` is `ambiguous`. Located at the work — `<bib_dir>/<file>:<key>:author` or `:editor` — with the position and every id it fits in the prose. A warning; an error under `--strict`, because it is about lab members, whom sslabdata does own. **Narrowed** by #26 decision 6: until then it also covered an unresolved authorship that fits a declared collaborator and someone else, which is now `ID-GROUPING-AMBIGUOUS-DECLARED`. No release carried the wider meaning. |
+| `RESOLVE-SUGGESTION` | An author or editor name matched no person but is close to one: its initials fit a person's name that declares no such alias, or it is a near miss on string similarity. Nothing is linked. Located as above, naming the position and the suggested ids. A warning in every mode, including under `--strict`: an author who matched no lab member is never an error (#26 decision 10), because sslabdata cannot tell an outside co-author from a possible member until #25. The known cost is that a misspelt member's name passes `--strict` with only this warning. |
 | `ID-GROUPING-AMBIGUOUS-DECLARED` | An unresolved name fits more than one `collaborators_file` entry, or one entry and one lab member it did not resolve to, so it joins none of them and is grouped by its own name (#26 decisions 6 and 10). Located like `RESOLVE-AMBIGUOUS-NAME`, naming every candidate (`collaborator:<name>`, `person:<id>`). A warning in every mode, including under `--strict`: an author who matched no lab member is never an error. Two other codes can accompany it for the same authorship. When the name fits one entry and **one** lab member — `Patel, P.` beside an entry declaring `P. Patel` and a member Paul Patel who declares no such alias — the resolver also reports `RESOLVE-SUGGESTION` for that member, before this code; both are warnings under #26 decision 10, so `--strict` passes. When it fits one entry and **more than one** lab member, it is also reported here, and `RESOLVE-AMBIGUOUS-NAME` reports the members' ambiguity first, with no `RESOLVE-SUGGESTION`; that one is an error under `--strict`. |
 | `RESOLVE-UNRESOLVED-NAME` | One author name that matched no person, as `--unresolved --format json` lists them: one record per name `--unresolved` would print, in the same order. Located at the first authorship, in document order, written that way and linked to nobody; the message is the name itself, with any line break as a space. Emitted **only** by `--unresolved --format json`; the text modes list these names as before, and `--validate --format json` carries only the other codes. A warning in every mode, including under `--strict` (#26 decision 10). |
 | `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` | A `collaborators_file` `name` or alias equal to a lab member's name or alias. The member keeps the spelling and the collaborator entry is not used for it. Located at `<collaborators_file>:<collaborator name>:name` or `:aliases`. A warning. |
@@ -230,10 +230,10 @@ Codes in use:
 | `BIB-YEAR-INVALID` | An entry's `year` is present but is not a number (`int()` rejects it), such as `in press`. The work is emitted with `year: null` and sorts last, as one with no year does. A warning. |
 | `BIB-STRING-UNDEFINED` | A field value names an `@string` macro that nothing defined earlier in the same file. Located at the entry and field that use it, and naming the macro. It is read as empty, as BibTeX reads it, and the entry and its neighbours are kept. A macro used inside another `@string` definition is located at the file alone. A warning. |
 | `BIB-STRING-REDEFINED` | One or more `@string` macros are defined more than once. One line per run, however many files and macros: the count, the macros and every redefinition as `file:line` (§7). Only definitions the parser reads count, so one inside an `@comment` group does not, while a well-formed `@string{…}` on a `%` line does: the parser reads it, as it does on `main`, and it changes the macro's value. Whether it should be read is #78. The last definition is used, as in BibTeX. A warning in every mode, including under `--strict`. |
-| `BIB-SYNTAX-ERROR` | Text the BibTeX parser cannot read. Inside an entry, located at that entry and at the field the parser was reading or had just read, which is where an unclosed brace or quote leaves it, or with the field left empty when the error comes before any field; the entry is kept as far as it was read, so that value may hold text meant for later fields. Outside any entry — an `@` that begins no well-formed command — located at the file alone and skipped. A syntax error the parser library raises on a `%` line outside any entry — prose that mentions `@article`, say, which the library reads as the start of a command — is not reported (`labdata.parsers.bibtex._on_comment_line()`), so the prose `tests/COVERAGE.md` rows `structure.comment_lines` and `structure.comment_mentions_command` describe says nothing. A **well-formed** command on such a line is read, as it is on `main` and in classic BibTeX, which has no `%` comment outside an entry: `% @article{hidden, …}` is an entry. Whether it should be is #78. The prose gives the line. A warning. |
-| `BIB-VENUE-MISSING` | An `@article` has no `journal`, or an `@inproceedings` has no `booktitle` (`labdata.parsers.bibtex.REQUIRED_CONTAINER`). No other entry type is checked. A field present but empty counts as missing. The entry is kept, and its venue is read by the usual rule from any other container field it carries, or is `null`. A warning. |
-| `BIB-ENTRY-TYPE-UNSUPPORTED` | An entry's type is not one labdata documents. Those are `@article`, `@inproceedings`, `@conference`, `@proceedings`, `@incollection`, `@inbook`, `@book`, `@phdthesis`, `@mastersthesis`, `@techreport`, `@manual` and `@misc` (`labdata.parsers.bibtex.SUPPORTED_TYPES`); `@unpublished` and `@booklet`, for two, are not. Located at `<file>:<key>:entry_type`. The entry is kept, and its venue is read by the field rules alone. A warning. |
-| `LATEX-COMMAND-UNKNOWN` | A text field or a name uses a LaTeX command labdata's conversion has no rule for (`labdata.parsers.latex.unknown_commands()`): one outside the converter's table and not one of the two whose conversion labdata documents, `\textsuperscript{…}`, which becomes its argument, and the escaped star `\*`, which is consumed (`tests/COVERAGE.md` rows `names.equal_contribution` and `names.equal_contribution_escaped`). The command is dropped and a braced argument after it is kept as plain text, so no raw LaTeX reaches the document. Math is not searched. Reported once per field and command. A warning. |
+| `BIB-SYNTAX-ERROR` | Text the BibTeX parser cannot read. Inside an entry, located at that entry and at the field the parser was reading or had just read, which is where an unclosed brace or quote leaves it, or with the field left empty when the error comes before any field; the entry is kept as far as it was read, so that value may hold text meant for later fields. Outside any entry — an `@` that begins no well-formed command — located at the file alone and skipped. A syntax error the parser library raises on a `%` line outside any entry — prose that mentions `@article`, say, which the library reads as the start of a command — is not reported (`sslabdata.parsers.bibtex._on_comment_line()`), so the prose `tests/COVERAGE.md` rows `structure.comment_lines` and `structure.comment_mentions_command` describe says nothing. A **well-formed** command on such a line is read, as it is on `main` and in classic BibTeX, which has no `%` comment outside an entry: `% @article{hidden, …}` is an entry. Whether it should be is #78. The prose gives the line. A warning. |
+| `BIB-VENUE-MISSING` | An `@article` has no `journal`, or an `@inproceedings` has no `booktitle` (`sslabdata.parsers.bibtex.REQUIRED_CONTAINER`). No other entry type is checked. A field present but empty counts as missing. The entry is kept, and its venue is read by the usual rule from any other container field it carries, or is `null`. A warning. |
+| `BIB-ENTRY-TYPE-UNSUPPORTED` | An entry's type is not one sslabdata documents. Those are `@article`, `@inproceedings`, `@conference`, `@proceedings`, `@incollection`, `@inbook`, `@book`, `@phdthesis`, `@mastersthesis`, `@techreport`, `@manual` and `@misc` (`sslabdata.parsers.bibtex.SUPPORTED_TYPES`); `@unpublished` and `@booklet`, for two, are not. Located at `<file>:<key>:entry_type`. The entry is kept, and its venue is read by the field rules alone. A warning. |
+| `LATEX-COMMAND-UNKNOWN` | A text field or a name uses a LaTeX command sslabdata's conversion has no rule for (`sslabdata.parsers.latex.unknown_commands()`): one outside the converter's table and not one of the two whose conversion sslabdata documents, `\textsuperscript{…}`, which becomes its argument, and the escaped star `\*`, which is consumed (`tests/COVERAGE.md` rows `names.equal_contribution` and `names.equal_contribution_escaped`). The command is dropped and a braced argument after it is kept as plain text, so no raw LaTeX reaches the document. Math is not searched. Reported once per field and command. A warning. |
 | `RESOLVE-PROJECT-UNKNOWN` | A work's `project` field names an id `projects_file` does not define. Located at `<bib_dir>/<file>:<key>:project`, naming the id. The id stays on the work (§5). A validation error. |
 | `PEOPLE-NOT-A-LIST` | `people_file` is not a list of records. Located at the file alone. An empty file is no records, and is not reported. An entry of the list that is not a mapping is not checked, and raises as it does on `main`. Fatal: nothing is emitted from a file that cannot be read as records. |
 | `PEOPLE-FIELD-MISSING` | A person has no `name`, or an empty one. Located at `<people_file>:<id>:name`. The record is not loaded, and the run is fatal: a document cannot carry a person with no name. A person with no `id` is not checked, and raises as it does on `main`. |
@@ -246,7 +246,7 @@ Codes in use:
 | `CONFIG-NOT-A-MAPPING` | `lab.yaml` is not a mapping of keys, or is empty. Fatal at load. |
 | `CONFIG-KEY-MISSING` | A required key is absent: `bib_dir`, or the `name` or `category` of a `bib_files` entry (`lab.yaml:bib_files:name`). Fatal at load. |
 | `CONFIG-TYPE-INVALID` | A key has a value of the wrong type: `bib_dir`, `pdf_base_url`, `people_file` or `projects_file` that is not a string, `lab` that is not a mapping, or `bib_files` that is not a list. A `bib_files` entry that is not a mapping, or whose `name` or `category` is not a string, is not checked, and fails or passes as it does on `main`. Fatal at load. |
-| `CONFIG-KEY-UNKNOWN` | `lab.yaml` holds a key labdata does not read (`labdata.config.KNOWN_KEYS`), such as a misspelt `people_fil`. It is ignored. A warning. |
+| `CONFIG-KEY-UNKNOWN` | `lab.yaml` holds a key sslabdata does not read (`sslabdata.config.KNOWN_KEYS`), such as a misspelt `people_fil`. It is ignored. A warning. |
 | `CONFIG-BIB-FILES-MISSING` | No `bib_files` are configured, absent or empty, so the document has no works. A warning: that can be meant, but it is never silently normal. |
 | `CONFIG-FILE-NOT-FOUND` | A file the configuration names is not there: a `bib_files` entry under `bib_dir` (`lab.yaml:bib_files:name`), `people_file` or `projects_file`. A missing `collaborators_file` is not checked, and reads as no declared collaborators. Named with the path it looked for. Fatal: compiling on would emit a document without that file's works, people or projects. |
 | `BIB-PARSER-MESSAGE` | The BibTeX parser library raised a message that is neither a syntax error nor an undefined macro — a field repeated within one entry, or a name list it cannot split. The prose is the **library's own wording**, kept as it phrased it. Located at the file, and at the entry key when the library raised it while reading one; the field is left empty. The entry is kept as the library read it. A warning. |
@@ -254,9 +254,9 @@ Codes in use:
 | `BIB-WRITE-BACK-FAILED` | An entry that could not be written back out as BibTeX. Its `bibtex` is `null`. Located at `<file>:<key>:bibtex`. A warning. |
 | `CONFIG-NOT-FOUND` | The `--config` file does not exist. Located at that path alone; `Error: CONFIG-NOT-FOUND …` on standard error. Fatal at load. |
 | `CONFIG-UNREADABLE` | The `--config` file exists but cannot be loaded — not valid YAML, for one, or a `bib_files` entry the loader cannot take. Located at that path alone; the prose is the reading library's own wording, on one line. Fatal at load. |
-| `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute. Raised as a `labdata.config.ConfigurationError` — its own type, so that a crash still reaches the user as a crash — by `LabDataConfig.from_yaml()`, by `BibFile` itself, by `assemble()` on every name it is about to compile, and by `Work.to_dict()`. **The last is the one that holds**, because it is the boundary every emitted document passes through: `BibFile` is a plain, mutable dataclass, so a name can be set after it was checked, and a `Work` can be built without a configuration at all. The three earlier checks stay because they fail sooner and say more — `from_yaml()` names the file the user would edit. |
+| `CONFIG-BIB-FILE-ABSOLUTE` | A `bib_files[].name` is an absolute path, under POSIX or Windows rules. Fatal at load, because the name is emitted as `work.source.file`, which is promised never to be absolute. Raised as a `sslabdata.config.ConfigurationError` — its own type, so that a crash still reaches the user as a crash — by `LabDataConfig.from_yaml()`, by `BibFile` itself, by `assemble()` on every name it is about to compile, and by `Work.to_dict()`. **The last is the one that holds**, because it is the boundary every emitted document passes through: `BibFile` is a plain, mutable dataclass, so a name can be set after it was checked, and a `Work` can be built without a configuration at all. The three earlier checks stay because they fail sooner and say more — `from_yaml()` names the file the user would edit. |
 
-Every diagnostic labdata prints carries one of these codes (#26 decision
+Every diagnostic sslabdata prints carries one of these codes (#26 decision
 8). What is not a diagnostic carries none: the counts and headers of a
 report, the `Wrote …` line, the argument parser's usage errors, and a Python
 traceback, which is a crash (Target (#80) above).
@@ -319,7 +319,7 @@ What each mode puts in the array:
 > **Version note (#26, PR #64).** Duplicate citation keys were invisible
 > through commit `dd06e37`: the parser library kept the first entry, and a key
 > repeated across two configured files passed `--validate` with exit `0`.
-> Since PR #64 merged, `labdata.parsers.bibtex.parse_all_works()`
+> Since PR #64 merged, `sslabdata.parsers.bibtex.parse_all_works()`
 > reports each duplicate under the `BIB-DUPLICATE-KEY` code, `--validate`
 > exits `1`, and the other modes emit the same diagnostic as a warning and
 > continue. The code was introduced as `E-BIB-DUPLICATE-KEY` and renamed to
@@ -355,11 +355,11 @@ What each mode puts in the array:
 > **Version note (#22, PR #61).** Through commit `cf9e055`, `--unresolved`
 > printed `All authors resolved.` when no `people_file` was configured, where
 > nothing had been attempted. Since PR #61 merged, the `--unresolved` branch
-> of `labdata.cli.main()` prints `Author resolution is not configured (no
+> of `sslabdata.cli.main()` prints `Author resolution is not configured (no
 > people_file).` and exits `0`. `tests/COVERAGE.md` row
 > `config.people_file.missing` records the current behaviour as `pass`.
 
-**The Python API is convenience only.** Public: the names in `labdata.__all__`
+**The Python API is convenience only.** Public: the names in `sslabdata.__all__`
 — `assemble`, `AssemblyResult`, the models `LabData`, `Work`, `Author`,
 `Contributor`, `Venue`, `Link`, `Person`, `Project`, `Collaborator`, the
 config loader `LabDataConfig` with `BibFile`, and the exporters
@@ -367,8 +367,8 @@ config loader `LabDataConfig` with `BibFile`, and the exporters
 `ConfigurationError`. `Publication` was renamed to `Work` at package version
 3.0.0, when the document's `publications` became `works`.
 
-**`labdata.ConfigurationError`** (defined in `labdata.config`) is a subclass
-of `ValueError`, raised for a configuration labdata will not compile from.
+**`sslabdata.ConfigurationError`** (defined in `sslabdata.config`) is a subclass
+of `ValueError`, raised for a configuration sslabdata will not compile from.
 It has its own type so that a caller can tell a rejected configuration from
 anything else that raises a `ValueError`. For an absolute `bib_files` name
 (`CONFIG-BIB-FILE-ABSOLUTE`) it is raised by `LabDataConfig.from_yaml()`, by
@@ -379,15 +379,15 @@ objects. For a `lab.yaml` of the wrong shape (`CONFIG-NOT-A-MAPPING`,
 `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`) it is raised by `from_yaml()`
 alone. Its message is always one coded diagnostic line.
 
-Private, and free to change without a version bump: `labdata.parsers.*`,
-`labdata.loaders`, `labdata.resolver`, `labdata.cli`'s internals, and every
+Private, and free to change without a version bump: `sslabdata.parsers.*`,
+`sslabdata.loaders`, `sslabdata.resolver`, `sslabdata.cli`'s internals, and every
 underscore-prefixed name. Importing them is unsupported. In particular, no
 guarantee is made about which BibTeX or LaTeX library sits behind
-`labdata.parsers`; that it is an adapter boundary is stated in the
-`labdata.parsers.bibtex` module docstring.
+`sslabdata.parsers`; that it is an adapter boundary is stated in the
+`sslabdata.parsers.bibtex` module docstring.
 
-The package version (`labdata.__version__`) and the document's
-`schema_version` (`labdata.models.SCHEMA_VERSION`) are independent. Neither
+The package version (`sslabdata.__version__`) and the document's
+`schema_version` (`sslabdata.models.SCHEMA_VERSION`) are independent. Neither
 can be derived from the other.
 
 ---
@@ -400,14 +400,14 @@ also carries strings that are not display text at all — identifiers, URLs and
 the `bibtex` record — and heading 4 below lists them.
 
 **Text is untrusted.** A title may contain `<`, `&`, `"`, `*` or `$`, and
-often does: `Informed RRT*` and `BIT*` are real paper titles. labdata does
+often does: `Informed RRT*` and `BIT*` are real paper titles. sslabdata does
 not escape them and will not, because it does not know what they are being
 escaped for. **Renderers are responsible for escaping** — for HTML bodies, for
 HTML attributes, for shell arguments, for whatever they emit.
 
-### What labdata converts, and what it does not
+### What sslabdata converts, and what it does not
 
-This is the part that must be read carefully, because labdata enforces the
+This is the part that must be read carefully, because sslabdata enforces the
 rule in one place only.
 
 The four headings below are **lenses, not a partition**. Conversion and fate
@@ -420,9 +420,9 @@ question to ask about a string, not as a box the string lives in.
 
 **1. Converted prose — the rule is enforced here.** Prose fields read from
 BibTeX are converted from LaTeX to Unicode by
-`labdata.parsers.latex.latex_to_text()`, so `C{\^o}t{\'e}` arrives as `Côté`
+`sslabdata.parsers.latex.latex_to_text()`, so `C{\^o}t{\'e}` arrives as `Côté`
 and `\textbf{Best Paper}` arrives as `Best Paper`. Exactly the fields in
-`labdata.parsers.bibtex.TEXT_FIELDS` are converted — `title`, `abstract`,
+`sslabdata.parsers.bibtex.TEXT_FIELDS` are converted — `title`, `abstract`,
 `note`, `journal`, `booktitle`, `school`, `institution`, `type`, `series`,
 `publisher`, `address`, `organization` — applied in `entry_fields()`. Name
 parts are converted the same way, in `person_name_parts()`, for authors and
@@ -432,15 +432,15 @@ Being converted is not the same as being emitted. Of these fields, `title`,
 `abstract`, `note`, `type`, `series`, `publisher`, `address` and
 `organization` are emitted under their own names; `journal`, `booktitle`,
 `school` and `institution` are consumed by `build_venue()` and reach the
-document as `venue.name`, which is the one place labdata normalises across
+document as `venue.name`, which is the one place sslabdata normalises across
 entry types.
 
 **2. Emitted without conversion — the rule is a requirement on the input.**
-These strings do reach the document, exactly as written, and labdata neither
+These strings do reach the document, exactly as written, and sslabdata neither
 converts nor checks them:
 
 - **The person and project strings supplied in YAML.**
-  `labdata.loaders.load_people()` and `load_projects()` perform no conversion
+  `sslabdata.loaders.load_people()` and `load_projects()` perform no conversion
   of any kind — they check a person's `name` and `role`, and that a
   `status` is one they know, but emit every value as written — so a person's `name`, `role`, `current_position` or
   `thesis_title`, and a project's `title` or `description`, are copied
@@ -448,8 +448,8 @@ converts nor checks them:
   emitted — `aliases` and the configuration paths are not; see heading 3.
 - **`work.category`**, which comes from the `category` of the `bib_files`
   entry in `lab.yaml`, not from the `.bib` file
-  (`labdata.config.LabDataConfig.from_yaml()`, then
-  `labdata.parsers.bibtex.parse_all_works()`).
+  (`sslabdata.config.LabDataConfig.from_yaml()`, then
+  `sslabdata.parsers.bibtex.parse_all_works()`).
 - **`lab`**, copied through from `lab.yaml` unchanged
   (`LabDataConfig.from_yaml()`, then `LabData.to_dict()`).
 - **The bibliographic parts** `volume`, `number`, `pages`, `chapter`, `month`,
@@ -459,14 +459,14 @@ converts nor checks them:
   `origin` is `input`.
 
 For these the plain-Unicode rule is a **requirement on the input, not a
-guarantee labdata enforces**. If `people.yaml` says `name: "<b>Alice</b>"`,
+guarantee sslabdata enforces**. If `people.yaml` says `name: "<b>Alice</b>"`,
 or a `bib_files` category is `"**Journal** Papers"`, that string appears in
 the document exactly as written and no diagnostic is raised. Verified
 directly: a category of `<b>Cat</b> & **md**` is emitted unchanged. Authors
 of input files are responsible for keeping these plain, and renderers should
 escape them as they escape everything else.
 
-**3. Read and acted on.** labdata reads each of these and does something with
+**3. Read and acted on.** sslabdata reads each of these and does something with
 it other than passing it through as display text: transforms it, consumes it
 into a derived field, or reads it only to make a decision. None of them
 reaches the document as a plain-text string under its own name, so the text
@@ -486,14 +486,14 @@ rule does not apply to the input itself — only to whatever it produces.
 | `crossref` | **Rejected, on presence rather than on value.** An entry carrying the field is an error under `BIB-CROSSREF-UNSUPPORTED`, whatever is inside it: an empty `crossref = {}` is a field the entry carries, and letting it through would put the silent path back under a different spelling. The entry is not emitted and the run fails in every mode (`parse_all_works()`). No field of any entry is filled in from any other entry. |
 | `journal`, `booktitle`, `school`, `institution` | Converted under heading 1, then consumed by `build_venue()` into `venue.name`, with the `venue.kind` each implies. |
 | The citation key and the entry type | Become `bib_id` (and `source.key`) and `entry_type` (`entry_fields()`); see heading 4. |
-| `person.aliases` | Read for matching by `labdata.resolver.match()`, never emitted — `Person.to_dict()` has no `aliases` key. |
-| `collaborators_file` entries | A list of `{name, aliases}` read by `labdata.loaders.load_collaborators()`. Read only to decide which unresolved authorships share one `collaborators` grouping (§5); never emitted as such and never a source of `person_id`. |
-| `bib_dir`, `people_file`, `projects_file`, `collaborators_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed PDF link. `bib_files[].name` **is** emitted, as `work.source.file`, and is therefore checked: an absolute one is rejected (`labdata.config.is_absolute_path()`), at load and again when the document is built. |
-| Any BibTeX field named nowhere in this table or heading 1 — `keywords`, `annote`, `language` and the rest | Not interpreted by labdata outside the `bibtex` record. `entry_fields()` copies it and `format_bibtex()` serializes it, but nothing reads its value, so it affects no other property (§5). |
+| `person.aliases` | Read for matching by `sslabdata.resolver.match()`, never emitted — `Person.to_dict()` has no `aliases` key. |
+| `collaborators_file` entries | A list of `{name, aliases}` read by `sslabdata.loaders.load_collaborators()`. Read only to decide which unresolved authorships share one `collaborators` grouping (§5); never emitted as such and never a source of `person_id`. |
+| `bib_dir`, `people_file`, `projects_file`, `collaborators_file`, `pdf_base_url` | Configuration. Never emitted; `pdf_base_url` survives only inside the constructed PDF link. `bib_files[].name` **is** emitted, as `work.source.file`, and is therefore checked: an absolute one is rejected (`sslabdata.config.is_absolute_path()`), at load and again when the document is built. |
+| Any BibTeX field named nowhere in this table or heading 1 — `keywords`, `annote`, `language` and the rest | Not interpreted by sslabdata outside the `bibtex` record. `entry_fields()` copies it and `format_bibtex()` serializes it, but nothing reads its value, so it affects no other property (§5). |
 
-The fields named in that table and in heading 1 are the complete set labdata
+The fields named in that table and in heading 1 are the complete set sslabdata
 *interprets* from a `.bib` entry; everything else falls in the last row.
-Verified by enumerating the field names `labdata/parsers/bibtex.py` looks up,
+Verified by enumerating the field names `sslabdata/parsers/bibtex.py` looks up,
 and by the field-loss probe of #69, which re-emits a BibTeX entry from the
 document's first-class properties and reports every field name that reached
 none (`tests/COVERAGE.md` row `probe.field_loss`).
@@ -523,27 +523,27 @@ but it is built from a name and is explicitly not an assertion about a human
 ### The one markup exception
 
 **Math is left as TeX**, delimited by `$…$`, so that KaTeX or MathJax can
-typeset it (`labdata.parsers.latex._CONVERTER` is built with
+typeset it (`sslabdata.parsers.latex._CONVERTER` is built with
 `math_mode='verbatim'`). This is the one place a text field is expected to
 contain markup, and it applies only to the fields under heading 1.
 
 ### Two degraded cases
 
-- When a field cannot be converted, labdata warns
+- When a field cannot be converted, sslabdata warns
   (`LATEX-CONVERSION-FAILED`) and falls back to
-  `labdata.parsers.latex.strip_braces()`, keeping the text as written with
-  its braces removed (`labdata.parsers.bibtex._convert()`). Such a value may
+  `sslabdata.parsers.latex.strip_braces()`, keeping the text as written with
+  its braces removed (`sslabdata.parsers.bibtex._convert()`). Such a value may
   still contain LaTeX commands. This is a degraded case, not a second
   contract: the document is still declared plain text, and the warning is the
   signal that one field did not make it.
 - `\href{url}{text}` is rewritten to `text (url)` before conversion, in
-  `labdata.parsers.latex.latex_to_text()`, because the converter cannot read
+  `sslabdata.parsers.latex.latex_to_text()`, because the converter cannot read
   it. Carrying link content into explicit fields is #27.
 
 > **Version note (#18, #56).** Through `schema_version` 3,
 > `venue` was composed with Markdown emphasis by
 > `format_venue()` — an article in journal `J` published in 2021 yielded the
-> string `*J*, 2021` — and it was the only place labdata *generated* markup
+> string `*J*, 2021` — and it was the only place sslabdata *generated* markup
 > into a text field, as distinct from the YAML strings above, which it merely
 > passes through. `schema_version` 4 replaced it with a structured container
 > and flat bibliographic properties, so there is nothing left to compose and
@@ -564,20 +564,20 @@ accident.
 
 | List | Order |
 |---|---|
-| `works` | `year` **descending**, with works that have no year **last**. Ties keep *read order* (below). The sort is the final statement of `labdata.parsers.bibtex.parse_all_works()`. |
-| `work.authors` | The order the `author` field wrote them (`labdata.parsers.bibtex.parse_author_list()`). A terminal `and others` is BibTeX's "et al." and is dropped rather than emitted as an author. `position` is that order, 1-based, and counts only the names that reach the document. |
+| `works` | `year` **descending**, with works that have no year **last**. Ties keep *read order* (below). The sort is the final statement of `sslabdata.parsers.bibtex.parse_all_works()`. |
+| `work.authors` | The order the `author` field wrote them (`sslabdata.parsers.bibtex.parse_author_list()`). A terminal `and others` is BibTeX's "et al." and is dropped rather than emitted as an author. `position` is that order, 1-based, and counts only the names that reach the document. |
 | `work.editors` | The order the `editor` field wrote them, read the same way (`parse_editor_list()`). |
-| `work.project_ids` | The order the `project` field wrote them, comma-separated, whitespace trimmed, empty entries dropped (`labdata.parsers.bibtex.parse_project_ids()`). |
-| `people` | The order of `people_file`. labdata does not sort people (`labdata.loaders.load_people()`, called by `labdata.assembler.assemble()`). |
-| `projects` | The order of `projects_file`, likewise (`labdata.loaders.load_projects()`). |
-| `person.work_ids` | The order of the `works` list, filtered to that person's authorships, first occurrence only (`labdata.resolver.compute_backlinks()`). Editors are not authorships and do not appear. |
+| `work.project_ids` | The order the `project` field wrote them, comma-separated, whitespace trimmed, empty entries dropped (`sslabdata.parsers.bibtex.parse_project_ids()`). |
+| `people` | The order of `people_file`. sslabdata does not sort people (`sslabdata.loaders.load_people()`, called by `sslabdata.assembler.assemble()`). |
+| `projects` | The order of `projects_file`, likewise (`sslabdata.loaders.load_projects()`). |
+| `person.work_ids` | The order of the `works` list, filtered to that person's authorships, first occurrence only (`sslabdata.resolver.compute_backlinks()`). Editors are not authorships and do not appear. |
 | `project.work_ids` | The order of the `works` list, filtered to that project, first occurrence only (`compute_backlinks()`). |
 | `project.people_ids` | Person id **ascending**, by Unicode code point (`compute_backlinks()` sorts the set it collects). |
-| `collaborators` | `last_year` **descending** with `null` last, then `work_count` **descending**, then `name` **ascending** by Unicode code point, then `key` **ascending** by Unicode code point (the sort in `labdata.assembler.group_collaborators()`; `tests/COVERAGE.md` row `output.collaborators.order`). `key` is appended after `name` rather than replacing it: two keys can carry the same readable name — a parsed and a brace-protected spelling of one string are two keys — so the name alone is no longer total, but it is still what decides. |
+| `collaborators` | `last_year` **descending** with `null` last, then `work_count` **descending**, then `name` **ascending** by Unicode code point, then `key` **ascending** by Unicode code point (the sort in `sslabdata.assembler.group_collaborators()`; `tests/COVERAGE.md` row `output.collaborators.order`). `key` is appended after `name` rather than replacing it: two keys can carry the same readable name — a parsed and a brace-protected spelling of one string are two keys — so the name alone is no longer total, but it is still what decides. |
 | `collaborator.authorships` | The order of the `works` list, then `position` within a work (`group_collaborators()`). |
 | `collaborator.work_ids` | The same order, first occurrence only. |
 | `collaborator.name_variants` | **Ascending** by Unicode code point. `collaborator.name` is the *first* spelling in document order, which need not be the first variant. |
-| `links`, `identifiers` | **Unordered.** They are maps, and a consumer reads them by key and filters the list under it. The list under one key is in the order labdata built it, which is not promised. |
+| `links`, `identifiers` | **Unordered.** They are maps, and a consumer reads them by key and filters the list under it. The list under one key is in the order sslabdata built it, which is not promised. |
 | `lab` | Unordered. It is a YAML mapping copied through; consumers read it by key. |
 
 **Read order** is the order in which entries were parsed: the files in the
@@ -603,12 +603,12 @@ accident.
   after `z`. No locale collation is applied.
 
 **Key order within an object is not part of the contract.** The YAML export
-writes keys in insertion order (`labdata.exporters.export_to_yaml()` passes
+writes keys in insertion order (`sslabdata.exporters.export_to_yaml()` passes
 `sort_keys=False`) and the JSON export does the same, but both formats define
 objects as unordered and consumers must treat them that way.
 
 **YAML and JSON carry the same document.** `--format yaml` and `--format
-json` serialize the identical structure (`labdata.exporters.export_to_yaml()`
+json` serialize the identical structure (`sslabdata.exporters.export_to_yaml()`
 and `export_to_json()` both serialize `LabData.to_dict()`); neither is more
 authoritative.
 
@@ -697,24 +697,24 @@ a new link kind or identifier scheme is not a breaking change.
 
 ## 5. Input versus derived
 
-**Input** fields come from the author's files and labdata carries them
-through. **Derived** fields labdata computes. Derived fields are **read-only
+**Input** fields come from the author's files and sslabdata carries them
+through. **Derived** fields sslabdata computes. Derived fields are **read-only
 outputs**: they must never be written back into `people.yaml`,
 `projects.yaml` or a `.bib` file. Doing so makes the next compile read
-labdata's own output as input, and a wrong derivation becomes permanent.
+sslabdata's own output as input, and a wrong derivation becomes permanent.
 
 | Field | Origin |
 |---|---|
-| `schema_version` | Derived — a constant of the compiler (`labdata.models.SCHEMA_VERSION`). |
+| `schema_version` | Derived — a constant of the compiler (`sslabdata.models.SCHEMA_VERSION`). |
 | `generator` | Derived — the compiler's name, its package version and the schema version (`LabData.to_dict()`). No timestamp. |
 | `lab` | Input — the `lab` section of `lab.yaml`, copied unchanged (`LabDataConfig.from_yaml()`), and always emitted. |
-| `work.bib_id`, `work.source.key` | Input — the BibTeX citation key, **as written**. `labdata.parsers.bibtex.entry_fields()` preserves its case. |
+| `work.bib_id`, `work.source.key` | Input — the BibTeX citation key, **as written**. `sslabdata.parsers.bibtex.entry_fields()` preserves its case. |
 | `work.source.file` | Input — the `name` of the `bib_files` entry the file was listed under, **never an absolute path**. A *relative* directory is fine and is passed through as written: `sub/journal.bib` is a name under `bib_dir`. The guarantee is kept by rejecting the input rather than by rewriting it — rewriting would quietly discard that directory — and it is enforced under `CONFIG-BIB-FILE-ABSOLUTE` at `Work.to_dict()`, the boundary every emitted document passes through, so that it holds whatever built the objects. `LabDataConfig.from_yaml()`, `BibFile`'s constructor and `assemble()` check it earlier as well, for messages that fail sooner and name more. |
 | `work.entry_type` | Input — the BibTeX entry type, **lowercased** by `entry_fields()`. Of it and `bib_id`, it is the only one that is case-folded. |
-| `work.title`, `abstract`, `note` | Input — BibTeX fields, converted from LaTeX to text (§2). `note` additionally has trailing `.` and whitespace trimmed (`labdata.parsers.bibtex.extract_note()`). |
+| `work.title`, `abstract`, `note` | Input — BibTeX fields, converted from LaTeX to text (§2). `note` additionally has trailing `.` and whitespace trimmed (`sslabdata.parsers.bibtex.extract_note()`). |
 | `work.year` | Input — the BibTeX `year`, as an integer; `null` when the entry supplied none, with a diagnostic (`entry_year()`). |
-| `work.category` | Input — the `category` of the `bib_files` entry the file was listed under, not anything in the `.bib` file (`labdata.config.BibFile`, read by `parse_all_works()`). |
-| `work.venue` | **Derived** — the first of `journal`, `booktitle`, `school` and `institution` the entry wrote, as `name`, with the `kind` that field and the entry type imply; a preprint's repository when the entry has only an `eprint`; `null` when it names no container (`labdata.parsers.bibtex.build_venue()`). See below. |
+| `work.category` | Input — the `category` of the `bib_files` entry the file was listed under, not anything in the `.bib` file (`sslabdata.config.BibFile`, read by `parse_all_works()`). |
+| `work.venue` | **Derived** — the first of `journal`, `booktitle`, `school` and `institution` the entry wrote, as `name`, with the `kind` that field and the entry type imply; a preprint's repository when the entry has only an `eprint`; `null` when it names no container (`sslabdata.parsers.bibtex.build_venue()`). See below. |
 | `work.volume`, `number`, `pages`, `series`, `edition`, `publisher`, `address`, `organization`, `chapter`, `month`, `howpublished`, `type` | Input — the BibTeX fields of those names, under BibTeX's names and with BibTeX's meanings (`FLAT_FIELDS`, read in `entry_to_work()`). Those in `TEXT_FIELDS` are converted from LaTeX (§2); the rest are emitted as written. |
 | `work.identifiers` | **Derived** — a map from scheme to identifiers, built from `doi`, `eprint` with `archivePrefix`, `isbn` and `issn` (`build_identifiers()`). A `doi` written as a resolver URL has that prefix taken off. An `eprint`'s scheme is the repository `archivePrefix` named, **lower-cased**, as `entry_type` is: the scheme is a vocabulary token rather than display text, so a round trip recovers the repository and not the spelling the entry used. |
 | `work.links` | **Derived** — a map from kind to link records, built from the entry's `url`, from `pdf_base_url` and from the identifiers above (`build_links()`). See below. |
@@ -723,21 +723,21 @@ labdata's own output as input, and a wrong derivation becomes permanent.
 | `author.given`, `von`, `family`, `suffix`, `literal` | Input — the parts BibTeX split the name into, converted from LaTeX, with an equal-contribution marker removed (`person_name_parts()`). An entry writing `Brown, B.` yields `given: "B."`, and that is correct, not a gap. |
 | `author.name` | **Derived** — the parts joined in reading order (`readable_name()`). *A readable form of the input name, not a citation form*: it does not abbreviate, expand or normalise. |
 | `author.position` | **Derived** — where the authorship sits in its work's list, 1-based, counting only the names that reach the document. |
-| `author.person_id` | **Derived** — the resolver's match against `people_file` (`labdata.resolver.resolve_authors()`): on the structured full name, then — only for a name that is itself abbreviated — on a declared alias, and never when the name fits more than one person or only nearly matches. See *How a name is matched* below. |
-| `author.collaborator_key` | **Derived** — the key of the grouping an unresolved authorship fell into (`labdata.assembler.group_collaborators()`). Exactly one of it and `person_id` is non-null. |
+| `author.person_id` | **Derived** — the resolver's match against `people_file` (`sslabdata.resolver.resolve_authors()`): on the structured full name, then — only for a name that is itself abbreviated — on a declared alias, and never when the name fits more than one person or only nearly matches. See *How a name is matched* below. |
+| `author.collaborator_key` | **Derived** — the key of the grouping an unresolved authorship fell into (`sslabdata.assembler.group_collaborators()`). Exactly one of it and `person_id` is non-null. |
 | `author.resolution` | **Derived** — `status` over `resolved`, `unresolved` and `ambiguous`, and `method` `exact`, or `null` when nothing matched (`resolve_authors()`). Both are open strings; `fuzzy` is no longer emitted (Version note under §6). |
-| `author.equal_contribution` | **Derived** — whether the entry wrote a `*` marker on any part of the name (`labdata.parsers.bibtex.marks_equal_contribution()`). |
+| `author.equal_contribution` | **Derived** — whether the entry wrote a `*` marker on any part of the name (`sslabdata.parsers.bibtex.marks_equal_contribution()`). |
 | `work.editors[*]` | The same, minus `collaborator_key` and `equal_contribution`. An editor that matched nobody is simply `person_id: null` (`parse_editor_list()`). |
-| `person.*` except the two below | Input — the fields of `people_file` (`labdata.loaders.load_people()`). `aliases` is read for matching and is **not** emitted. `status` is `current` or `alumni`, and `current` when absent; `role` is open, any non-empty string (`PEOPLE-STATUS-INVALID`, `PEOPLE-ROLE-INVALID`). |
-| `person.work_ids`, `work_count` | **Derived** — back-links over authorships, and their count (`labdata.resolver.compute_backlinks()`). Editors are not authorships and are not counted. |
-| `project.id`, `title`, `description`, `website`, `status` | Input — the fields of `projects_file` (`labdata.loaders.load_projects()`). `status` is one of `active` and `completed`, and `active` when absent (`PROJECTS-STATUS-INVALID`). |
+| `person.*` except the two below | Input — the fields of `people_file` (`sslabdata.loaders.load_people()`). `aliases` is read for matching and is **not** emitted. `status` is `current` or `alumni`, and `current` when absent; `role` is open, any non-empty string (`PEOPLE-STATUS-INVALID`, `PEOPLE-ROLE-INVALID`). |
+| `person.work_ids`, `work_count` | **Derived** — back-links over authorships, and their count (`sslabdata.resolver.compute_backlinks()`). Editors are not authorships and are not counted. |
+| `project.id`, `title`, `description`, `website`, `status` | Input — the fields of `projects_file` (`sslabdata.loaders.load_projects()`). `status` is one of `active` and `completed`, and `active` when absent (`PROJECTS-STATUS-INVALID`). |
 | `project.work_ids`, `people_ids` | **Derived** — back-links, and the people reached through them (`compute_backlinks()`). |
-| `collaborators` | **Derived, entirely** — see below (`labdata.assembler.group_collaborators()`). |
-| `derived` | Reserved for labdata; empty today. See below. |
+| `collaborators` | **Derived, entirely** — see below (`sslabdata.assembler.group_collaborators()`). |
+| `derived` | Reserved for sslabdata; empty today. See below. |
 
 ### How a name is matched
 
-`labdata.resolver.match()` compares a name's structured parts against every
+`sslabdata.resolver.match()` compares a name's structured parts against every
 person's `name` and `aliases`, all read through `normalize_name()`. That
 function does exactly this, in this order:
 
@@ -788,7 +788,7 @@ removes their full stops, so `J.-P.` equals `J-P`, but it is not equal to
   middle names. Particles, the family name and everything after the comma
   are never spaced, so `S.S. Ivers, Jr.` equals `S. S. Ivers, Jr.`, while
   `S.S. S.S.` equals `S. S. S.S.` but not `S. S. S. S.`, and
-  `Alice Ivers, S.S.` does not equal `Alice Ivers, S. S.` labdata has no
+  `Alice Ivers, S.S.` does not equal `Alice Ivers, S. S.` sslabdata has no
   way to tell a suffix from a given name after a comma, so a declaration
   written `Family, Given` is not spaced at all: `Ivers, S.S.` and
   `Ivers, S. S.` stay two spellings, as on `main`. Where the parse does not
@@ -836,7 +836,7 @@ well: `journal` for a journal, `conference` for `@inproceedings`,
 `institution` for a `school` or an `institution`. An entry with none of the
 four but with an `eprint` gets `{kind: "repository", name: <archivePrefix>}`,
 defaulting to `arXiv`, because the repository is what the preprint's
-container is. Anything else gets `null`: labdata does not invent a container
+container is. Anything else gets `null`: sslabdata does not invent a container
 the entry did not name. `kind` is an **open string**, deliberately not a JSON
 Schema enum, so a new work type (#31) needs no version bump.
 
@@ -860,7 +860,7 @@ configured" is no link at all, "the file is not there" is `missing`, and
 
 A link does **not** name the identifier it was built from. That is redundant
 with its kind and its origin, and it would be a cross-record constraint JSON
-Schema cannot express and labdata would have to police by hand.
+Schema cannot express and sslabdata would have to police by hand.
 
 **`work.bibtex` is re-serialized, not verbatim.** It is produced by
 `format_bibtex()`, which calls pybtex's `Entry.to_string("bibtex")` on the
@@ -872,7 +872,7 @@ delimiters, whitespace and indentation are all the serializer's, and
 
 It is produced *before* LaTeX conversion, so LaTeX markup is still present.
 Read it as "the entry's data, re-typeset", not as "the entry as the author
-wrote it", and never as a source of properties: nothing in labdata reads a
+wrote it", and never as a source of properties: nothing in sslabdata reads a
 value back out of it, and a consumer probe that mined it would prove nothing
 about the document (§1).
 
@@ -931,11 +931,11 @@ it. What that buys, and what it does not:
   grouping and no emitted value, and neither is reported against a
   `declared` grouping, whose spellings a human joined on purpose.
 
-**`derived` is labdata's, and it is not an extension mechanism.** Every
+**`derived` is sslabdata's, and it is not an extension mechanism.** Every
 closed entity carries a `derived` object with `additionalProperties: true`.
-Every key inside it is **reserved for labdata**. Consumers must tolerate keys
+Every key inside it is **reserved for sslabdata**. Consumers must tolerate keys
 they do not know — that is the point of it — and must not write their own,
-because a key they invent can collide with one labdata adds later. A key
+because a key they invent can collide with one sslabdata adds later. A key
 **graduating out of `derived` into a named property is still a major
 change**, for the same reason any new property is: the entity is closed. It
 is **not** a general extension mechanism and not a place to park data the
@@ -947,14 +947,14 @@ cannot quietly fill.
 **Unknown project ids are kept, not dropped.** A `project_ids` entry naming no
 project in `projects_file` stays on the work so the problem stays visible, and
 `--validate` reports it under `RESOLVE-PROJECT-UNKNOWN` and exits `1`
-(`labdata.resolver.resolve_projects()`).
+(`sslabdata.resolver.resolve_projects()`).
 
 ---
 
 ## 6. Version policy
 
 The document carries a single integer, `schema_version`
-(`labdata.models.SCHEMA_VERSION`, pinned in the schema at
+(`sslabdata.models.SCHEMA_VERSION`, pinned in the schema at
 `/properties/schema_version/const`). It has no minor component, because there
 is nothing in the document a consumer would branch on below the level of "can
 I still read this".
@@ -1001,7 +1001,7 @@ and the *guarantees* of a relationship — not every result an implementation
 produces.** `author.person_id` is frozen as "the id of a person in
 `people.yaml`, or null": its type, the namespace it points into, and the
 promise that it is never widened to reach anything else. It is **not** frozen
-as "whichever person labdata matched on the day version 4 shipped".
+as "whichever person sslabdata matched on the day version 4 shipped".
 
 So a **resolver correction** — a change that makes the matcher better satisfy
 the documented matching policy, without changing the shape, the namespace or
@@ -1069,8 +1069,18 @@ the tag is the closest thing that can be written down at the time the file is
 written. Each later version gets its own tag, at its own path, under the same
 rule.
 
+**The published addresses carry the old repository name.** The project was
+called `labdata` until #82 renamed it, and its repository with it, to
+`sslabdata`. The v3 and v4 schema files were published before the rename, so
+their `$id`s, and the titles and descriptions inside them, still say
+`labdata`, and they are left byte for byte as published rather than
+rewritten. v4's raw `$id` still resolves: GitHub redirects the old repository
+name to the new one. v3's `blob/main` `$id` still does not resolve, as above.
+The first schema published under the new name will be
+the next one, set up by #37.
+
 **Version history**, as recorded in the comment above
-`labdata.models.SCHEMA_VERSION`:
+`sslabdata.models.SCHEMA_VERSION`:
 
 | `schema_version` | Change |
 |---|---|
@@ -1083,7 +1093,7 @@ rule.
 
 ## 7. `@string` macros: last definition wins
 
-BibTeX `@string` macros are expanded before a field reaches labdata. When one
+BibTeX `@string` macros are expanded before a field reaches sslabdata. When one
 file defines the same macro more than once, **the last definition wins**.
 
 This matches classic BibTeX. It is not universal: some BibTeX parsers keep the
@@ -1104,7 +1114,7 @@ Verified directly against a file with an entry between two definitions of the
 same macro; `tests/corpus/valid/strings.bib` defines all three macros before
 any entry uses them, so the corpus does not distinguish the two readings.
 
-A redefinition is never silent. `labdata.parsers.bibtex._redefined_macros()`
+A redefinition is never silent. `sslabdata.parsers.bibtex._redefined_macros()`
 finds every definition of a macro after its first — among the definitions
 the parser itself reads, so an `@string` inside an `@comment` group is not
 counted, and a line number counts lines as the parser does, after a byte
@@ -1142,7 +1152,7 @@ schema_version, generator, lab, people, works, projects,
 collaborators (a derived grouping)
 ```
 
-`lab` is the one entity labdata does not compute anything from. It is kept
+`lab` is the one entity sslabdata does not compute anything from. It is kept
 deliberately: a document needs a header, and it is where contact information
 lives.
 
@@ -1171,13 +1181,13 @@ So each rejected type is rejected for a stated reason, and each has a home:
 | Awards and honours | An attribute of the work, today `work.note`; #27 moves it out of `note`. |
 | Funding and grants | Your site repository. Nothing in the document depends on it. |
 | Software and datasets | Not a separate collection — they are kinds of *work*, added by #31. |
-| Alumni | Not a collection — a `status` on a person (`labdata.models.Person.status`). |
+| Alumni | Not a collection — a `status` on a person (`sslabdata.models.Person.status`). |
 | Robots, platforms, facilities | Your site repository; one of 27 surveyed sites had such a page. |
 
 **There is no generic extension mechanism and no `collections` escape hatch.**
 What one would carry is mostly prose, and its one real service — catching
 references that point at nothing — is delivered by #58 without the document
-owning the payload. `derived` is not that hatch either: it is labdata's own
+owning the payload. `derived` is not that hatch either: it is sslabdata's own
 (§5), and the open maps `links` and `identifiers` are open over *their own*
 vocabularies, not over arbitrary content.
 
@@ -1187,11 +1197,11 @@ vocabularies, not over arbitrary content.
 
 It does not list the document's fields; `schema/v4/output.schema.json` does.
 It does not describe renderers such as
-[labdata-site](https://github.com/siddhss5/labdata-site), which are
+[sslabdata-site](https://github.com/siddhss5/sslabdata-site), which are
 downstream consumers in their own repositories. It does not describe the input formats `lab.yaml`,
 `people.yaml` and `projects.yaml` beyond what §5 needs; schemas for those are
 #37.
 
-`tests/COVERAGE.md` is the case-by-case record of what labdata does with each
+`tests/COVERAGE.md` is the case-by-case record of what sslabdata does with each
 input, with the fixture and the test for each. Where it and this file disagree
 about current behaviour, `tests/COVERAGE.md` is the one backed by a test.

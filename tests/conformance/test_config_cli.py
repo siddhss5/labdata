@@ -9,7 +9,7 @@ import json
 import pytest
 import yaml
 
-from .support import VALID, case, covers, export, item, run_labdata, work, write_variant
+from .support import VALID, case, covers, export, item, run_sslabdata, work, write_variant
 
 
 # --- Config keys: present ----------------------------------------------------
@@ -21,7 +21,7 @@ def test_config_present(valid_output):
     categories = {w["category"] for w in valid_output["works"]}
     assert categories == {"Strings", "Names", "LaTeX", "Structure", "Encoding", "Links",
                           "Projects"}
-    # site is for downstream renderers; labdata accepts it and does not
+    # site is for downstream renderers; sslabdata accepts it and does not
     # copy it into the output.
     assert "site" not in valid_output
 
@@ -74,8 +74,8 @@ def test_collaborator_alias_that_is_a_member_is_reported(tmp_path, valid_output)
     """`A. Adams` is also a member's alias: reported as a warning in both
     reporting modes, neither exit code moves, and the member keeps it."""
     variant = write_variant(tmp_path, collaborators_file="collaborators.yaml")
-    validate = run_labdata(["--config", variant, "--validate"], VALID)
-    unresolved = run_labdata(["--config", variant, "--unresolved"], VALID)
+    validate = run_sslabdata(["--config", variant, "--validate"], VALID)
+    unresolved = run_sslabdata(["--config", variant, "--unresolved"], VALID)
     # Under --validate the report is on stdout, beneath `Warnings`; in the
     # other modes a warning is on stderr with the `Warning: ` prefix.
     for run, stream, prefix in ((validate, validate.stdout, "  - "),
@@ -141,7 +141,7 @@ def test_config_people_file_missing(tmp_path):
 @covers("config.people_file.missing")
 def test_unresolved_without_people_file(tmp_path):
     """--unresolved says author resolution is not configured, naming people_file."""
-    run = run_labdata(["--config", write_variant(tmp_path, people_file=None), "--unresolved"],
+    run = run_sslabdata(["--config", write_variant(tmp_path, people_file=None), "--unresolved"],
                       VALID)
     assert "people_file" in run.output
 
@@ -185,7 +185,7 @@ def test_remote_pdf_url_not_verified(tmp_path):
 
 @covers("cli.config")
 def test_cli_config_required():
-    run = run_labdata(["--validate"], VALID)
+    run = run_sslabdata(["--validate"], VALID)
     assert run.crash is None
     assert run.code == 2
     assert "--config" in run.stderr
@@ -193,7 +193,7 @@ def test_cli_config_required():
 
 @covers("cli.config_not_found", "diag.config_not_found")
 def test_cli_config_not_found():
-    run = run_labdata(["--config", "no-such-lab.yaml", "--validate"], VALID)
+    run = run_sslabdata(["--config", "no-such-lab.yaml", "--validate"], VALID)
     assert run.crash is None
     assert run.code == 1
     assert "no-such-lab.yaml" in run.stderr
@@ -201,7 +201,7 @@ def test_cli_config_not_found():
 
 @covers("cli.mode.required", "diag.mode_required")
 def test_cli_mode_required():
-    run = run_labdata(["--config", "lab.yaml"], VALID)
+    run = run_sslabdata(["--config", "lab.yaml"], VALID)
     assert run.crash is None
     assert run.code == 2
     for flag in ("--output", "--validate", "--unresolved"):
@@ -210,7 +210,7 @@ def test_cli_mode_required():
 
 @covers("cli.help")
 def test_cli_help():
-    run = run_labdata(["--help"], VALID)
+    run = run_sslabdata(["--help"], VALID)
     assert run.code == 0
     for flag in ("--config", "--format", "--output", "--validate", "--unresolved"):
         assert flag in run.stdout
@@ -226,14 +226,14 @@ FORMATS = [
 @pytest.mark.parametrize("case_id, args, parse", FORMATS)
 def test_cli_format(tmp_path, valid_output, case_id, args, parse):
     out = tmp_path / "lab.out"
-    run = run_labdata(["--config", "lab.yaml", *args, "--output", out], VALID)
+    run = run_sslabdata(["--config", "lab.yaml", *args, "--output", out], VALID)
     assert run.code == 0 and run.crash is None, run.output
     assert parse(out.read_text(encoding="utf-8")) == valid_output
 
 
 @covers("cli.format.invalid", "diag.format_invalid")
 def test_cli_format_invalid(tmp_path):
-    run = run_labdata(["--config", "lab.yaml", "--format", "xml", "--output",
+    run = run_sslabdata(["--config", "lab.yaml", "--format", "xml", "--output",
                        tmp_path / "lab.xml"], VALID)
     assert run.code == 2
     assert "xml" in run.stderr
@@ -243,7 +243,7 @@ def test_cli_format_invalid(tmp_path):
 @covers("cli.output", "diag.wrote")
 def test_cli_output_creates_parent_dirs(tmp_path, valid_output):
     out = tmp_path / "out" / "nested" / "lab.yml"
-    run = run_labdata(["--config", "lab.yaml", "--output", out], VALID)
+    run = run_sslabdata(["--config", "lab.yaml", "--output", out], VALID)
     assert run.code == 0 and run.crash is None, run.output
     assert out.exists()
     assert str(out) in run.stdout
@@ -288,9 +288,9 @@ def test_cli_unresolved(valid_unresolved, valid_output):
 
 @covers("cli.unresolved_none", "diag.all_resolved")
 def test_cli_unresolved_none(tmp_path):
-    """Every author resolves: labdata says so in one line and lists nobody."""
+    """Every author resolves: sslabdata says so in one line and lists nobody."""
     variant = write_variant(tmp_path, bib_files=[{"name": "encoding.bib", "category": "E"}])
-    run = run_labdata(["--config", variant, "--unresolved"], VALID)
+    run = run_sslabdata(["--config", variant, "--unresolved"], VALID)
     assert run.code == 0 and run.crash is None, run.output
     lines = [line for line in run.stdout.splitlines() if line.strip()]
     assert len(lines) == 1, run.stdout

@@ -1,6 +1,6 @@
 # Valid conformance corpus: a fictional lab. Every case here should assemble
 # cleanly. See tests/COVERAGE.md for what each CASE marker means.
-# Paths are relative to this directory; the tests run labdata from here.
+# Paths are relative to this directory; the tests run sslabdata from here.
 
 # CASE config.lab.present
 # CASE config.lab.missing
@@ -10,11 +10,11 @@
 # CASE output.derived_is_empty
 lab:
   name: "Corpus Lab"
-  description: "A fictional lab used only by the labdata conformance tests."
+  description: "A fictional lab used only by the sslabdata conformance tests."
   university: "Example University"
   website: "https://example.org/corpus"
 
-# Read by downstream renderers, not by labdata, which accepts it.
+# Read by downstream renderers, not by sslabdata, which accepts it.
 # CASE config.site
 site:
   url: "https://example.org"

@@ -2,7 +2,7 @@
 
 import re
 
-from labdata.diagnostics import CLASSES, NEVER_AN_ERROR
+from sslabdata.diagnostics import CLASSES, NEVER_AN_ERROR
 
 from ..conformance.support import REPO_ROOT
 from ..test_strict_json import (
@@ -19,13 +19,13 @@ def test_the_code_classes_are_the_ones_spec_states():
 
 def test_every_code_the_source_names_is_classified():
     named = set()
-    for path in (REPO_ROOT / "labdata").rglob("*.py"):
+    for path in (REPO_ROOT / "sslabdata").rglob("*.py"):
         named |= set(re.findall(rf'"({CODE})"', path.read_text(encoding="utf-8")))
     assert named and named - set(CLASSES) == set()
 
 
 def test_a_field_whose_latex_cannot_be_read_is_located(tmp_path, monkeypatch):
-    import labdata.parsers.bibtex as bibtex
+    import sslabdata.parsers.bibtex as bibtex
 
     def unreadable(value):
         if "Broken" in value:
@@ -43,7 +43,7 @@ def test_a_field_whose_latex_cannot_be_read_is_located(tmp_path, monkeypatch):
 def test_an_entry_that_cannot_be_written_back_is_located(tmp_path, monkeypatch):
     def refuse(self, *args, **kwargs):
         raise ValueError("cannot write")
-    monkeypatch.setattr("labdata.parsers.bibtex.Entry.to_string", refuse)
+    monkeypatch.setattr("sslabdata.parsers.bibtex.Entry.to_string", refuse)
     write_lab(tmp_path, "@article{e, title = {T}, journal = {J}, year = 2024}\n")
     run, [record] = json_run(tmp_path, "--validate")
     assert (record["code"], record["file"], record["key"], record["field"]) == (

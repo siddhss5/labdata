@@ -3,7 +3,7 @@ comparison of the valid corpus's parsed output.
 
 To regenerate tests/corpus/expected/valid.yaml after an intended change, run
 
-    LABDATA_REGENERATE_EXPECTED=1 uv run pytest tests/conformance/test_output_format.py
+    SSLABDATA_REGENERATE_EXPECTED=1 uv run pytest tests/conformance/test_output_format.py
 
 and review the diff (git diff tests/corpus/expected/valid.yaml) before committing.
 """
@@ -181,8 +181,8 @@ HTML_TAG = re.compile(r"</?[A-Za-z][^<>]*>")
 
 # The properties whose value the input supplies verbatim. Markdown
 # punctuation in one of these is text an author wrote, which SPEC.md section
-# 2 says labdata neither escapes nor strips -- the corpus carries `not
-# *emphasis*` in a title on purpose. Anywhere else it would be markup labdata
+# 2 says sslabdata neither escapes nor strips -- the corpus carries `not
+# *emphasis*` in a title on purpose. Anywhere else it would be markup sslabdata
 # generated, which is what composing `venue` used to do and what #56 removed.
 INPUT_TEXT = {"title", "abstract", "note", "name", "given", "von", "family",
               "suffix", "literal", "name_variants", "description",
@@ -224,10 +224,10 @@ def leaf_property(path):
 
 @covers("output.no_markup")
 def test_the_demo_document_carries_no_markup(demo_exports):
-    """Nothing labdata emits for the demo is Markdown or HTML.
+    """Nothing sslabdata emits for the demo is Markdown or HTML.
 
     The demo's input is plain, so any markup in its output would be markup
-    labdata generated. Under `schema_version` 3 `venue` was exactly that:
+    sslabdata generated. Under `schema_version` 3 `venue` was exactly that:
     `*Transactions on Robot Learning*, 4(2), 2025`.
     """
     for data in demo_exports:
@@ -245,7 +245,7 @@ def test_markup_in_the_corpus_is_only_text_the_input_wrote(valid_output):
 
     The corpus writes `[a link](x)`, `# heading` and `*emphasis*` into a
     title on purpose, and SPEC.md section 2 says those are text rather than
-    markup. What must never happen is markup in a property labdata composes,
+    markup. What must never happen is markup in a property sslabdata composes,
     and that is what this pins.
     """
     found = markup_paths(valid_output)
@@ -257,7 +257,7 @@ def test_markup_in_the_corpus_is_only_text_the_input_wrote(valid_output):
 
 @covers("output.derived_is_empty")
 def test_every_derived_bag_is_empty(valid_output, demo_exports):
-    """`derived` is labdata-owned and labdata puts nothing in it yet.
+    """`derived` is sslabdata-owned and sslabdata puts nothing in it yet.
 
     Asserted so the region cannot quietly fill: a key appearing there is a
     change a reader of this test has to make on purpose.
@@ -394,13 +394,13 @@ def diff_paths(expected, actual, path=""):
 def test_full_output(valid_output):
     """The snapshot, compared as parsed data rather than byte for byte."""
     chosen = select(valid_output)
-    if os.environ.get("LABDATA_REGENERATE_EXPECTED"):
+    if os.environ.get("SSLABDATA_REGENERATE_EXPECTED"):
         with open(EXPECTED_VALID, "w", encoding="utf-8") as f:
             f.write("# Part of the output of tests/corpus/valid/, compared as parsed data by\n"
                     "# tests/conformance/test_output_format.py::test_full_output. The entries\n"
                     "# here are the ones no open issue is expected to change; SNAPSHOT in that\n"
                     "# file says which they are and why the rest is left out. Regenerate with\n"
-                    "#   LABDATA_REGENERATE_EXPECTED=1 uv run pytest "
+                    "#   SSLABDATA_REGENERATE_EXPECTED=1 uv run pytest "
                     "tests/conformance/test_output_format.py\n"
                     "# and review the diff before committing.\n")
             yaml.safe_dump(chosen, f, allow_unicode=True, sort_keys=False, width=100)
