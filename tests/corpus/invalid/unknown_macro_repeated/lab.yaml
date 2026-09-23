@@ -1,0 +1,6 @@
+# CASE latex.unknown_macro_repeated
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "macro.bib"
+    category: "Papers"

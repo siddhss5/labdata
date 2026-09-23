@@ -195,7 +195,8 @@ def corpus_entry_keys() -> Set[str]:
     """Every citation key defined anywhere in tests/corpus."""
     keys = set()
     for path in sorted(CORPUS.rglob("*.bib")):
-        text = path.read_bytes().decode("utf-8-sig")
+        # errors="replace": the corpus holds a file that is deliberately not UTF-8.
+        text = path.read_bytes().decode("utf-8-sig", errors="replace")
         keys |= {key for kind, key in ENTRY_KEY_RE.findall(text)
                  if kind.lower() not in NOT_ENTRIES}
     return keys

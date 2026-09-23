@@ -109,7 +109,9 @@ def read_markers(corpus_dir: Path, repo_root: Path) -> Dict[str, Set[str]]:
     for path in sorted(Path(corpus_dir).rglob("*")):
         if not path.is_file() or path.suffix not in FIXTURE_SUFFIXES:
             continue
-        for case_id in MARKER_RE.findall(path.read_bytes().decode("utf-8-sig")):
+        # errors="replace": a fixture may be deliberately not UTF-8.
+        text = path.read_bytes().decode("utf-8-sig", errors="replace")
+        for case_id in MARKER_RE.findall(text):
             markers.setdefault(case_id, set()).add(path.relative_to(repo_root).as_posix())
     return markers
 

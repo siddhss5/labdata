@@ -16,15 +16,29 @@ MIT License - see LICENSE file for details.
 
 import re
 
-from pylatexenc.latex2text import LatexNodes2Text, get_default_latex_context_db
+from pylatexenc.latex2text import (
+    LatexNodes2Text, MacroTextSpec, get_default_latex_context_db,
+)
 from pylatexenc.latexwalker import LatexMacroNode, LatexMathNode, LatexWalker
 
 
-_CONVERTER = LatexNodes2Text(math_mode='verbatim')
+# Common text macros the converter's own table lacks. Without a rule each
+# would be dropped, so `The \TeX{} book 1990\emdash 2000` would read
+# `The  book 19902000`.
+_TEXT_MACROS = {
+    "TeX": "TeX", "LaTeX": "LaTeX", "LaTeXe": "LaTeX2e", "BibTeX": "BibTeX",
+    "emdash": "\u2014", "endash": "\u2013", "slash": "/", "xspace": "",
+}
 
 # The commands the converter has a rule for. A command outside it is dropped,
 # with any braced argument after it read as a group of plain text.
 _KNOWN = get_default_latex_context_db()
+_KNOWN.add_context_category(
+    "sslabdata-text",
+    macros=[MacroTextSpec(name, text) for name, text in _TEXT_MACROS.items()],
+    prepend=True)
+
+_CONVERTER = LatexNodes2Text(latex_context=_KNOWN, math_mode='verbatim')
 
 # Two commands outside that table whose conversion sslabdata documents, so they
 # are known rather than unknown (tests/COVERAGE.md, `names.equal_contribution`

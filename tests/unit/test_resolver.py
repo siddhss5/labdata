@@ -897,8 +897,38 @@ class TestPeopleAndProjectsFiles:
         assert errors == ["PEOPLE-FIELD-MISSING f.yaml:q:name: entry 1 has no name",
                           "PEOPLE-FIELD-MISSING f.yaml:p:name: entry 2 has no name"]
 
-    def test_a_projects_file_that_is_not_a_list_is_no_projects(self, tmp_path):
-        assert self.load(tmp_path, load_projects, "p: {title: T}\n") == ([], [], [], [])
+    def test_a_projects_file_that_is_not_a_list_is_fatal(self, tmp_path):
+        records, errors, _, _ = self.load(tmp_path, load_projects, "p: {title: T}\n")
+        assert records == [] and [e.split(" ", 2)[:2] for e in errors] == [
+            ["PROJECTS-NOT-A-LIST", "f.yaml:::"]]
+
+    @pytest.mark.parametrize("loader, code", [
+        (load_people, "PEOPLE-YAML-INVALID"),
+        (load_projects, "PROJECTS-YAML-INVALID"),
+        (lambda path, errors, *_: load_collaborators(path, errors),
+         "COLLABORATORS-YAML-INVALID")])
+    def test_invalid_yaml_is_fatal_and_located(self, tmp_path, loader, code):
+        records, errors, _, _ = self.load(tmp_path, loader, "- id: [unclosed\n")
+        [line] = errors
+        assert records == [] and line.startswith(f"{code} f.yaml::: ")
+        assert "line 1" in line and "\n" not in line
+
+    def test_every_record_is_checked_the_same_way(self, tmp_path):
+        records, errors, _, _ = self.load(
+            tmp_path, load_projects, "- just text\n- {title: No id}\n"
+            "- {id: q}\n- {id: p, title: P}\n")
+        assert [r.id for r in records] == ["p"]
+        assert errors == [
+            "PROJECTS-NOT-A-LIST f.yaml::: entry 1 is a str, not a record",
+            "PROJECTS-FIELD-MISSING f.yaml::id: entry 2 has no id",
+            "PROJECTS-FIELD-MISSING f.yaml:q:title: entry 3 has no title"]
+        _, errors, _, _ = self.load(tmp_path, load_people, "- {name: No Id}\n")
+        assert errors == ["PEOPLE-FIELD-MISSING f.yaml::id: entry 1 has no id"]
+        declared, errors, _, _ = self.load(
+            tmp_path, lambda path, errors, *_: load_collaborators(path, errors),
+            "- {aliases: [X]}\n- {name: Priya Patel}\n")
+        assert [c.name for c in declared] == ["Priya Patel"]
+        assert errors == ["COLLABORATORS-FIELD-MISSING f.yaml::name: entry 1 has no name"]
 
     def test_duplicate_ids_are_kept_and_reported(self, tmp_path):
         records, _, diagnostics, _ = self.load(

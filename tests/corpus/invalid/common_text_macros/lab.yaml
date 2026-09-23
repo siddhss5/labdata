@@ -1,0 +1,6 @@
+# CASE latex.text_macros
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "macros.bib"
+    category: "Papers"

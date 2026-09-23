@@ -97,6 +97,10 @@ LATEX_CONVERSION_FAILED = "LATEX-CONVERSION-FAILED"
 # An entry that could not be written back out as BibTeX; its `bibtex` is null.
 WRITE_BACK_FAILED = "BIB-WRITE-BACK-FAILED"
 
+# A `.bib` file that is not UTF-8. Fatal, and no other encoding is guessed:
+# reading Latin-1 bytes as something else would silently change names.
+ENCODING_INVALID = "BIB-ENCODING-INVALID"
+
 # A LaTeX command the converter does not know. It is dropped, and a braced
 # argument after it is kept as plain text.
 LATEX_COMMAND_UNKNOWN = "LATEX-COMMAND-UNKNOWN"
@@ -460,10 +464,32 @@ def _convert(value: str, where: str, on_unknown=None) -> str:
     return text
 
 
-def _unknown_command_reporter(report, file: str, key: str):
+def unknown_command_diagnostic(command: str, where: Tuple[str, str, str],
+                               fields: Optional[int] = None) -> str:
+    """One `LATEX_COMMAND_UNKNOWN` line, located at ``(file, key, field)``.
+
+    With ``fields``, the line summarises a whole run: how many fields use the
+    command, located at the first of them.
+    """
+    uses = ""
+    if fields is not None:
+        uses = (f"; used in {fields} field{'s' if fields != 1 else ''}, "
+                "located at the first")
+    return diagnostic(
+        LATEX_COMMAND_UNKNOWN, *where,
+        f"the LaTeX command '\\{command}' is not one sslabdata converts; it "
+        f"is dropped, and a braced argument after it is kept as plain "
+        f"text{uses}")
+
+
+def _unknown_command_reporter(report, file: str, key: str,
+                              tally: Optional[Dict[str, list]] = None):
     """For one entry: a field name → the ``on_unknown`` for that field.
 
-    A command is reported once per field, however many times it is used.
+    A command is counted once per field, however many times it is used.
+    Without ``tally`` each is reported at once; with it, each is added to
+    ``tally[command]`` as ``[fields, first location]``, for a caller that
+    reports a whole run in one line per command.
     """
     reported = set()
 
@@ -472,11 +498,13 @@ def _unknown_command_reporter(report, file: str, key: str):
             if (field_name, command) in reported:
                 return
             reported.add((field_name, command))
-            report(diagnostic(
-                LATEX_COMMAND_UNKNOWN, file, key, field_name,
-                f"the LaTeX command '\\{command}' is not one sslabdata "
-                "converts; it is dropped, and a braced argument after it is "
-                "kept as plain text"))
+            where = (file, key, field_name)
+            if tally is None:
+                report(unknown_command_diagnostic(command, where))
+            elif command in tally:
+                tally[command][0] += 1
+            else:
+                tally[command] = [1, where]
 
         def failed() -> None:
             report(diagnostic(LATEX_CONVERSION_FAILED, file, key, field_name,
@@ -957,10 +985,16 @@ def entry_to_work(
     source: str = "",
     source_file: str = "",
     report=None,
+    unknown_commands_seen: Optional[Dict[str, list]] = None,
 ) -> Work:
-    """Convert one pybtex Entry to a Work dataclass."""
+    """Convert one pybtex Entry to a Work dataclass.
+
+    Unknown LaTeX commands are reported through ``report``, or added to
+    ``unknown_commands_seen`` when it is given (`_unknown_command_reporter`).
+    """
     report = report if report is not None else _warn
-    unknown_in = _unknown_command_reporter(report, source, bib_id)
+    unknown_in = _unknown_command_reporter(report, source, bib_id,
+                                           unknown_commands_seen)
     fields = entry_fields(bib_id, entry, source, unknown_in)
     identifiers = build_identifiers(fields)
     check_entry_type(fields, source, report)
@@ -985,6 +1019,18 @@ def entry_to_work(
         bibtex=format_bibtex(bib_id, entry, source, report),
         **{name: fields.get(name) for name in FLAT_FIELDS},
     )
+
+
+def _encoding_error(path: str, error: UnicodeDecodeError) -> str:
+    """The one diagnostic for a `.bib` file that is not UTF-8.
+
+    No other encoding is tried: a wrong guess would silently change names.
+    """
+    line = error.object[:error.start].count(b"\n") + 1
+    return diagnostic(ENCODING_INVALID, path, None, None,
+                      f"the file is not UTF-8: byte "
+                      f"0x{error.object[error.start]:02x} on line {line} "
+                      "cannot be read. Save the file as UTF-8.")
 
 
 def _crossref_error(path: str, bib_id: str, parent: str) -> str:
@@ -1049,9 +1095,13 @@ def parse_all_works(
         category = bib_file['category'] if isinstance(bib_file, dict) else bib_file.category
         path = f"{bib_dir}/{name}"
         file_errors: List[str] = []
-        parsed = parse_bibtex_file(path, duplicate_errors=file_errors,
-                                   warnings=warnings,
-                                   redefinitions=redefinitions)
+        try:
+            parsed = parse_bibtex_file(path, duplicate_errors=file_errors,
+                                       warnings=warnings,
+                                       redefinitions=redefinitions)
+        except UnicodeDecodeError as error:
+            fail(_encoding_error(path, error))
+            continue
         for error in file_errors:
             report(error)
         for bib_id, entry in parsed.items():
@@ -1077,9 +1127,16 @@ def parse_all_works(
     if summary:
         warn(summary)
 
+    # One line per unknown command for the whole run: a real bibliography
+    # can use one command in thousands of fields, and a line for each would
+    # bury every other diagnostic.
+    unknown: Dict[str, list] = {}
     works = [
-        entry_to_work(bib_id, entry, category, pdf_base_url, path, name, warn)
+        entry_to_work(bib_id, entry, category, pdf_base_url, path, name, warn,
+                      unknown)
         for path, name, bib_id, entry, category in read
     ]
+    for command, (fields, where) in unknown.items():
+        warn(unknown_command_diagnostic(command, where, fields))
     works.sort(key=lambda w: (w.year is not None, w.year or 0), reverse=True)
     return works
