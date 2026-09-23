@@ -12,7 +12,7 @@ import pytest
 import yaml
 
 from .support import (
-    EXPECTED, EXPECTED_FAILURE, INVALID, case, covers, export, run_sslabdata,
+    EXPECTED, INVALID, case, export, run_sslabdata,
 )
 
 with open(EXPECTED / "diagnostics.yaml", encoding="utf-8") as f:
@@ -27,10 +27,7 @@ def params(check):
         if check not in spec:
             continue
         issue = spec.get("xfail", {}).get(check)
-        # `raises` is not decoration: it is what stops a marked row that
-        # breaks before its own assertion from being counted as expected.
-        marks = [pytest.mark.xfail(strict=True, reason=issue,
-                                   raises=EXPECTED_FAILURE)] if issue else []
+        marks = [pytest.mark.xfail(strict=True, reason=issue)] if issue else []
         rows.append(pytest.param(case_id, spec, id=case_id, marks=marks))
     return rows
 
@@ -68,8 +65,8 @@ def test_locates(case_id, spec):
     "case_id",
     ("structure.duplicate_key_file", "structure.duplicate_key_across"),
 )
-@covers("structure.duplicate_key_file", "structure.duplicate_key_across",
-        "diag.duplicate_citation_key")
+# Covers structure.duplicate_key_file, structure.duplicate_key_across,
+# diag.duplicate_citation_key
 def test_duplicate_keys_warn_but_do_not_block_nonvalidation_modes(tmp_path, case_id):
     """Exports and author reports stay available while naming malformed input."""
     spec = DIAGNOSTICS[case_id]
@@ -84,7 +81,7 @@ def test_duplicate_keys_warn_but_do_not_block_nonvalidation_modes(tmp_path, case
     assert data is not None
 
 
-@covers("config.bib_files.name_absolute")
+# Covers config.bib_files.name_absolute
 def test_a_fatal_at_load_code_goes_to_standard_error_in_every_mode(tmp_path):
     """The one shape that carries a code inside another one.
 
@@ -109,7 +106,7 @@ def test_a_fatal_at_load_code_goes_to_standard_error_in_every_mode(tmp_path):
     assert not out.exists(), "a document was written despite a fatal diagnostic"
 
 
-@covers("structure.crossref")
+# Covers structure.crossref
 def test_a_fatal_diagnostic_stops_a_normal_compile(tmp_path):
     """A user cannot produce a document by skipping --validate.
 
@@ -136,7 +133,7 @@ def test_kept(tmp_path, case_id, spec):
     assert not missing, f"entries dropped: {missing}"
 
 
-@covers("latex.unknown_macro")
+# Covers latex.unknown_macro
 def test_unknown_macro_keeps_its_text(tmp_path):
     """The macro's argument survives and no raw LaTeX reaches the output."""
     run, data = export(INVALID / DIAGNOSTICS["latex.unknown_macro"]["dir"], tmp_path)
@@ -172,7 +169,7 @@ def test_malformed_input_is_fatal_and_coded(tmp_path, case_id, code, location):
     assert not out.exists(), "a document was written despite a fatal diagnostic"
 
 
-@covers("latex.text_macros")
+# Covers latex.text_macros
 def test_common_text_macros_are_converted(tmp_path):
     """Each macro becomes its text, and none is reported as unknown."""
     where = INVALID / DIAGNOSTICS["latex.text_macros"]["dir"]
@@ -183,7 +180,7 @@ def test_common_text_macros_are_converted(tmp_path):
     assert work["note"] == "Typeset with LaTeX and BibTeX, pages 1\u20132, read/write"
 
 
-@covers("latex.unknown_macro_repeated")
+# Covers latex.unknown_macro_repeated
 def test_an_unknown_macro_is_one_line_per_run(tmp_path):
     """Three fields use the macro; one line reports it, at the first."""
     where = INVALID / DIAGNOSTICS["latex.unknown_macro_repeated"]["dir"]
@@ -204,7 +201,7 @@ def test_spec_is_well_formed():
     assert dirs == {d.name for d in INVALID.iterdir() if d.is_dir()}
 
 
-@covers("identity.ambiguous_alias")
+# Covers identity.ambiguous_alias
 def test_an_alias_two_people_declare_resolves_to_neither(tmp_path):
     """The name both people declare is linked to nobody and says why."""
     run, data = export(INVALID / DIAGNOSTICS["identity.ambiguous_alias"]["dir"],

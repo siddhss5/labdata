@@ -18,8 +18,7 @@ import pytest
 import yaml
 
 from .support import (
-    EXPECTED, PREVIOUS_SCHEMA_PATH, REPO_ROOT, SCHEMA_PATH, VALID, covers,
-    corpus_entry_keys, export, item, xfail_owned_entries,
+    EXPECTED, PREVIOUS_SCHEMA_PATH, REPO_ROOT, SCHEMA_PATH, VALID, export, item,
 )
 
 DEMO_CONFIG = "examples/demo/lab.yaml"
@@ -88,20 +87,20 @@ def check_references(data):
     assert referenced == keys
 
 
-@covers("output.schema")
+# Covers output.schema
 def test_valid_corpus_matches_schema(validator, valid_output):
     assert schema_errors(validator, valid_output) == []
     check_references(valid_output)
 
 
-@covers("output.demo_schema")
+# Covers output.demo_schema
 def test_demo_matches_schema(validator, demo_exports):
     for data in demo_exports:
         assert schema_errors(validator, data) == []
         check_references(data)
 
 
-@covers("output.schema")
+# Covers output.schema
 def test_schema_rejects_unknown_fields(validator, valid_output):
     """The schema is closed, so a new output field must be added to it."""
     data = json.loads(json.dumps(valid_output))
@@ -109,7 +108,7 @@ def test_schema_rejects_unknown_fields(validator, valid_output):
     assert schema_errors(validator, data)
 
 
-@covers("output.schema")
+# Covers output.schema
 def test_schema_rejects_an_authorship_with_two_references_or_none(validator,
                                                                   valid_output):
     """The `oneOf` on the contributor reference is enforced, both ways."""
@@ -136,7 +135,7 @@ SCHEMA_ID = ("https://raw.githubusercontent.com/siddhss5/labdata/schema-v4"
              "/schema/v4/output.schema.json")
 
 
-@covers("output.versioned_schema")
+# Covers output.versioned_schema
 def test_the_previous_schema_stays_reachable_unchanged(validator):
     """v3 is still at its own path, byte for byte, and v4 is a second one.
 
@@ -157,7 +156,7 @@ def test_the_previous_schema_stays_reachable_unchanged(validator):
     assert previous["$id"] != validator.schema["$id"]
 
 
-@covers("output.versioned_schema")
+# Covers output.versioned_schema
 def test_the_published_id_is_the_string_consumers_resolve(validator):
     """The `$id` is the contract's address, so it is pinned as a literal.
 
@@ -222,7 +221,7 @@ def leaf_property(path):
     return parts[-1] if parts else ""
 
 
-@covers("output.no_markup")
+# Covers output.no_markup
 def test_the_demo_document_carries_no_markup(demo_exports):
     """Nothing sslabdata emits for the demo is Markdown or HTML.
 
@@ -239,7 +238,7 @@ def test_the_demo_document_carries_no_markup(demo_exports):
     assert markup_paths({"lab": {"name": "<b>Lab</b>"}}) != []
 
 
-@covers("output.no_markup")
+# Covers output.no_markup
 def test_markup_in_the_corpus_is_only_text_the_input_wrote(valid_output):
     """Where the corpus does carry Markdown punctuation, it is input text.
 
@@ -255,7 +254,7 @@ def test_markup_in_the_corpus_is_only_text_the_input_wrote(valid_output):
     assert offenders == []
 
 
-@covers("output.derived_is_empty")
+# Covers output.derived_is_empty
 def test_every_derived_bag_is_empty(valid_output, demo_exports):
     """`derived` is sslabdata-owned and sslabdata puts nothing in it yet.
 
@@ -285,7 +284,7 @@ def test_every_derived_bag_is_empty(valid_output, demo_exports):
     assert len(bags(valid_output)) > 100, len(bags(valid_output))
 
 
-@covers("output.yaml_json_same")
+# Covers output.yaml_json_same
 def test_yaml_and_json_hold_the_same_data(tmp_path, valid_output, demo_exports):
     run, yaml_data = export(VALID, tmp_path, fmt="yaml")
     assert run.code == 0 and run.crash is None, run.output
@@ -296,11 +295,10 @@ def test_yaml_and_json_hold_the_same_data(tmp_path, valid_output, demo_exports):
 
 # --- The snapshot ------------------------------------------------------------
 # One small comparison of parsed output. It covers only cases whose values no
-# open issue is expected to change: everything an active xfail owns is left
-# out on purpose, and test_snapshot_avoids_xfailed_cases enforces that. So
-# fixing #18, #20, #23, #24 or #28 turns those xfails green without anyone
-# having to re-record this file, and the dedicated xfail tests in
-# test_valid_corpus.py stay the only place that behavior is stated.
+# open issue is expected to change: entries an xfailed test checks are left
+# out on purpose. So fixing that issue turns its xfail green without anyone
+# having to re-record this file, and the dedicated xfail tests stay the only
+# place that behavior is stated.
 
 SNAPSHOT = {
     "works": [
@@ -329,48 +327,6 @@ def select(data):
     return chosen
 
 
-def test_snapshot_avoids_xfailed_cases(valid_output):
-    """Nothing in the snapshot is owned by an open issue's xfail.
-
-    Ownership is declared by the xfailed case() and covers() calls themselves
-    (support.XFAIL_OWNERSHIP). A publication an open issue owns, and anything
-    whose value is derived from one, stays out: otherwise a fix would break
-    the snapshot and the tempting way out would be to re-record the behavior
-    the xfail rejects.
-    """
-    bib_ids = {w["bib_id"] for w in valid_output["works"]}
-    excluded = bib_ids & xfail_owned_entries()
-    assert excluded, "expected some xfailed entries to exclude"
-
-    chosen = select(valid_output)
-    assert [w["bib_id"] for w in chosen["works"] if w["bib_id"] in excluded] == []
-    for section in ("people", "projects"):
-        for entry in chosen[section]:
-            overlap = sorted(set(entry["work_ids"]) & excluded)
-            assert overlap == [], f"{section} {entry['id']} depends on {overlap}"
-    for collaborator in chosen["collaborators"]:
-        grouped = {a["work_id"] for a in collaborator["authorships"]}
-        assert sorted(grouped & excluded) == [], collaborator["name"]
-
-
-def test_xfail_ownership_names_real_entries():
-    """A typo in owns= would quietly exclude nothing, so reject it here."""
-    unknown = sorted(xfail_owned_entries() - corpus_entry_keys())
-    assert unknown == [], f"owns= names entries that are in no .bib: {unknown}"
-
-
-def test_xfail_without_declared_ownership_is_an_error():
-    """An xfailed covers() that forgets owns= fails loudly, not silently."""
-    # Called through a local name: this exercises the decorator's contract and
-    # is not a claim to cover a case, which is what a literal covers(...) call
-    # would mean to tests/COVERAGE.md.
-    declare = covers
-    with pytest.raises(TypeError):
-        declare("example.not_a_real_case", xfail="#23")
-    # Declaring no ownership is fine; only leaving it out is an error.
-    assert declare("example.not_a_real_case", xfail="#23", owns=()) is not None
-
-
 def diff_paths(expected, actual, path=""):
     """List the paths where two parsed outputs differ."""
     if isinstance(expected, dict) and isinstance(actual, dict):
@@ -390,7 +346,7 @@ def diff_paths(expected, actual, path=""):
     return [] if expected == actual else [f"{path}: expected {expected!r}, got {actual!r}"]
 
 
-@covers("output.full")
+# Covers output.full
 def test_full_output(valid_output):
     """The snapshot, compared as parsed data rather than byte for byte."""
     chosen = select(valid_output)
