@@ -165,7 +165,8 @@ def valid_pdf_base(tmp_path):
 
 
 # Covers links.pdf.remote_guess
-@pytest.mark.xfail(strict=True, reason="#20: a remote PDF link is not verified")
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="#20: a remote PDF link is not verified")
 def test_remote_pdf_url_not_verified(tmp_path):
     """A remote pdf_base_url gives a link nobody has checked.
 

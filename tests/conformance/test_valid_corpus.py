@@ -421,7 +421,8 @@ LINKS = [
     case("links.note_link_award", "link-note-award", "note",
          Contains("https://example.org/papers/award")),
     case("links.note_link_award", "link-note-award", "award", "Best Paper Award Finalist",
-         marks=pytest.mark.xfail(strict=True, reason="#27: the award field is not read")),
+         marks=pytest.mark.xfail(strict=True, raises=AssertionError,
+                                 reason="#27: the award field is not read")),
 ]
 
 
@@ -571,7 +572,7 @@ PROJECTS = [
     case("projects.multiple", "proj-multiple", "project_ids", ["homebot", "sharedarm"]),
     case("projects.none", "proj-none", "project_ids", []),
     case("projects.keywords", "proj-keywords", "project_ids", Contains("sharedarm"),
-         marks=pytest.mark.xfail(strict=True,
+         marks=pytest.mark.xfail(strict=True, raises=AssertionError,
                                  reason="#28: keywords are not read as project tags")),
 ]
 

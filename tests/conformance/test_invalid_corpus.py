@@ -27,7 +27,9 @@ def params(check):
         if check not in spec:
             continue
         issue = spec.get("xfail", {}).get(check)
-        marks = [pytest.mark.xfail(strict=True, reason=issue)] if issue else []
+        # raises: a row that breaks before its assertion fails rather than xfails.
+        marks = [pytest.mark.xfail(strict=True, reason=issue,
+                                   raises=AssertionError)] if issue else []
         rows.append(pytest.param(case_id, spec, id=case_id, marks=marks))
     return rows
 
