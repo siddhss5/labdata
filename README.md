@@ -331,6 +331,16 @@ run its **Release gate** workflow with the candidate's git ref as
 `sslabdata_ref`. It builds without deploying, and keeps the renderer's toolchain
 out of this repository's CI.
 
+Also run the smoke check over real, messy bibliographies. It compiles each
+`.bib` file under a directory on its own. It must report no crashes and no
+uncoded lines. Review any LaTeX remnants it lists. A local TeX Live installation
+has a directory of such files. Nothing is fetched, and nothing from it is
+committed. It is not in CI because it needs TeX:
+
+```bash
+uv run python tools/smoke.py /usr/local/texlive/2025/texmf-dist/bibtex/bib
+```
+
 ## Dependencies
 
 - **pybtex** — BibTeX parsing
