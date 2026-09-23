@@ -54,38 +54,62 @@ REGISTERED = spec_registry()
 
 # --- No uncoded line, in any mode --------------------------------------------
 
-def corpus_runs():
+def corpus_folders():
     folders = [(REPO_ROOT, "examples/demo/lab.yaml"), (VALID, "lab.yaml")]
     folders += [(d, "lab.yaml") for d in sorted(INVALID.iterdir()) if d.is_dir()]
-    for cwd, config in folders:
-        for mode in ("--validate", "--unresolved", "--output"):
-            for strict in ((), ("--strict",)):
-                for fmt in ("yaml", "json"):
-                    label = f"{cwd.name}:{mode}:{fmt}:{'strict' if strict else 'plain'}"
-                    yield pytest.param(cwd, config, mode, strict, fmt, id=label)
+    return [pytest.param(cwd, config, id="demo" if cwd == REPO_ROOT else cwd.name)
+            for cwd, config in folders]
 
+
+MODES = [(mode, strict, fmt)
+         for mode in ("--validate", "--unresolved", "--output")
+         for strict in ((), ("--strict",))
+         for fmt in ("yaml", "json")]
 
 LINE = re.compile(rf"^(?:Warning: |Error: |Error loading configuration: )?({CODE}) ")
 
 
-@pytest.mark.parametrize("cwd, config, mode, strict, fmt", list(corpus_runs()))
-def test_every_line_on_standard_error_carries_a_code(tmp_path, cwd, config,
-                                                     mode, strict, fmt):
+def uncoded(tmp_path, cwd, config, mode, strict, fmt):
+    """What one run does wrong, one message each; empty when it keeps the rule."""
+    out = tmp_path / f"{'strict' if strict else 'plain'}.{fmt}"
     args = ["--config", config, "--format", fmt, *strict]
-    args += [mode, tmp_path / f"out.{fmt}"] if mode == "--output" else [mode]
+    args += [mode, out] if mode == "--output" else [mode]
     run = run_sslabdata(args, cwd)
-    assert run.crash is None, run.crash
+    if run.crash is not None:
+        return [f"crashed: {run.crash}"]
+    problems = []
     for line in run.stderr.splitlines():
         found = LINE.match(line)
-        assert found and found.group(1) in REGISTERED, line
+        if not (found and found.group(1) in REGISTERED):
+            problems.append(f"uncoded line: {line!r}")
 
     if fmt == "json" and mode != "--output":
-        assert run.stderr == ""
-        records = json.loads(run.stdout)
-        jsonschema.validate(records, spec_schema())
-        assert {r["code"] for r in records} <= REGISTERED
+        if run.stderr:
+            problems.append("standard error is not empty")
+        try:
+            records = json.loads(run.stdout)
+            jsonschema.validate(records, spec_schema())
+        except (ValueError, jsonschema.ValidationError) as e:
+            return problems + [f"not a diagnostics array: {e}"]
+        unregistered = {r["code"] for r in records} - REGISTERED
+        if unregistered:
+            problems.append(f"unregistered codes: {sorted(unregistered)}")
         errors = [r for r in records if r["severity"] == "error"]
-        assert run.code == (1 if errors else 0), records
+        if run.code != (1 if errors else 0):
+            problems.append(f"exit {run.code} with {len(errors)} error record(s)")
+    return problems
+
+
+@pytest.mark.parametrize("cwd, config", corpus_folders())
+def test_every_line_on_standard_error_carries_a_code(tmp_path, cwd, config):
+    """Every mode is run and every failure reported, so one bad mode cannot
+    hide another in the same folder."""
+    failures = []
+    for mode, strict, fmt in MODES:
+        label = " ".join([mode, "--format", fmt, *strict])
+        failures += [f"{config} {label}: {problem}"
+                     for problem in uncoded(tmp_path, cwd, config, mode, strict, fmt)]
+    assert not failures, f"in {cwd}:\n" + "\n".join(failures)
 
 
 # --- --strict ----------------------------------------------------------------

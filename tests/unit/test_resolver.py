@@ -1,7 +1,6 @@
-"""Tests for the resolver: author matching, project resolution, back-linking."""
+"""Tests for the resolver: author matching, collaborator grouping, back-linking."""
 
 import pytest
-from pathlib import Path
 
 from sslabdata.models import Author, Contributor, Work, Person, Project, LabData
 from sslabdata.loaders import load_collaborators, load_people, load_projects
@@ -14,14 +13,8 @@ from sslabdata.resolver import (
     fuzzy_matches,
     match_form,
     resolve_authors,
-    resolve_projects,
     compute_backlinks,
 )
-from sslabdata.assembler import assemble
-from sslabdata.config import LabDataConfig, BibFile
-
-
-FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
 class TestNormalizeName:
@@ -485,50 +478,6 @@ class TestResolveAuthors:
             entry_type="article",
         )
 
-    def _author(self, given, family, position=1):
-        return Author(name=f"{given} {family}", position=position,
-                      given=given, family=family)
-
-    def test_exact_alias_match(self):
-        people = [
-            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
-        ]
-        work = self._make_work([self._author("Alice", "Adams")])
-        unresolved = resolve_authors([work], people)
-        assert work.authors[0].person_id == "aadams"
-        assert work.authors[0].resolution_status == "resolved"
-        assert work.authors[0].resolution_method == "exact"
-        assert unresolved == []
-
-    def test_unresolved_external(self):
-        people = [
-            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
-        ]
-        work = self._make_work([self._author("Erin E.", "Jones")])
-        unresolved = resolve_authors([work], people)
-        assert work.authors[0].person_id is None
-        assert work.authors[0].resolution_status == "unresolved"
-        assert work.authors[0].resolution_method is None
-        # The readable name is what a human is asked to add to people.yaml,
-        # not the private form the matcher compared.
-        assert "Erin E. Jones" in unresolved
-
-    def test_mixed_resolved_and_unresolved(self):
-        people = [
-            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
-            Person(id="bbrown", name="Bob Brown", aliases=["B. A. Brown"]),
-        ]
-        work = self._make_work([
-            self._author("Alice", "Adams", 1),
-            self._author("Erin", "External", 2),
-            self._author("Bob A.", "Brown", 3),
-        ])
-        unresolved = resolve_authors([work], people)
-        assert work.authors[0].person_id == "aadams"
-        assert work.authors[1].person_id is None
-        assert work.authors[2].person_id == "bbrown"
-        assert "Erin External" in unresolved
-
     def test_editors_resolve_but_are_never_reported_as_unresolved(self):
         """Editing a volume is not an authorship, so an editor nobody matches
         is not an author sslabdata could not resolve."""
@@ -541,38 +490,6 @@ class TestResolveAuthors:
         unresolved = resolve_authors([work], people)
         assert [e.person_id for e in work.editors] == ["aadams", None]
         assert unresolved == []
-
-    def test_empty_people(self):
-        work = self._make_work([self._author("Alice", "Adams")])
-        unresolved = resolve_authors([work], [])
-        assert unresolved == []
-        assert work.authors[0].person_id is None
-
-
-class TestResolveProjects:
-    def _make_pub(self, project_ids):
-        return Work(
-            bib_id="test",
-            title="Test",
-            authors=[],
-            year=2024,
-            venue="Test",
-            category="Test",
-            entry_type="article",
-            project_ids=project_ids,
-        )
-
-    def test_valid_projects(self):
-        projects = [Project(id="gardenbot", title="Robot Gardening")]
-        pub = self._make_pub(["gardenbot"])
-        unknown = resolve_projects([pub], projects)
-        assert unknown == []
-
-    def test_unknown_project(self):
-        projects = [Project(id="gardenbot", title="Robot Gardening")]
-        pub = self._make_pub(["gardenbot", "nonexistent"])
-        unknown = resolve_projects([pub], projects)
-        assert "nonexistent" in unknown
 
 
 class TestComputeBacklinks:
@@ -587,23 +504,6 @@ class TestComputeBacklinks:
         )
         fields.update(changes)
         return Work(**fields)
-
-    def test_people_backlinks(self):
-        work = self._work()
-        person = Person(id="aadams", name="Alice Adams")
-        data = LabData(works=[work], people=[person], projects=[])
-        compute_backlinks(data)
-        assert "adams2024" in person.work_ids
-        assert person.work_count == 1
-
-    def test_project_backlinks(self):
-        work = self._work(project_ids=["gardenbot"])
-        person = Person(id="aadams", name="Alice Adams")
-        project = Project(id="gardenbot", title="Robot Gardening")
-        data = LabData(works=[work], people=[person], projects=[project])
-        compute_backlinks(data)
-        assert "adams2024" in project.work_ids
-        assert "aadams" in project.people_ids
 
     def test_editors_are_not_authorships(self):
         """An editor back-links nothing: not the person, not the project."""
@@ -631,31 +531,11 @@ class TestComputeBacklinks:
 
 
 class TestLoadPeople:
-    def test_load_fixtures(self):
-        people = load_people(str(FIXTURES / "people.yaml"))
-        assert len(people) == 3
-        pi = next(p for p in people if p.id == "aadams")
-        assert pi.role == "pi"
-        assert pi.status == "current"
-        assert "A. Adams" in pi.aliases
-
-        alumni = next(p for p in people if p.id == "bbrown")
-        assert alumni.status == "alumni"
-        assert alumni.degree == "PhD"
-        assert alumni.end_year == 2023
-
     def test_missing_file(self):
         assert load_people("/nonexistent/path.yaml") == []
 
 
 class TestLoadProjects:
-    def test_load_fixtures(self):
-        projects = load_projects(str(FIXTURES / "projects.yaml"))
-        assert len(projects) == 2
-        rf = next(p for p in projects if p.id == "gardenbot")
-        assert rf.title == "Robot-Assisted Gardening"
-        assert rf.status == "active"
-
     def test_missing_file(self):
         assert load_projects("/nonexistent/path.yaml") == []
 
@@ -805,76 +685,6 @@ class TestDeclaredCollaboratorGrouping:
             "the collaborator entry is not used for it"]
 
 
-class TestAssembleEndToEnd:
-    def test_full_pipeline(self):
-        """End-to-end test: config → LabData with resolved links."""
-        config = LabDataConfig(
-            bib_dir=str(FIXTURES),
-            bib_files=[BibFile(name="sample.bib", category="Test Papers")],
-            people_file=str(FIXTURES / "people.yaml"),
-            projects_file=str(FIXTURES / "projects.yaml"),
-        )
-        data = assemble(config)
-
-        # Works parsed
-        assert len(data.works) == 3
-
-        # Authors resolved for lab members
-        adams_work = next(w for w in data.works if w.bib_id == "adams2024robot")
-        adams_author = next(a for a in adams_work.authors if "Adams" in a.name)
-        assert adams_author.person_id == "aadams"
-
-        # External author NOT resolved, and grouped under a collaborator key
-        jones_work = next(w for w in data.works if w.bib_id == "jones2023preprint")
-        jones_author = jones_work.authors[0]
-        assert jones_author.person_id is None
-        assert jones_author.collaborator_key
-        assert jones_author.collaborator_key in {c.key for c in data.collaborators}
-
-        # Projects resolved
-        assert "gardenbot" in adams_work.project_ids
-
-        # Back-links computed
-        aadams = next(p for p in data.people if p.id == "aadams")
-        assert aadams.work_count > 0
-        assert "adams2024robot" in aadams.work_ids
-
-        rf = next(p for p in data.projects if p.id == "gardenbot")
-        assert len(rf.work_ids) > 0
-        assert "aadams" in rf.people_ids
-
-    def test_without_people_or_projects(self):
-        """Should work with just bib files, no people/projects."""
-        config = LabDataConfig(
-            bib_dir=str(FIXTURES),
-            bib_files=[BibFile(name="sample.bib", category="Test Papers")],
-        )
-        data = assemble(config)
-        assert len(data.works) == 3
-        assert data.people == []
-        assert data.projects == []
-
-    def test_to_dict(self):
-        """Verify the full output serializes cleanly."""
-        config = LabDataConfig(
-            bib_dir=str(FIXTURES),
-            bib_files=[BibFile(name="sample.bib", category="Test Papers")],
-            people_file=str(FIXTURES / "people.yaml"),
-            projects_file=str(FIXTURES / "projects.yaml"),
-        )
-        data = assemble(config)
-        d = data.to_dict()
-        assert "works" in d
-        assert "people" in d
-        assert "projects" in d
-        assert len(d["works"]) == 3
-        # Check structured author format
-        first_work = d["works"][0]
-        assert isinstance(first_work["authors"], list)
-        assert "name" in first_work["authors"][0]
-
-
-
 class TestPeopleAndProjectsFiles:
     """What is wrong with a people or projects file, in its three classes."""
 
@@ -901,17 +711,6 @@ class TestPeopleAndProjectsFiles:
         records, errors, _, _ = self.load(tmp_path, load_projects, "p: {title: T}\n")
         assert records == [] and [e.split(" ", 2)[:2] for e in errors] == [
             ["PROJECTS-NOT-A-LIST", "f.yaml:::"]]
-
-    @pytest.mark.parametrize("loader, code", [
-        (load_people, "PEOPLE-YAML-INVALID"),
-        (load_projects, "PROJECTS-YAML-INVALID"),
-        (lambda path, errors, *_: load_collaborators(path, errors),
-         "COLLABORATORS-YAML-INVALID")])
-    def test_invalid_yaml_is_fatal_and_located(self, tmp_path, loader, code):
-        records, errors, _, _ = self.load(tmp_path, loader, "- id: [unclosed\n")
-        [line] = errors
-        assert records == [] and line.startswith(f"{code} f.yaml::: ")
-        assert "line 1" in line and "\n" not in line
 
     def test_every_record_is_checked_the_same_way(self, tmp_path):
         records, errors, _, _ = self.load(

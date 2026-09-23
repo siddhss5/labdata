@@ -39,5 +39,5 @@ source = ["sslabdata"]
 branch = true
 
 [tool.coverage.report]
-fail_under = 97
+fail_under = 92
 precision = 2

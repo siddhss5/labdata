@@ -140,10 +140,15 @@ def test_config_people_file_missing(tmp_path):
 
 # Covers config.people_file.missing
 def test_unresolved_without_people_file(tmp_path):
-    """--unresolved says author resolution is not configured, naming people_file."""
-    run = run_sslabdata(["--config", write_variant(tmp_path, people_file=None), "--unresolved"],
-                      VALID)
+    """--unresolved says author resolution is not configured, naming people_file,
+    and --validate lists no author as unresolved when there was nobody to
+    resolve against."""
+    variant = write_variant(tmp_path, people_file=None)
+    run = run_sslabdata(["--config", variant, "--unresolved"], VALID)
     assert "people_file" in run.output
+    assert "All authors resolved" not in run.stdout, run.stdout
+    validate = run_sslabdata(["--config", variant, "--validate"], VALID)
+    assert "Unresolved authors" not in validate.stdout, validate.stdout
 
 
 # Covers config.projects_file.missing

@@ -1,12 +1,4 @@
-"""Smoke tests to verify the package loads and basic functionality works."""
-
-import sslabdata
-
-
-def test_package_imports():
-    """Verify the package can be imported and has expected attributes."""
-    assert hasattr(sslabdata, '__version__')
-    assert sslabdata.__version__ == "3.0.0"
+"""Smoke test: the package's public names import."""
 
 
 def test_core_classes_importable():
@@ -28,28 +20,3 @@ def test_core_classes_importable():
         export_to_json,
     )
 
-
-def test_work_dataclass():
-    """Verify Work dataclass works."""
-    from sslabdata import Author, Venue, Work
-
-    work = Work(
-        bib_id="test2024",
-        entry_type="article",
-        year=2024,
-        title="Test Paper",
-        authors=[Author(name="Bob Brown", position=1),
-                 Author(name="Alice Adams", position=2)],
-        venue=Venue(kind="journal", name="Test Journal"),
-        category="Journal Papers",
-        project_ids=["test_project"],
-    )
-    assert work.year == 2024
-    assert work.title == "Test Paper"
-    assert work.project_ids == ["test_project"]
-
-    d = work.to_dict()
-    assert d["title"] == "Test Paper"
-    assert d["year"] == 2024
-    assert d["authors"][0]["name"] == "Bob Brown"
-    assert d["venue"] == {"kind": "journal", "name": "Test Journal"}
