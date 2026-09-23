@@ -43,11 +43,11 @@ relative to the repository root.
 
 ## Consumer Probes
 
-[`consumers/`](consumers/) holds five small programs that read the emitted
-document and nothing else — an HTML page, a LaTeX CV fragment, a CSL-JSON
-export, an edge list and a BibTeX re-emission. They are falsification tests
-rather than examples to copy: four of them cannot be written against the
-current schema, and that is the point. See [`consumers/README.md`](consumers/README.md).
+[`consumers/`](consumers/) holds three small programs that read the emitted
+document and nothing else — a LaTeX CV fragment, a CSL-JSON export and an edge
+list. They are falsification tests rather than examples to copy: a probe that
+cannot be written from the document alone is a schema bug. See
+[`consumers/README.md`](consumers/README.md).
 
 ## Demo Site
 

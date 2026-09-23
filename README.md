@@ -126,10 +126,9 @@ nothing else:
 The entry is also re-serialized into a `bibtex` field, so fields sslabdata does
 not interpret are still carried. It is a re-serialization, not a copy: field
 order, braces and quoting are normalised and `@string` macros are expanded.
-That every field name in the demo's input reaches a first-class property is
-measured, not asserted: `examples/consumers/bibtex_roundtrip.py` re-emits each
-entry from the document alone and the test behind it fails naming any field
-that reached none.
+`tests/conformance/test_consumer_probes.py` checks that every field of every
+entry in the demo's input reaches the property this table names, with the
+input's own value wherever the input wrote plain text.
 
 ### The `project` tag
 

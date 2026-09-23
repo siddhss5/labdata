@@ -52,11 +52,11 @@ the document; the fix belongs in the schema, not in the consumer. Recovering
 the property from `work.bibtex` does not close the gap, because that
 record is an opaque re-serialization of the entry rather than a set of
 first-class properties (§5), and neither does taking a composed string such
-as `venue` apart. `examples/consumers/` holds five such probes — a plain HTML
-page, a LaTeX CV fragment, a CSL-JSON export, a person/project/work edge list
-and a BibTeX re-emission — each reading the document and nothing else, and
+as `venue` apart. `examples/consumers/` holds three such probes — a LaTeX CV
+fragment, a CSL-JSON export and a person/project/work edge list — each reading
+the document and nothing else, and
 `tests/conformance/test_consumer_probes.py` runs every one of them against the
-demo output. Under `schema_version` 3 four of them could not produce correct
+demo output. Under `schema_version` 3 none of them could produce correct
 output; `schema_version` 4 closed every one of those gaps but one. Their
 failing assertions are marked `xfail(strict=True)` against **the issue that
 owns the missing property**. The last of them was #24's, which asked for two
@@ -503,9 +503,9 @@ rule does not apply to the input itself — only to whatever it produces.
 The fields named in that table and in heading 1 are the complete set sslabdata
 *interprets* from a `.bib` entry; everything else falls in the last row.
 Verified by enumerating the field names `sslabdata/parsers/bibtex.py` looks up,
-and by the field-loss probe of #69, which re-emits a BibTeX entry from the
-document's first-class properties and reports every field name that reached
-none (`tests/COVERAGE.md` row `probe.field_loss`).
+and by looking up every field of every entry in the demo's input in the
+property the document gives it (`tests/COVERAGE.md` row
+`fields.demo_every_field`).
 
 "Not emitted" throughout that table means *not emitted as a property of the
 work*. Every field of the entry, read or not, also survives inside the

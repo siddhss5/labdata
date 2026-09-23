@@ -84,10 +84,10 @@ Every type sslabdata has a venue rule for, plus one it does not.
 | `types.misc_arxiv` | `@misc` with `eprint` | Venue `{kind: repository, name: arXiv}`; the identifier is `identifiers.arxiv` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `types.misc` | `@misc` with no venue fields | Venue is null: nothing names a container, so the work declares none | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `types.unsupported` | `@unpublished`, a type sslabdata has no venue rule for | Warning naming the file, key and type; the entry is kept | `tests/corpus/invalid/unsupported_entry_type/entry.bib` | `test_invalid_corpus.py::test_locates` | pass |
-| `types.incollection` | `@incollection` with `booktitle`, `editor`, `chapter`, `pages`, `publisher`, `series`, `isbn` and `month` | The `booktitle` naming the collection is the venue's name, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
-| `types.inbook` | `@inbook` with `chapter`, `pages`, `publisher`, `address`, `edition` and `isbn` | The `publisher` of the book is a property of the work, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
-| `types.book` | `@book` with `publisher`, `address`, `series`, `edition` and `isbn` | The `publisher` is a property of the work, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
-| `types.manual` | `@manual` with `organization`, `address`, `edition` and `month` | The issuing `organization` is a property of the work, and the round-trip probe can write it back out | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_the_book_entry_types_carry_their_container` | pass |
+| `types.incollection` | `@incollection` with `booktitle`, `editor`, `chapter`, `pages`, `publisher`, `series`, `isbn` and `month` | Kept as an `incollection` work; the `booktitle` naming the collection is the venue's name | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_entries_keep_their_key_and_type`, `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `types.inbook` | `@inbook` with `chapter`, `pages`, `publisher`, `address`, `edition` and `isbn` | Kept as an `inbook` work; the `publisher` of the book is a property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_entries_keep_their_key_and_type`, `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `types.book` | `@book` with `publisher`, `address`, `series`, `edition` and `isbn` | Kept as a `book` work; the `publisher` is a property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_entries_keep_their_key_and_type`, `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `types.manual` | `@manual` with `organization`, `address`, `edition` and `month` | Kept as a `manual` work; the issuing `organization` is a property of the work | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_entries_keep_their_key_and_type`, `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
 
 ## Fields read
 Every BibTeX field sslabdata reads. A field it emits no property for is still
@@ -100,9 +100,9 @@ preserved in the copyable `bibtex` output field.
 | `fields.number` | `number` | The `number` property, keeping BibTeX's name and BibTeX's meaning | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.pages` | `pages` | The `pages` property, as written | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.publisher` | `publisher` | The `publisher` property, converted from LaTeX | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
-| `fields.address` | `address` on an `@incollection` | The `address` property: its value is at a path in the work, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
-| `fields.series` | `series` on an `@incollection` | The `series` property: its value is at a path in the work, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
-| `fields.edition` | `edition` on a `@book` | The `edition` property: its value is at a path in the work, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
+| `fields.address` | `address` on an `@incollection` | The `address` property, with the input's value | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `fields.series` | `series` on an `@incollection` | The `series` property, with the input's value | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `fields.edition` | `edition` on a `@book` | The `edition` property, with the input's value | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
 | `fields.booktitle` | `booktitle` | The venue's name, with a `kind` the entry type decides | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.school` | `school` | The venue's name, with `kind: institution` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
 | `fields.institution` | `institution` | The venue's name, with `kind: institution` | `tests/corpus/valid/structure.bib` | `test_valid_corpus.py::test_structure` | pass |
@@ -115,31 +115,25 @@ preserved in the copyable `bibtex` output field.
 | `fields.unread` | `keywords`, which sslabdata emits no property for | Not dropped: it stays in the `bibtex` field | `tests/corpus/valid/projects.bib` | `test_valid_corpus.py::test_structure` | pass |
 
 ## Fields the demo carries, and the property each reaches
-The fields #69 required a fixture for. Under `schema_version` 3 each of them
-reached no property at all, and these rows recorded the loss; v4 closed it,
-and they now record where each one lands. One row each, and each bound to an
-assertion that the field's own **value** is at some path in the work and that
-the round-trip probe can write the field back out. Every value here is also
-preserved in the `bibtex` record, as `fields.unread` says.
-
-Each row reacts to its own field's value, wherever in the work it lands -- a
-flat property, `identifiers[scheme]`, a parsed `editors` entry, the
-structured `venue` -- and to nothing else. Not to a container that merely
-exists, since `identifiers: {}` and a null flat property are what a work with
-no such field looks like; and not by substring, since `chapter = {9}` and the
-ISBN `978-1-00-000003-5` are on the same work.
-`test_field_presence_reads_the_value_not_the_container` pins both directions:
-which removals turn a row red, and which leave it alone.
+Every field of every demo entry is read from the `.bib` files and looked up
+in the one property SPEC.md §5 gives it: a flat property, `venue.name`,
+`identifiers[scheme]`, the parsed `editors`, or a link whose `origin` is
+`input`. The value must equal the input's wherever the input wrote plain
+text; a value written with LaTeX is converted on the way in, so for those
+only presence is compared. Every value here is also preserved in the
+`bibtex` record, as `fields.unread` says.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `fields.editor` | `editor = {Quinn, Quentin and Silva, Sofia}` on an `@incollection` | Parsed into `editors` beside the authors, name parts and all, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
-| `fields.month` | `month = {March}` | The `month` property, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
-| `fields.chapter` | `chapter = {9}` on an `@inbook` | The `chapter` property, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
-| `fields.isbn` | `isbn` on a `@book` | `identifiers.isbn`, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
-| `fields.organization` | `organization` on a `@manual` | Converted from LaTeX into the `organization` property, and the round-trip probe emits the field | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
-| `fields.issn` | `issn` on an `@article` | `identifiers.issn`, and the round-trip probe emits the field | `examples/demo/bib/journal.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
-| `fields.howpublished` | `howpublished` on a `@misc` | The `howpublished` property, and the round-trip probe emits the field | `examples/demo/bib/other.bib` | `test_consumer_probes.py::test_demo_field_is_in_the_input_and_in_a_property` | pass |
+| `fields.demo_entry_type` | Every entry of the demo, across its four `.bib` files | One work per entry, with the entry's citation key and entry type | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_demo_entries_keep_their_key_and_type` | pass |
+| `fields.demo_every_field` | Every field of every demo entry except `project`, which `fields.project` covers | Reaches its property, equal to the input's value where the input wrote plain text and present where the value carries LaTeX; `eprint` under the scheme `archivePrefix` names, lower-cased; `url` as a link with `origin: input` | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `fields.editor` | `editor = {Quinn, Quentin and Silva, Sofia}` on an `@incollection` | Parsed into `editors` beside the authors, name parts and all, with the input's value | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `fields.month` | `month = {March}` | The `month` property, with the input's value | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `fields.chapter` | `chapter = {9}` on an `@inbook` | The `chapter` property, with the input's value | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `fields.isbn` | `isbn` on a `@book` | `identifiers.isbn`, with the input's value | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `fields.organization` | `organization` on a `@manual` | Converted from LaTeX into the `organization` property, with the input's value | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `fields.issn` | `issn` on an `@article` | `identifiers.issn`, with the input's value | `examples/demo/bib/journal.bib` | `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
+| `fields.howpublished` | `howpublished` on a `@misc` | The `howpublished` property, with the input's value | `examples/demo/bib/other.bib` | `test_consumer_probes.py::test_demo_field_reaches_the_document` | pass |
 
 ## Name forms
 Author names as they appear in `.bib` files. `name` below is the `authors[].name`
@@ -420,17 +414,8 @@ because emitting nulls over an unbounded key set says nothing.
 
 ## Consumer probes
 The probes in `examples/consumers/` read the emitted document and nothing
-else, and run against the demo in CI. The rows here are the two of #69: the
-field-loss probe, which re-emits a BibTeX entry from first-class properties
-and reports every field name that did not reach one, and the identity
+else, and run against the demo in CI. The rows here are the identity
 scenarios asserted over the node and edge sets `graph.py` builds.
-
-The field-loss probe is a **field-loss detector, not a value round trip**:
-LaTeX-to-Unicode conversion is one-way, so comparing values would assert
-something false. Its one ignore set member, `project`, is named on its own in
-the test with the reason it is not a loss: it is sslabdata's own tag field
-rather than a bibliographic one, and it does reach the document, as
-`project_ids`.
 
 The identity rows are filed against **two** issues, because two issues
 promise them. #56 settled a grouping keyed on the normalised full name and
@@ -441,10 +426,6 @@ the collaborator aliases of #24, which is why one row here is still `xfail`.
 
 | Case | Input | Expected | Fixture | Test | Status |
 |---|---|---|---|---|---|
-| `probe.roundtrip_shape` | The demo document | One BibTeX entry per work, keyed and typed from the document, carrying exactly the fields the document can still supply | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_entry_is_well_formed` | pass |
-| `probe.link_origin` | A work whose only link states an `origin` of `input`, `enrichment`, `sidecar`, `derived`, `inferred`, or none at all | The round-trip probe reads the link as the entry's `url` only when the document says it came from the input | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_reads_only_a_link_the_input_supplied` | pass |
-| `probe.field_loss` | Every entry of the demo, across its four `.bib` files | Every field name in a source entry reaches a first-class property, except `project`; the failure names every field lost, by entry and overall | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_loses_no_field` | pass |
-| `probe.eprint_repository` | A work whose `eprint` sits under a repository scheme other than `arxiv`, beside its other identifiers | The round-trip probe writes `eprint` and `archiveprefix` from that scheme rather than from a constant | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_bibtex_roundtrip_reads_the_repository_from_the_scheme` | pass |
 | `probe.identity_fixtures` | The demo document: one external co-author on three works in two spellings, a second with the same first initial and family name on a fourth, and two different people under one written name on a fifth | All four scenarios are present, with the given names kept apart on the authorships and one display name across all of them | `examples/demo/lab.yaml` | `test_consumer_probes.py::test_identity_fixtures_are_present` | pass |
 | `probe.identity_one_person` | `Patel, Priya` on two works and `Patel, P.` on a third | Exactly one contributor in the `collaborator:` namespace touches any of the three works, and it holds exactly those three | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_joins_one_co_author_written_two_ways` | pass |
 | `probe.identity_distinct_people` | `Patel, Pradeep` on a fourth work | Exactly one contributor in the `collaborator:` namespace holds that work, it holds exactly that work, and it shares no contributor with the three above | `examples/demo/bib/books.bib` | `test_consumer_probes.py::test_graph_separates_co_authors_sharing_an_initial` | pass |
