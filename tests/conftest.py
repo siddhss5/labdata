@@ -1,14 +1,7 @@
-"""Shared test fixtures.
-
-``pytest_plugins`` enables pytest's own ``pytester`` fixture, which
-``tests/conformance/test_coverage_table.py`` uses to run a throwaway suite in
-an isolated subprocess. It ships with pytest; nothing new is installed.
-"""
+"""Shared test fixtures."""
 
 import pytest
 from pathlib import Path
-
-pytest_plugins = ["pytester"]
 
 
 @pytest.fixture

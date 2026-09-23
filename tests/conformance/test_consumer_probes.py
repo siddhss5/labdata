@@ -33,10 +33,9 @@ What the static checks catch, and where they stop.
 
 `test_no_probe_imports_sslabdata` and
 `test_no_probe_reads_the_inputs_or_the_reserialized_export` read ordinary
-Python and assume it was written in good faith, in the same spirit as
-`coverage_check.py`. They catch the honest mistake: a probe that imports the
-compiler to get at a value, one that opens an input file beside the document
-it was handed, one that reaches into `publication.bibtex` for a field the
+Python and assume it was written in good faith. They catch the honest
+mistake: a probe that imports the compiler to get at a value, one that opens
+an input file beside the document it was handed, one that reaches into `publication.bibtex` for a field the
 document does not emit. They see `import` and `from ... import` statements,
 string literals the code evaluates, and calls to the bare builtin `open`.
 They do not see `__import__`, `importlib`, `Path.read_text()`, a literal
@@ -59,7 +58,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-from .support import REPO_ROOT, case, covers, export, work
+from .support import REPO_ROOT, case, export, work
 
 
 PROBES = REPO_ROOT / "examples" / "consumers"
@@ -775,7 +774,7 @@ def expected_entry_fields(pub):
             for name, value in values.items() if value}
 
 
-@covers("probe.roundtrip_shape")
+# Covers probe.roundtrip_shape
 def test_bibtex_roundtrip_entry_is_well_formed(probe_output, demo_document):
     """One entry per work, keyed and typed by the document, carrying exactly
     the fields the document can still supply -- matched per work, because a
@@ -809,7 +808,7 @@ def test_bibtex_roundtrip_entry_is_well_formed(probe_output, demo_document):
 IGNORED_SOURCE_FIELDS = ("project",)
 
 
-@covers("probe.field_loss")
+# Covers probe.field_loss
 def test_bibtex_roundtrip_loses_no_field(probe_output, demo_document):
     """Every field name of every source entry reaches a first-class property.
 
@@ -886,7 +885,7 @@ def link_origin_entries(tmp_path_factory, demo_document):
         run_probe("bibtex_roundtrip.py", path))
 
 
-@covers("probe.link_origin")
+# Covers probe.link_origin
 def test_bibtex_roundtrip_reads_only_a_link_the_input_supplied(link_origin_entries):
     """`url` comes back from a link the document attributes to the input, and
     from no other, whatever kind it is filed under.
@@ -932,7 +931,7 @@ def other_repository_entry(tmp_path_factory, demo_document):
     return work_["bib_id"], read_entries(run_probe("bibtex_roundtrip.py", path))
 
 
-@covers("probe.eprint_repository")
+# Covers probe.eprint_repository
 def test_bibtex_roundtrip_reads_the_repository_from_the_scheme(other_repository_entry):
     """`eprint` and `archiveprefix` come from the scheme the document carries.
 
@@ -970,7 +969,7 @@ CONTAINER_FIELDS = {
 }
 
 
-@covers("types.incollection", "types.inbook", "types.book", "types.manual")
+# Covers types.incollection, types.inbook, types.book, types.manual
 def test_the_book_entry_types_carry_their_container(probe_output, demo_document):
     """Each of the four is emitted and the field naming its container reaches
     a property of the work, which the round-trip probe can write back out."""
@@ -1221,7 +1220,7 @@ def authors_named(pub, family, given=None):
             and (given is None or a["given"] == given)]
 
 
-@covers("probe.identity_fixtures")
+# Covers probe.identity_fixtures
 def test_identity_fixtures_are_present(demo_document):
     """The document carries all four scenarios the graph tests assert over.
 
@@ -1296,7 +1295,7 @@ def external_contributors(edges):
     return authored
 
 
-@covers("probe.identity_one_person")
+# Covers probe.identity_one_person
 def test_graph_joins_one_co_author_written_two_ways(probe_output, demo_document):
     """One external person on three works is one contributor, holding exactly
     those three works.
@@ -1316,7 +1315,7 @@ def test_graph_joins_one_co_author_written_two_ways(probe_output, demo_document)
     assert authored[joined[0]] == set(ONE_PERSON_WORKS)
 
 
-@covers("probe.identity_distinct_people")
+# Covers probe.identity_distinct_people
 def test_graph_separates_co_authors_sharing_an_initial(probe_output, demo_document):
     """Two external people who share a first initial and a family name are
     separate contributors, and neither holds any of the other's works.
@@ -1338,7 +1337,7 @@ def test_graph_separates_co_authors_sharing_an_initial(probe_output, demo_docume
     assert set(shared) & set(other) == set()
 
 
-@covers("probe.identity_authorship")
+# Covers probe.identity_authorship
 def test_graph_keeps_two_authorships_written_alike_apart(probe_output, demo_document):
     """Two different people written identically on one work stay two
     authorships of it, told apart by their positions.

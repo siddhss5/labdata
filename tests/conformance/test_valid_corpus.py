@@ -1,14 +1,14 @@
 """Field-level checks on the valid corpus (tests/corpus/valid/).
 
 Each table row is ``case(case_id, bib_key, field_path, expected)`` and checks
-one field of one exported publication. Rows marked ``xfail="#N"`` describe
-the intended behavior, which issue #N delivers.
+one field of one exported publication. Rows with a strict xfail
+mark describe the intended behavior, which the issue in the reason delivers.
 """
 
 import pytest
 
 from .support import (
-    VALID, AllOf, Contains, Excludes, assert_field, case, covers, item, work,
+    VALID, AllOf, Contains, Excludes, assert_field, case, item, work,
 )
 
 
@@ -37,7 +37,7 @@ def test_strings(valid_output, case_id, bib_key, path, expected):
     check_work(valid_output, bib_key, path, expected)
 
 
-@covers("strings.redefined_report")
+# Covers strings.redefined_report
 def test_redefined_strings_reported_once(valid_validate):
     """The three redefined macros are reported together by sslabdata, not one by one.
 
@@ -55,7 +55,7 @@ def test_redefined_strings_reported_once(valid_validate):
     assert summary[0] in warnings
 
 
-@covers("strings.defined_once")
+# Covers strings.defined_once
 def test_macro_defined_once_is_not_reported(valid_validate, valid_export):
     """A macro defined exactly once is used, and nothing is said about it."""
     run, _ = valid_export
@@ -251,7 +251,7 @@ def readable_name_from_parts(contributor):
     return " ".join(part for part in ordered if part)
 
 
-@covers("names.structured")
+# Covers names.structured
 def test_every_readable_name_agrees_with_its_parts(valid_output):
     """Across the whole corpus, the readable name follows from the parts, and
     abbreviates nothing.
@@ -285,7 +285,7 @@ def test_every_readable_name_agrees_with_its_parts(valid_output):
 MARKED_ENTRIES = set(EQUAL_ENTRIES) | {"name-equal-normalized", "name-equal-stacked"}
 
 
-@covers("names.equal_contribution_marker")
+# Covers names.equal_contribution_marker
 def test_only_marked_authors_are_equal_contributors(valid_output):
     """Across the corpus, equal_contribution is set exactly where a marker was.
 
@@ -303,13 +303,13 @@ def test_only_marked_authors_are_equal_contributors(valid_output):
     assert [name for _, name in marked if "*" in name] == []
 
 
-@covers("names.initials_ambiguous")
+# Covers names.initials_ambiguous
 def test_ambiguous_initials_listed(valid_unresolved):
     """An initials-only name that fits two members is listed for a human to resolve."""
     assert "A. Kim" in valid_unresolved.stdout
 
 
-@covers("identity.ambiguous_reported")
+# Covers identity.ambiguous_reported
 def test_ambiguous_name_reported_as_a_located_warning(valid_validate, valid_unresolved):
     """The author that fits both Kims is reported with its file, key and
     position, as a warning: neither mode's exit code moves."""
@@ -324,7 +324,7 @@ def test_ambiguous_name_reported_as_a_located_warning(valid_validate, valid_unre
     assert "Bibliography errors" not in report
 
 
-@covers("identity.suggestion_reported")
+# Covers identity.suggestion_reported
 def test_near_miss_reported_as_a_suggestion(valid_validate, valid_unresolved, valid_output):
     """`Davis, Dave M.` is suggested as ddavis, located, and linked to nobody."""
     for run in (valid_validate, valid_unresolved):
@@ -336,7 +336,7 @@ def test_near_miss_reported_as_a_suggestion(valid_validate, valid_unresolved, va
     assert work(valid_output, "id-fuzzy")["authors"][0]["collaborator_key"]
 
 
-@covers("identity.external")
+# Covers identity.external
 def test_external_author_listed(valid_unresolved, valid_output):
     assert "Quentin Quinn" in valid_unresolved.stdout
     quinn = item(valid_output, "collaborators", "name", "Quentin Quinn")
@@ -421,7 +421,8 @@ LINKS = [
     case("links.note_link_award", "link-note-award", "note",
          Contains("https://example.org/papers/award")),
     case("links.note_link_award", "link-note-award", "award", "Best Paper Award Finalist",
-         xfail="#27"),
+         marks=pytest.mark.xfail(strict=True, raises=AssertionError,
+                                 reason="#27: the award field is not read")),
 ]
 
 
@@ -519,7 +520,7 @@ def test_structure(valid_output, case_id, bib_key, path, expected):
     check_work(valid_output, bib_key, path, expected)
 
 
-@covers("structure.comment_lines", "structure.comment_mentions_command")
+# Covers structure.comment_lines, structure.comment_mentions_command
 def test_comment_lines_raise_no_syntax_error(valid_validate, valid_export):
     """A `%` comment line is ignored, so nothing is said about its prose.
 
@@ -531,7 +532,7 @@ def test_comment_lines_raise_no_syntax_error(valid_validate, valid_export):
         assert "BIB-SYNTAX-ERROR" not in output, output
 
 
-@covers("names.equal_contribution", "names.equal_contribution_escaped")
+# Covers names.equal_contribution, names.equal_contribution_escaped
 def test_documented_latex_commands_are_not_reported_unknown(valid_validate,
                                                             valid_export):
     """`\\textsuperscript{*}` and an escaped `\\*` have documented conversions."""
@@ -540,8 +541,8 @@ def test_documented_latex_commands_are_not_reported_unknown(valid_validate,
         assert "LATEX-COMMAND-UNKNOWN" not in output, output
 
 
-@covers("structure.comment_lines", "structure.comment_entry", "structure.preamble",
-        "structure.comment_mentions_command")
+# Covers structure.comment_lines, structure.comment_entry, structure.preamble,
+# structure.comment_mentions_command
 def test_comments_and_preamble_are_not_works(valid_output):
     structure = {w["bib_id"] for w in valid_output["works"]
                  if w["category"] == "Structure"}
@@ -556,7 +557,7 @@ def test_comments_and_preamble_are_not_works(valid_output):
                 if w["entry_type"] in ("comment", "preamble", "string")]
 
 
-@covers("structure.bom_crlf")
+# Covers structure.bom_crlf
 def test_encoding_fixture_has_bom_and_crlf():
     """Guard the fixture itself: git or an editor must not normalize it."""
     raw = (VALID / "encoding.bib").read_bytes()
@@ -571,7 +572,8 @@ PROJECTS = [
     case("projects.multiple", "proj-multiple", "project_ids", ["homebot", "sharedarm"]),
     case("projects.none", "proj-none", "project_ids", []),
     case("projects.keywords", "proj-keywords", "project_ids", Contains("sharedarm"),
-         xfail="#28"),
+         marks=pytest.mark.xfail(strict=True, raises=AssertionError,
+                                 reason="#28: keywords are not read as project tags")),
 ]
 
 
@@ -580,7 +582,7 @@ def test_projects(valid_output, case_id, bib_key, path, expected):
     check_work(valid_output, bib_key, path, expected)
 
 
-@covers("projects.single", "projects.multiple")
+# Covers projects.single, projects.multiple
 def test_project_backlinks(valid_output):
     homebot = item(valid_output, "projects", "id", "homebot")
     sharedarm = item(valid_output, "projects", "id", "sharedarm")
@@ -742,7 +744,7 @@ def test_output_fields(valid_output, case_id, section, key, value, path, expecte
     assert_field(obj, path, expected, where=f"{section} {value}: ")
 
 
-@covers("output.collaborators.order")
+# Covers output.collaborators.order
 def test_collaborators_order(valid_output):
     """Most recent first, then most works, then name, then key.
 
@@ -770,7 +772,7 @@ def test_collaborators_order(valid_output):
     assert tied[1][1] < tied[2][1], tied
 
 
-@covers("identity.alike_authorships")
+# Covers identity.alike_authorships
 def test_two_authorships_written_alike_stay_apart(valid_output):
     """Two different people written identically on one work stay two records.
 
@@ -854,8 +856,8 @@ def reported_initials_pairs(output, valid_output):
     return pairs
 
 
-@covers("identity.grouping_initials", "identity.grouping_distinct",
-        "identity.grouping_suffix")
+# Covers identity.grouping_initials, identity.grouping_distinct,
+# identity.grouping_suffix
 def test_the_initials_warnings_are_exactly_these_pairs(valid_validate, valid_output):
     """Both directions at once, over the whole corpus.
 
@@ -872,7 +874,7 @@ def test_the_initials_warnings_are_exactly_these_pairs(valid_validate, valid_out
 
 @pytest.mark.parametrize("label,initials,fuller",
                          [pytest.param(*row, id=row[0]) for row in INITIALS_SHADOWS])
-@covers("identity.grouping_initials", "identity.grouping_suffix")
+# Covers identity.grouping_initials, identity.grouping_suffix
 def test_an_initials_only_key_that_could_be_a_fuller_one_is_reported(
         valid_validate, valid_output, label, initials, fuller):
     """Each shape a check over the normalised key would miss.
@@ -893,7 +895,7 @@ def test_an_initials_only_key_that_could_be_a_fuller_one_is_reported(
     assert fuller_entry["key"] in named[0], (label, named[0])
 
 
-@covers("identity.grouping_spellings", "identity.grouping_initials")
+# Covers identity.grouping_spellings, identity.grouping_initials
 def test_grouping_risks_are_reported(valid_validate, valid_output):
     """The two ways the key can be wrong are said out loud, not left silent.
 

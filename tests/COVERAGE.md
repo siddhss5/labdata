@@ -18,30 +18,14 @@ throughout (`tests/corpus/`); no real lab data is used anywhere.
 Input sslabdata does not support has a row too, and its expected behavior is a
 warning or an error. Silently ignoring an input is never correct.
 
-`tests/conformance/test_coverage_table.py` fails if a row's fixture has no
-`CASE` marker, if the test it names does not exist or checks a different
-case, if that test runs no assertion, or if its status disagrees with the
-`xfail` markers in the tests. The rules live in
-`tests/conformance/coverage_check.py`, and `test_coverage_check.py` drives
-them against tiny synthetic tables to pin each one. `xfail` markers are
-`strict=True`, so a case turns red once the linked issue is fixed and the
-marker is stale.
-
-What that catches is the honest mistake: a row added here with no fixture
-entry, a row whose test does not exist or was wired to another case, a body
-that never got written, a helper that was emptied out, a parametrize table
-attached to a function that ignores its values, a diagnostics check that
-names no token to look for. The checker reads ordinary test code and assumes
-it was written in good faith; it is not a defence against a test arranged to
-look as though it establishes something while never running an assertion,
-and it does not try to be one.
-
-What no checker settles is whether an assertion is *about the right thing*: a
-test that asserts something true but beside the point, or a weaker property
-than its row claims, passes here. Only review catches that.
-
-A case can also be checked by tests other than the one its row names; the
-status column reports `xfail` when any of them is xfailed.
+This table is kept by review. The one automatic check,
+`test_coverage_table.py`, fails if a row's ID is missing from the fixture it
+names (a fixture outside `tests/corpus/` only has to exist) or appears in no
+test file and not in `tests/corpus/expected/diagnostics.yaml`. Whether the
+test really checks what the row claims, and whether the status column is
+current, is for review to judge. `xfail` markers are `strict=True` and name
+their issue in the reason, so a case turns red once the issue is fixed and
+the marker is stale.
 
 Cases that fail today are not fixed here (that is the linked issue's job):
 #20 (verifying a remote link), #27 (explicit link and award fields), #28

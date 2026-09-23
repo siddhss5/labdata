@@ -9,13 +9,13 @@ import json
 import pytest
 import yaml
 
-from .support import VALID, case, covers, export, item, run_sslabdata, work, write_variant
+from .support import VALID, case, export, item, run_sslabdata, work, write_variant
 
 
 # --- Config keys: present ----------------------------------------------------
 
-@covers("config.lab.present", "config.bib_dir.present", "config.bib_files.present",
-        "config.site")
+# Covers config.lab.present, config.bib_dir.present, config.bib_files.present,
+# config.site
 def test_config_present(valid_output):
     assert valid_output["lab"]["name"] == "Corpus Lab"
     categories = {w["category"] for w in valid_output["works"]}
@@ -26,18 +26,18 @@ def test_config_present(valid_output):
     assert "site" not in valid_output
 
 
-@covers("config.pdf_base_url.present")
+# Covers config.pdf_base_url.present
 def test_config_pdf_base_url_present(valid_output):
     assert "present.pdf" in work(valid_output, "present")["links"]["pdf"][0]["url"]
 
 
-@covers("config.people_file.present")
+# Covers config.people_file.present
 def test_config_people_file_present(valid_output):
     assert len(valid_output["people"]) == 18
     assert work(valid_output, "name-last-first")["authors"][0]["person_id"] == "aadams"
 
 
-@covers("config.projects_file.present")
+# Covers config.projects_file.present
 def test_config_projects_file_present(valid_output):
     assert [p["id"] for p in valid_output["projects"]] == ["homebot", "sharedarm"]
 
@@ -50,7 +50,7 @@ def person_ids(data):
             for w in data["works"] for a in w["authors"] + w["editors"]]
 
 
-@covers("config.collaborators_file.present", "identity.collaborator_alias")
+# Covers config.collaborators_file.present, identity.collaborator_alias
 def test_config_collaborators_file_present(tmp_path, valid_output):
     """A declared alias joins `Quinn, Quentin` and `Quinn, Q.` into one
     grouping, and changes no `person_id` anywhere."""
@@ -69,7 +69,7 @@ def test_config_collaborators_file_present(tmp_path, valid_output):
     assert person_ids(data) == person_ids(valid_output)
 
 
-@covers("identity.collaborator_alias_is_member")
+# Covers identity.collaborator_alias_is_member
 def test_collaborator_alias_that_is_a_member_is_reported(tmp_path, valid_output):
     """`A. Adams` is also a member's alias: reported as a warning in both
     reporting modes, neither exit code moves, and the member keeps it."""
@@ -97,7 +97,7 @@ def test_collaborator_alias_that_is_a_member_is_reported(tmp_path, valid_output)
 
 # --- Config keys: missing (optional keys) ------------------------------------
 
-@covers("config.lab.missing")
+# Covers config.lab.missing
 def test_config_lab_missing(tmp_path):
     """The header is always emitted, so `lab: {}` is what no header looks like.
 
@@ -114,7 +114,7 @@ def test_config_lab_missing(tmp_path):
     assert empty["lab"] == {}
 
 
-@covers("config.pdf_base_url.missing")
+# Covers config.pdf_base_url.missing
 def test_config_pdf_base_url_missing(tmp_path):
     """No base configured is a third answer, distinct from `missing`: there is
     no PDF link at all rather than one labelled as absent."""
@@ -125,7 +125,7 @@ def test_config_pdf_base_url_missing(tmp_path):
     assert "pdf" in work(valid_pdf_base(tmp_path), "present")["links"]
 
 
-@covers("config.people_file.missing")
+# Covers config.people_file.missing
 def test_config_people_file_missing(tmp_path):
     run, data = export(VALID, tmp_path, write_variant(tmp_path, people_file=None))
     assert run.code == 0 and run.crash is None, run.output
@@ -138,7 +138,7 @@ def test_config_people_file_missing(tmp_path):
     assert item(data, "collaborators", "name", "Alice Adams")["work_count"] > 1
 
 
-@covers("config.people_file.missing")
+# Covers config.people_file.missing
 def test_unresolved_without_people_file(tmp_path):
     """--unresolved says author resolution is not configured, naming people_file."""
     run = run_sslabdata(["--config", write_variant(tmp_path, people_file=None), "--unresolved"],
@@ -146,7 +146,7 @@ def test_unresolved_without_people_file(tmp_path):
     assert "people_file" in run.output
 
 
-@covers("config.projects_file.missing")
+# Covers config.projects_file.missing
 def test_config_projects_file_missing(tmp_path):
     run, data = export(VALID, tmp_path, write_variant(tmp_path, projects_file=None))
     assert run.code == 0 and run.crash is None, run.output
@@ -164,7 +164,9 @@ def valid_pdf_base(tmp_path):
     return data
 
 
-@covers("links.pdf.remote_guess", xfail="#20", owns=("missing",))
+# Covers links.pdf.remote_guess
+@pytest.mark.xfail(strict=True, raises=AssertionError,
+                   reason="#20: a remote PDF link is not verified")
 def test_remote_pdf_url_not_verified(tmp_path):
     """A remote pdf_base_url gives a link nobody has checked.
 
@@ -183,7 +185,7 @@ def test_remote_pdf_url_not_verified(tmp_path):
 
 # --- CLI flags and output formats --------------------------------------------
 
-@covers("cli.config")
+# Covers cli.config
 def test_cli_config_required():
     run = run_sslabdata(["--validate"], VALID)
     assert run.crash is None
@@ -191,7 +193,7 @@ def test_cli_config_required():
     assert "--config" in run.stderr
 
 
-@covers("cli.config_not_found", "diag.config_not_found")
+# Covers cli.config_not_found, diag.config_not_found
 def test_cli_config_not_found():
     run = run_sslabdata(["--config", "no-such-lab.yaml", "--validate"], VALID)
     assert run.crash is None
@@ -199,7 +201,7 @@ def test_cli_config_not_found():
     assert "no-such-lab.yaml" in run.stderr
 
 
-@covers("cli.mode.required", "diag.mode_required")
+# Covers cli.mode.required, diag.mode_required
 def test_cli_mode_required():
     run = run_sslabdata(["--config", "lab.yaml"], VALID)
     assert run.crash is None
@@ -208,7 +210,7 @@ def test_cli_mode_required():
         assert flag in run.stderr
 
 
-@covers("cli.help")
+# Covers cli.help
 def test_cli_help():
     run = run_sslabdata(["--help"], VALID)
     assert run.code == 0
@@ -231,7 +233,7 @@ def test_cli_format(tmp_path, valid_output, case_id, args, parse):
     assert parse(out.read_text(encoding="utf-8")) == valid_output
 
 
-@covers("cli.format.invalid", "diag.format_invalid")
+# Covers cli.format.invalid, diag.format_invalid
 def test_cli_format_invalid(tmp_path):
     run = run_sslabdata(["--config", "lab.yaml", "--format", "xml", "--output",
                        tmp_path / "lab.xml"], VALID)
@@ -240,7 +242,7 @@ def test_cli_format_invalid(tmp_path):
     assert not (tmp_path / "lab.xml").exists()
 
 
-@covers("cli.output", "diag.wrote")
+# Covers cli.output, diag.wrote
 def test_cli_output_creates_parent_dirs(tmp_path, valid_output):
     out = tmp_path / "out" / "nested" / "lab.yml"
     run = run_sslabdata(["--config", "lab.yaml", "--output", out], VALID)
@@ -250,7 +252,7 @@ def test_cli_output_creates_parent_dirs(tmp_path, valid_output):
     assert str(len(valid_output["works"])) in run.stdout
 
 
-@covers("cli.validate", "diag.unresolved_authors")
+# Covers cli.validate, diag.unresolved_authors
 def test_cli_validate(valid_validate, valid_output):
     assert valid_validate.crash is None
     assert valid_validate.code == 0, valid_validate.output
@@ -260,7 +262,7 @@ def test_cli_validate(valid_validate, valid_output):
     assert "Quentin Quinn" in valid_validate.stdout
 
 
-@covers("diag.validation_passed")
+# Covers diag.validation_passed
 def test_cli_validate_closes_with_a_summary_line(valid_validate, valid_output):
     """A passing --validate ends with a line of its own, after the counts.
 
@@ -276,7 +278,7 @@ def test_cli_validate_closes_with_a_summary_line(valid_validate, valid_output):
     assert closing not in lines[:-1], closing
 
 
-@covers("cli.unresolved", "diag.unresolved_authors")
+# Covers cli.unresolved, diag.unresolved_authors
 def test_cli_unresolved(valid_unresolved, valid_output):
     assert valid_unresolved.crash is None
     assert valid_unresolved.code == 0
@@ -286,7 +288,7 @@ def test_cli_unresolved(valid_unresolved, valid_output):
     assert "A. Adams" not in valid_unresolved.stdout
 
 
-@covers("cli.unresolved_none", "diag.all_resolved")
+# Covers cli.unresolved_none, diag.all_resolved
 def test_cli_unresolved_none(tmp_path):
     """Every author resolves: sslabdata says so in one line and lists nobody."""
     variant = write_variant(tmp_path, bib_files=[{"name": "encoding.bib", "category": "E"}])

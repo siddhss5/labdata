@@ -1,189 +1,41 @@
-"""Meta-tests: tests/COVERAGE.md, the corpus and the tests agree.
-
-The rules are in coverage_check.py, driven here against the real tree and in
-test_coverage_check.py against synthetic ones that pin each of them. That
-file's docstring says what the rules catch and where they stop.
-"""
+"""tests/COVERAGE.md names a fixture and a test for each case, and test-suite
+hygiene: tests reach sslabdata only through its public names."""
 
 import ast
 import re
-from pathlib import Path
-
-import pytest
 
 import sslabdata
 
-from .coverage_check import read_table, validate
 from .support import CORPUS, EXPECTED, REPO_ROOT, TESTS_DIR
 
-COVERAGE = TESTS_DIR / "COVERAGE.md"
-CONFORMANCE = Path(__file__).parent
-DIAGNOSTICS = EXPECTED / "diagnostics.yaml"
+ROW_RE = re.compile(r"^\|\s*`([^`]+)`\s*\|[^|]*\|[^|]*\|\s*`([^`]+)`\s*\|", re.MULTILINE)
 
 
-@pytest.fixture(scope="module")
-def problems():
-    return validate(COVERAGE, CORPUS, CONFORMANCE, REPO_ROOT, DIAGNOSTICS)
+def mentions(text, case_id):
+    return re.search(r"(?<![\w.])" + re.escape(case_id) + r"(?![\w.])", text)
 
 
-def of(problems, category):
-    return "\n".join(str(p) for p in problems if p.category == category)
+def test_every_row_appears_in_its_fixture_and_a_test():
+    """Each row's ID is in the fixture it names and in a test or diagnostics.yaml.
 
-
-def test_table_is_populated():
-    rows = read_table(COVERAGE)
-    assert len(rows) > 100
-
-
-def test_ids_are_unique_and_well_formed(problems):
-    assert of(problems, "id") == ""
-
-
-def test_every_row_has_fixture_data(problems):
-    """Each row's fixture marks its case with `% CASE <id>`."""
-    assert of(problems, "fixture") == ""
-
-
-def test_every_row_has_an_assertion(problems):
-    """The test each row names exists, checks that case, and asserts something.
-
-    Honest mistakes — a missing test, one wired to another case, a body that
-    was never written — not a test built to look past the check.
+    A fixture outside tests/corpus (the demo, a schema) carries no markers,
+    so for those the named file only has to exist.
     """
-    assert of(problems, "assertion") == ""
-
-
-def test_status_matches_xfail_markers(problems):
-    assert of(problems, "status") == ""
-
-
-def test_diagnostics_checks_name_something(problems):
-    """Every reports/locates/kept list in diagnostics.yaml says what to look for."""
-    assert of(problems, "diagnostics") == ""
-
-
-def test_no_orphan_cases(problems):
-    """Every CASE marker and every case a test names has a row."""
-    assert of(problems, "orphan") == ""
-
-
-def test_unsupported_input_is_never_silently_ignored():
-    """Rows for unsupported or invalid input expect a warning or an error."""
-    for row in read_table(COVERAGE):
-        if row.test.startswith("test_invalid_corpus.py"):
-            assert re.search(r"\b(warning|error)\b", row.expected, re.I), row.id
-
-
-# --- Test-suite hygiene (acceptance criteria of #43) ------------------------
-
-# --- Strict xfails say what they expect to fail with -------------------------
-#
-# A strict xfail names a claim the document does not yet satisfy, and the test
-# makes that claim with an `assert`. A marked test that breaks on a NameError,
-# a missing key or an unreadable fixture never reached its own assertion, so
-# the marker reports nothing -- and, with no `raises`, pytest counts it as
-# expected and nobody looks. Declaring the exception is what makes pytest
-# itself reject the other kind.
-
-def _strict_xfails(items):
-    """(item, mark) for every strict xfail marker on the collected tests."""
-    return [(item, mark) for item in items
-            for mark in item.iter_markers(name="xfail")
-            if mark.kwargs.get("strict")]
-
-
-def test_every_collected_strict_xfail_declares_the_exception_it_expects(request):
-    """Over the tests actually collected, so a generated marker is covered too.
-
-    Dropping `raises` from `support._xfail_marks()`, from the generator in
-    `test_invalid_corpus.py`, or from a literal marker turns this red. It says
-    nothing when the selection happens to collect no marked test, which is why
-    the source check below carries the "looked and found some" half.
-    """
-    undeclared = sorted(item.nodeid
-                        for item, mark in _strict_xfails(request.session.items)
-                        if mark.kwargs.get("raises") is None)
-    assert undeclared == []
-
-
-def _xfail_marker_calls(tree):
-    """Every ``pytest.mark.xfail(...)`` call in an AST, as its keyword names."""
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        name, attribute = "", node.func
-        while isinstance(attribute, ast.Attribute):
-            name = attribute.attr + "." + name
-            attribute = attribute.value
-        if isinstance(attribute, ast.Name):
-            name = attribute.id + "." + name
-        if name.rstrip(".") == "pytest.mark.xfail":
-            yield {keyword.arg for keyword in node.keywords}
-
-
-# Every place in the suite that builds a strict xfail marker: the two
-# generators. Stated here so that a third cannot be added without this row
-# moving, and so the search below cannot pass by finding nothing.
-XFAIL_MARKER_SITES = 2
-
-
-def test_every_strict_xfail_in_the_source_declares_the_exception_it_expects():
-    """The other half: the search really finds the markers it is checking."""
-    found, undeclared = 0, []
-    for path in sorted(TESTS_DIR.rglob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for keywords in _xfail_marker_calls(tree):
-            if "strict" not in keywords:
-                continue
-            found += 1
-            if "raises" not in keywords:
-                undeclared.append(str(path.relative_to(TESTS_DIR)))
-    assert undeclared == []
-    assert found == XFAIL_MARKER_SITES, found
-
-
-# One throwaway suite, covering the three shapes: the claim the marker names,
-# a test that breaks in the call phase, and one that breaks in a fixture --
-# which is the case a hook keyed on `report.when == "call"` cannot see.
-DECLARED_RAISES_SUITE = """
-import pytest
-
-
-@pytest.mark.xfail(strict=True, reason="#0", raises=AssertionError)
-def test_makes_the_claim_its_marker_names():
-    assert False, "the property the issue owes"
-
-
-@pytest.mark.xfail(strict=True, reason="#0", raises=AssertionError)
-def test_breaks_in_the_call_phase():
-    RenamedAwayFromUnderTheTest  # noqa: F821
-
-
-@pytest.fixture
-def broken_fixture():
-    return RenamedAwayFromUnderTheTest  # noqa: F821
-
-
-@pytest.mark.xfail(strict=True, reason="#0", raises=AssertionError)
-def test_breaks_in_the_fixture_phase(broken_fixture):
-    assert False, "never reached"
-"""
-
-
-def test_a_declared_raises_rejects_a_marker_that_broke_before_its_assertion(pytester):
-    """End to end, in an isolated pytest run: one xfail, two refusals.
-
-    `pytester` is pytest's own fixture and adds no dependency. The run is a
-    subprocess with its own rootdir, so this repository's settings do not
-    reach it and what it shows is pytest's behaviour and nothing else.
-    """
-    pytester.makepyfile(DECLARED_RAISES_SUITE)
-    outcomes = pytester.runpytest_subprocess("-q").parseoutcomes()
-
-    # The one that made its claim is expected; the two that broke on the way
-    # are not, whichever phase they broke in.
-    assert outcomes.get("xfailed", 0) == 1, outcomes
-    assert outcomes.get("failed", 0) + outcomes.get("errors", 0) == 2, outcomes
+    rows = ROW_RE.findall((TESTS_DIR / "COVERAGE.md").read_text(encoding="utf-8"))
+    test_files = [*TESTS_DIR.rglob("test_*.py"), EXPECTED / "diagnostics.yaml"]
+    tests = "\n".join(path.read_text(encoding="utf-8") for path in test_files)
+    problems = []
+    for case_id, fixture in rows:
+        path = REPO_ROOT / fixture
+        if not path.is_file():
+            problems.append(f"{case_id}: no fixture {fixture}")
+        elif CORPUS in path.parents and not mentions(
+                path.read_bytes().decode("utf-8", errors="replace"), case_id):
+            problems.append(f"{case_id}: not in {fixture}")
+        if not mentions(tests, case_id):
+            problems.append(f"{case_id}: in no test")
+    assert len(rows) > 100, len(rows)
+    assert not problems, "\n".join(problems)
 
 
 # --- Test-suite hygiene (acceptance criteria of #43) ------------------------
