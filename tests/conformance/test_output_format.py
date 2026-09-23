@@ -100,6 +100,18 @@ def test_demo_matches_schema(validator, demo_exports):
         check_references(data)
 
 
+def test_demo_header_and_equal_contribution_markers(demo_exports):
+    """The demo's own header, and the `$^{*}$` it writes on two surnames: both
+    are read as markers, and the marked authors still resolve."""
+    for data in demo_exports:
+        assert data["lab"]["name"] == "Example Lab"
+        authors = item(data, "works", "bib_id", "brown2025tidy")["authors"]
+        assert [(a["family"], a["person_id"], a["equal_contribution"])
+                for a in authors] == [("Brown", "bbrown", True),
+                                      ("Côté", "ccote", True),
+                                      ("Adams", "aadams", False)]
+
+
 # Covers output.schema
 def test_schema_rejects_unknown_fields(validator, valid_output):
     """The schema is closed, so a new output field must be added to it."""
