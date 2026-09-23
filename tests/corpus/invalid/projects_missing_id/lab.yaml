@@ -1,0 +1,7 @@
+# CASE projects.missing_id
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "ok.bib"
+    category: "Papers"
+projects_file: "projects.yaml"

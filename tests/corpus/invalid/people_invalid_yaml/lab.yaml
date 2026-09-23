@@ -1,0 +1,7 @@
+# CASE people.invalid_yaml
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "ok.bib"
+    category: "Papers"
+people_file: "people.yaml"

@@ -1,0 +1,4 @@
+# CASE collaborators.invalid_yaml
+# A tab may not indent YAML.
+- name: "Priya Patel"
+	aliases: ["P. Patel"]

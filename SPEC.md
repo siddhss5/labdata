@@ -146,10 +146,12 @@ the class table below.
 
 > **Target (#80).** An unhandled failure prints a Python traceback and also
 > exits `1`, so `1` does not by itself distinguish a diagnosed error from a
-> crash. A `.bib` file that does not exist and a `year` that is not a number
-> no longer do this (`CONFIG-FILE-NOT-FOUND`, `BIB-YEAR-INVALID`), but a
-> people or projects file that is not valid YAML still does, and so does a
-> `.bib` file that is not UTF-8. Verified by running both.
+> crash. Ordinary malformed input does not do this: a `.bib` file that does
+> not exist or is not UTF-8, a `year` that is not a number, and a people,
+> projects or collaborators file that is not valid YAML or not a list of
+> records are each reported under a code (`CONFIG-FILE-NOT-FOUND`,
+> `BIB-ENCODING-INVALID`, `BIB-YEAR-INVALID`, `PEOPLE-YAML-INVALID` and the
+> rows beside it).
 
 **Diagnostic *prose* is not stable**, though every diagnostic carries a code
 and a location. A message the BibTeX parser raises that is neither a syntax
@@ -178,7 +180,7 @@ without depending on English wording. Codes obey three rules:
    | Class | `--validate` | Every other mode | Codes |
    |---|---|---|---|
    | **Fatal at load** | `Error loading configuration: <CODE> …` (`Error: <CODE> …` for `CONFIG-NOT-FOUND`) on standard error; exits `1` before anything is compiled, so there is no report. | The same. | `CONFIG-BIB-FILE-ABSOLUTE`, `CONFIG-NOT-A-MAPPING`, `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`, `CONFIG-NOT-FOUND`, `CONFIG-UNREADABLE` |
-   | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `CONFIG-FILE-NOT-FOUND`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING` |
+   | **Fatal** | Listed under `Bibliography errors` and counted; exits `1`. | Written to standard error unprefixed; exits `1`, and `--output` writes nothing. | `BIB-CROSSREF-UNSUPPORTED`, `BIB-ENCODING-INVALID`, `CONFIG-FILE-NOT-FOUND`, `PEOPLE-YAML-INVALID`, `PEOPLE-NOT-A-LIST`, `PEOPLE-FIELD-MISSING`, `PROJECTS-YAML-INVALID`, `PROJECTS-NOT-A-LIST`, `PROJECTS-FIELD-MISSING`, `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING` |
    | **Validation error** | Listed under `Bibliography errors` and counted; exits `1`. | Prefixed `Warning: ` on standard error; the run continues and exits `0`. | `BIB-DUPLICATE-KEY`, `RESOLVE-PROJECT-UNKNOWN`, `PEOPLE-ID-DUPLICATE`, `PROJECTS-ID-DUPLICATE` |
    | **Warning** | Listed under `Warnings`; not counted, and does not change the exit code. | Prefixed `Warning: ` on standard error; the run continues. | `BIB-YEAR-MISSING`, `BIB-YEAR-INVALID`, `BIB-STRING-UNDEFINED`, `BIB-SYNTAX-ERROR`, `BIB-VENUE-MISSING`, `BIB-ENTRY-TYPE-UNSUPPORTED`, `LATEX-COMMAND-UNKNOWN`, `ID-GROUPING-SPANS-SPELLINGS`, `ID-GROUPING-INITIALS-AMBIGUOUS`, `RESOLVE-AMBIGUOUS-NAME`, `RESOLVE-SUGGESTION`, `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER`, `PEOPLE-ALIAS-AMBIGUOUS`, `PEOPLE-ROLE-INVALID`, `PEOPLE-STATUS-INVALID`, `PROJECTS-STATUS-INVALID`, `CONFIG-LAB-NAME-MISSING`, `CONFIG-KEY-UNKNOWN`, `CONFIG-BIB-FILES-MISSING`, `BIB-PARSER-MESSAGE`, `LATEX-CONVERSION-FAILED`, `BIB-WRITE-BACK-FAILED`, `BIB-STRING-REDEFINED`, `ID-GROUPING-AMBIGUOUS-DECLARED`, `RESOLVE-UNRESOLVED-NAME` |
 
@@ -233,10 +235,14 @@ Codes in use:
 | `BIB-SYNTAX-ERROR` | Text the BibTeX parser cannot read. Inside an entry, located at that entry and at the field the parser was reading or had just read, which is where an unclosed brace or quote leaves it, or with the field left empty when the error comes before any field; the entry is kept as far as it was read, so that value may hold text meant for later fields. Outside any entry — an `@` that begins no well-formed command — located at the file alone and skipped. A syntax error the parser library raises on a `%` line outside any entry — prose that mentions `@article`, say, which the library reads as the start of a command — is not reported (`sslabdata.parsers.bibtex._on_comment_line()`), so the prose `tests/COVERAGE.md` rows `structure.comment_lines` and `structure.comment_mentions_command` describe says nothing. A **well-formed** command on such a line is read, as it is on `main` and in classic BibTeX, which has no `%` comment outside an entry: `% @article{hidden, …}` is an entry. Whether it should be is #78. The prose gives the line. A warning. |
 | `BIB-VENUE-MISSING` | An `@article` has no `journal`, or an `@inproceedings` has no `booktitle` (`sslabdata.parsers.bibtex.REQUIRED_CONTAINER`). No other entry type is checked. A field present but empty counts as missing. The entry is kept, and its venue is read by the usual rule from any other container field it carries, or is `null`. A warning. |
 | `BIB-ENTRY-TYPE-UNSUPPORTED` | An entry's type is not one sslabdata documents. Those are `@article`, `@inproceedings`, `@conference`, `@proceedings`, `@incollection`, `@inbook`, `@book`, `@phdthesis`, `@mastersthesis`, `@techreport`, `@manual` and `@misc` (`sslabdata.parsers.bibtex.SUPPORTED_TYPES`); `@unpublished` and `@booklet`, for two, are not. Located at `<file>:<key>:entry_type`. The entry is kept, and its venue is read by the field rules alone. A warning. |
-| `LATEX-COMMAND-UNKNOWN` | A text field or a name uses a LaTeX command sslabdata's conversion has no rule for (`sslabdata.parsers.latex.unknown_commands()`): one outside the converter's table and not one of the two whose conversion sslabdata documents, `\textsuperscript{…}`, which becomes its argument, and the escaped star `\*`, which is consumed (`tests/COVERAGE.md` rows `names.equal_contribution` and `names.equal_contribution_escaped`). The command is dropped and a braced argument after it is kept as plain text, so no raw LaTeX reaches the document. Math is not searched. Reported once per field and command. A warning. |
+| `LATEX-COMMAND-UNKNOWN` | A text field or a name uses a LaTeX command sslabdata's conversion has no rule for (`sslabdata.parsers.latex.unknown_commands()`): one outside the converter's table and not one of the two whose conversion sslabdata documents, `\textsuperscript{…}`, which becomes its argument, and the escaped star `\*`, which is consumed (`tests/COVERAGE.md` rows `names.equal_contribution` and `names.equal_contribution_escaped`). The command is dropped and a braced argument after it is kept as plain text, so no raw LaTeX reaches the document. Math is not searched. One line per command for the whole run, however many fields use it: the number of fields, located at the first of them in document order. A warning. |
 | `RESOLVE-PROJECT-UNKNOWN` | A work's `project` field names an id `projects_file` does not define. Located at `<bib_dir>/<file>:<key>:project`, naming the id. The id stays on the work (§5). A validation error. |
-| `PEOPLE-NOT-A-LIST` | `people_file` is not a list of records. Located at the file alone. An empty file is no records, and is not reported. An entry of the list that is not a mapping is not checked, and raises as it does on `main`. Fatal: nothing is emitted from a file that cannot be read as records. |
-| `PEOPLE-FIELD-MISSING` | A person has no `name`, or an empty one. Located at `<people_file>:<id>:name`. The record is not loaded, and the run is fatal: a document cannot carry a person with no name. A person with no `id` is not checked, and raises as it does on `main`. |
+| `PEOPLE-YAML-INVALID` | `people_file` is not valid YAML. Located at the file alone; the prose is the YAML library's own wording, on one line, and gives the line and column. Fatal, as a `lab.yaml` that cannot be read is. |
+| `PEOPLE-NOT-A-LIST` | `people_file` is not a list of records, or an entry of the list is not a mapping. Located at the file alone. An empty file is no records, and is not reported. Fatal: nothing is emitted from a file that cannot be read as records. |
+| `PEOPLE-FIELD-MISSING` | A person has no `id` or no `name`, or an empty one. Located at `<people_file>:<id>:name`, or `<people_file>::id` for a person with no id. The record is not loaded, and the run is fatal: a document cannot carry a person with no id or name. |
+| `PROJECTS-YAML-INVALID`, `PROJECTS-NOT-A-LIST`, `PROJECTS-FIELD-MISSING` | The same three conditions for `projects_file`, checked by the same code (`sslabdata.loaders._records()`). A project needs an `id` and a `title`. Fatal. |
+| `COLLABORATORS-YAML-INVALID`, `COLLABORATORS-NOT-A-LIST`, `COLLABORATORS-FIELD-MISSING` | The same three conditions for `collaborators_file`. A collaborator needs a `name`, and a missing one is located at `<collaborators_file>::name`. Fatal. |
+| `BIB-ENCODING-INVALID` | A `.bib` file is not UTF-8. Located at the file alone; the prose names the first byte that cannot be read and its line. No other encoding is tried, because a wrong guess would silently change names. Fatal: the file's works are not read. |
 | `PEOPLE-ID-DUPLICATE` | Two people declare one `id`. Located at the second. Both are kept, as a repeated citation key is. A validation error. |
 | `PEOPLE-ROLE-INVALID` | A person's `role` is missing, empty or not a string. Located at `<people_file>:<id>:role`. A role is otherwise open: any non-empty string is accepted, so no list of roles is checked. A warning. |
 | `PEOPLE-STATUS-INVALID` | A person's `status` is present and is not `current` or `alumni`. Located at `<people_file>:<id>:status`, naming the value. A missing status reads as `current`. A warning. |
@@ -245,10 +251,10 @@ Codes in use:
 | `PROJECTS-STATUS-INVALID` | A project's `status` is present and is not `active` or `completed`. A missing status reads as `active`. A warning. |
 | `CONFIG-NOT-A-MAPPING` | `lab.yaml` is not a mapping of keys, or is empty. Fatal at load. |
 | `CONFIG-KEY-MISSING` | A required key is absent: `bib_dir`, or the `name` or `category` of a `bib_files` entry (`lab.yaml:bib_files:name`). Fatal at load. |
-| `CONFIG-TYPE-INVALID` | A key has a value of the wrong type: `bib_dir`, `pdf_base_url`, `people_file` or `projects_file` that is not a string, `lab` that is not a mapping, or `bib_files` that is not a list. A `bib_files` entry that is not a mapping, or whose `name` or `category` is not a string, is not checked, and fails or passes as it does on `main`. Fatal at load. |
+| `CONFIG-TYPE-INVALID` | A key has a value of the wrong type: `bib_dir`, `pdf_base_url`, `people_file`, `projects_file` or `collaborators_file` that is not a string, `lab` that is not a mapping, or `bib_files` that is not a list. A `bib_files` entry that is not a mapping, or whose `name` or `category` is not a string, is not checked, and fails or passes as it does on `main`. Fatal at load. |
 | `CONFIG-KEY-UNKNOWN` | `lab.yaml` holds a key sslabdata does not read (`sslabdata.config.KNOWN_KEYS`), such as a misspelt `people_fil`. It is ignored. A warning. |
 | `CONFIG-BIB-FILES-MISSING` | No `bib_files` are configured, absent or empty, so the document has no works. A warning: that can be meant, but it is never silently normal. |
-| `CONFIG-FILE-NOT-FOUND` | A file the configuration names is not there: a `bib_files` entry under `bib_dir` (`lab.yaml:bib_files:name`), `people_file` or `projects_file`. A missing `collaborators_file` is not checked, and reads as no declared collaborators. Named with the path it looked for. Fatal: compiling on would emit a document without that file's works, people or projects. |
+| `CONFIG-FILE-NOT-FOUND` | A file the configuration names is not there: a `bib_files` entry under `bib_dir` (`lab.yaml:bib_files:name`), `people_file`, `projects_file` or `collaborators_file`. Named with the path it looked for. Fatal: compiling on would emit a document without that file's works, people or projects. |
 | `BIB-PARSER-MESSAGE` | The BibTeX parser library raised a message that is neither a syntax error nor an undefined macro — a field repeated within one entry, or a name list it cannot split. The prose is the **library's own wording**, kept as it phrased it. Located at the file, and at the entry key when the library raised it while reading one; the field is left empty. The entry is kept as the library read it. A warning. |
 | `LATEX-CONVERSION-FAILED` | A text field or a name part whose LaTeX the converter could not read at all. Its text is kept as written, with the braces taken off, so it may still hold LaTeX (§2, *Two degraded cases*). Located at the entry and field. A warning. |
 | `BIB-WRITE-BACK-FAILED` | An entry that could not be written back out as BibTeX. Its `bibtex` is `null`. Located at `<file>:<key>:bibtex`. A warning. |
@@ -421,7 +427,10 @@ question to ask about a string, not as a box the string lives in.
 **1. Converted prose — the rule is enforced here.** Prose fields read from
 BibTeX are converted from LaTeX to Unicode by
 `sslabdata.parsers.latex.latex_to_text()`, so `C{\^o}t{\'e}` arrives as `Côté`
-and `\textbf{Best Paper}` arrives as `Best Paper`. Exactly the fields in
+and `\textbf{Best Paper}` arrives as `Best Paper`. Beside the converter's own
+table, a few common text macros have a rule (`sslabdata.parsers.latex._TEXT_MACROS`):
+`\TeX`, `\LaTeX`, `\LaTeXe` and `\BibTeX` become their names, `\emdash` and
+`\endash` their dashes, and `\slash` a `/`. Exactly the fields in
 `sslabdata.parsers.bibtex.TEXT_FIELDS` are converted — `title`, `abstract`,
 `note`, `journal`, `booktitle`, `school`, `institution`, `type`, `series`,
 `publisher`, `address`, `organization` — applied in `entry_fields()`. Name

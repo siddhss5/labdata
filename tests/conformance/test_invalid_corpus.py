@@ -6,11 +6,13 @@ at tokens (file, entry key, field, value) in sslabdata's output, never at exact
 wording or at parser-library messages.
 """
 
+import json
+
 import pytest
 import yaml
 
 from .support import (
-    EXPECTED, EXPECTED_FAILURE, INVALID, covers, export, run_sslabdata,
+    EXPECTED, EXPECTED_FAILURE, INVALID, case, covers, export, run_sslabdata,
 )
 
 with open(EXPECTED / "diagnostics.yaml", encoding="utf-8") as f:
@@ -142,6 +144,54 @@ def test_unknown_macro_keeps_its_text(tmp_path):
     title = next(w["title"] for w in data["works"] if w["bib_id"] == "unknown-macro")
     assert "Strange" in title
     assert "\\" not in title, title
+
+
+@pytest.mark.parametrize("case_id, code, location", [
+    case("structure.not_utf8", "BIB-ENCODING-INVALID", ("./latin1.bib", None, None)),
+    case("people.invalid_yaml", "PEOPLE-YAML-INVALID", ("people.yaml", None, None)),
+    case("projects.invalid_yaml", "PROJECTS-YAML-INVALID", ("projects.yaml", None, None)),
+    case("collaborators.invalid_yaml", "COLLABORATORS-YAML-INVALID",
+         ("collaborators.yaml", None, None)),
+    case("projects.missing_id", "PROJECTS-FIELD-MISSING", ("projects.yaml", None, "id")),
+    case("config.collaborators_file.not_found", "CONFIG-FILE-NOT-FOUND",
+         ("lab.yaml", "collaborators_file", None)),
+    case("config.collaborators_file.wrong_type", "CONFIG-TYPE-INVALID",
+         ("lab.yaml", "collaborators_file", None)),
+])
+def test_malformed_input_is_fatal_and_coded(tmp_path, case_id, code, location):
+    """No traceback; one coded, located record in JSON; nothing written."""
+    where = INVALID / DIAGNOSTICS[case_id]["dir"]
+    run = run_sslabdata(["--config", "lab.yaml", "--validate", "--format", "json"], where)
+    assert run.crash is None and run.code == 1 and run.stderr == "", run.output
+    records = [r for r in json.loads(run.stdout) if r["severity"] == "error"]
+    assert [(r["code"], (r["file"], r["key"], r["field"])) for r in records] == [
+        (code, location)], records
+    out = tmp_path / "lab.json"
+    run = run_sslabdata(["--config", "lab.yaml", "--output", out], where)
+    assert run.crash is None and run.code == 1 and code in run.stderr, run.output
+    assert not out.exists(), "a document was written despite a fatal diagnostic"
+
+
+@covers("latex.text_macros")
+def test_common_text_macros_are_converted(tmp_path):
+    """Each macro becomes its text, and none is reported as unknown."""
+    where = INVALID / DIAGNOSTICS["latex.text_macros"]["dir"]
+    run, data = export(where, tmp_path)
+    assert run.crash is None and "LATEX-COMMAND-UNKNOWN" not in run.stderr, run.output
+    [work] = data["works"]
+    assert work["title"] == "The TeX book 1990\u20142000"
+    assert work["note"] == "Typeset with LaTeX and BibTeX, pages 1\u20132, read/write"
+
+
+@covers("latex.unknown_macro_repeated")
+def test_an_unknown_macro_is_one_line_per_run(tmp_path):
+    """Three fields use the macro; one line reports it, at the first."""
+    where = INVALID / DIAGNOSTICS["latex.unknown_macro_repeated"]["dir"]
+    run = run_sslabdata(["--config", "lab.yaml", "--validate", "--format", "json"], where)
+    assert run.crash is None, run.crash
+    [line] = [r for r in json.loads(run.stdout) if r["code"] == "LATEX-COMMAND-UNKNOWN"]
+    assert (line["file"], line["key"], line["field"]) == ("./macro.bib", "first-use", "title")
+    assert "\\fictionalmacro" in line["message"] and "3 fields" in line["message"]
 
 
 def test_spec_is_well_formed():

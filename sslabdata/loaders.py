@@ -16,13 +16,20 @@ from .diagnostics import diagnostic
 from .models import Person, Project
 
 
-# What can be wrong with a people or projects file, one code per condition
-# and file. A people file that is not a list of records, and a person with no
-# name, cannot be emitted at all, so they fail every mode; a
-# repeated id fails `--validate`, as a repeated citation key does; the rest
-# are warnings.
+# What can be wrong with a people, projects or collaborators file, one code
+# per condition and file. A file that is not valid YAML or not a list of
+# records, and a record missing a field it cannot be emitted without, fail
+# every mode; a repeated id fails `--validate`, as a repeated citation key
+# does; the rest are warnings.
+PEOPLE_YAML_INVALID = "PEOPLE-YAML-INVALID"
 PEOPLE_NOT_A_LIST = "PEOPLE-NOT-A-LIST"
 PEOPLE_FIELD_MISSING = "PEOPLE-FIELD-MISSING"
+PROJECTS_YAML_INVALID = "PROJECTS-YAML-INVALID"
+PROJECTS_NOT_A_LIST = "PROJECTS-NOT-A-LIST"
+PROJECTS_FIELD_MISSING = "PROJECTS-FIELD-MISSING"
+COLLABORATORS_YAML_INVALID = "COLLABORATORS-YAML-INVALID"
+COLLABORATORS_NOT_A_LIST = "COLLABORATORS-NOT-A-LIST"
+COLLABORATORS_FIELD_MISSING = "COLLABORATORS-FIELD-MISSING"
 PEOPLE_ID_DUPLICATE = "PEOPLE-ID-DUPLICATE"
 PEOPLE_ROLE_INVALID = "PEOPLE-ROLE-INVALID"
 PEOPLE_STATUS_INVALID = "PEOPLE-STATUS-INVALID"
@@ -45,44 +52,66 @@ def _to(collected: Optional[List[str]]) -> Callable[[str], None]:
     return report
 
 
-def _records(path: str, errors, diagnostics) -> List[dict]:
-    """The records of one people file that can be emitted.
+def _records(path: str, codes, required, errors) -> List[dict]:
+    """The records of one people, projects or collaborators file that can be
+    emitted, every file checked the same way.
 
+    ``codes`` are the file's YAML-invalid, not-a-list and field-missing
+    codes, and ``required`` the fields a record cannot be emitted without.
     A missing file is not this function's to report (the assembler names the
     configuration key instead) and reads as no records, as does an empty one.
-    A file that is not a list, and a person with no name, are reported and
-    left out; a repeated id is reported and kept, as the parser library keeps
-    a repeated citation key. A record that is not a mapping, or has no `id`,
-    raises as it always has: no contract row covers it yet.
+    A file that is not valid YAML or not a list, a record that is not a
+    mapping and a record missing a required field are reported to
+    ``errors`` and left out.
     """
-    fail, report = _to(errors), _to(diagnostics)
+    yaml_invalid, not_a_list, field_missing = codes
+    fail = _to(errors)
     if not Path(path).exists():
         return []
 
-    with open(path, 'r', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+    except yaml.YAMLError as error:
+        fail(diagnostic(yaml_invalid, path, None, None,
+                        " ".join(str(error).split())))
+        return []
 
     if data is None:
         return []
     if not isinstance(data, list):
-        fail(diagnostic(PEOPLE_NOT_A_LIST, path, None, None,
+        fail(diagnostic(not_a_list, path, None, None,
                         "the file must be a list of records, one per entry; "
                         f"it is a {type(data).__name__}"))
         return []
 
-    records, seen = [], set()
+    records = []
     for number, entry in enumerate(data, start=1):
-        key = entry['id']
-        if entry.get('name') is None or str(entry['name']).strip() == "":
-            fail(diagnostic(PEOPLE_FIELD_MISSING, path, key, 'name',
-                            f"entry {number} has no name"))
+        if not isinstance(entry, dict):
+            fail(diagnostic(not_a_list, path, None, None,
+                            f"entry {number} is a {type(entry).__name__}, "
+                            "not a record"))
             continue
-        if key in seen:
-            report(diagnostic(PEOPLE_ID_DUPLICATE, path, key, 'id',
-                              f"the id '{key}' is declared more than once"))
-        seen.add(key)
+        missing = [name for name in required
+                   if entry.get(name) is None or str(entry[name]).strip() == ""]
+        if missing:
+            fail(diagnostic(field_missing, path, entry.get('id'), missing[0],
+                            f"entry {number} has no {missing[0]}"))
+            continue
         records.append(entry)
     return records
+
+
+def _repeated_ids(records: List[dict], path: str, code: str, report) -> None:
+    """Report each id declared again, at the record that repeats it; both
+    are kept, as the parser library keeps a repeated citation key."""
+    seen = set()
+    for entry in records:
+        key = entry['id']
+        if key in seen:
+            report(diagnostic(code, path, key, 'id',
+                              f"the id '{key}' is declared more than once"))
+        seen.add(key)
 
 
 def load_people(path: str, errors: Optional[List[str]] = None,
@@ -104,7 +133,10 @@ def load_people(path: str, errors: Optional[List[str]] = None,
     """
     warn = _to(warnings)
     people = []
-    for entry in _records(path, errors, diagnostics):
+    records = _records(path, (PEOPLE_YAML_INVALID, PEOPLE_NOT_A_LIST,
+                              PEOPLE_FIELD_MISSING), ('id', 'name'), errors)
+    _repeated_ids(records, path, PEOPLE_ID_DUPLICATE, _to(diagnostics))
+    for entry in records:
         role = entry.get('role')
         if not isinstance(role, str) or not role.strip():
             warn(diagnostic(PEOPLE_ROLE_INVALID, path, entry['id'], 'role',
@@ -148,26 +180,15 @@ def load_projects(path: str, errors: Optional[List[str]] = None,
           website: "https://gardenbot.example.org"
           status: "active"
 
-    A repeated id and an unknown status are reported as `load_people()`
-    reports them. A file that is not a list reads as no projects, and a
-    project with no id or title is not checked here.
+    The file is checked as `load_people()` checks its own; a project needs
+    an id and a title.
     """
-    warn, report = _to(warnings), _to(diagnostics)
-    if not Path(path).exists():
-        return []
-
-    with open(path, 'r', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
-
-    if not data or not isinstance(data, list):
-        return []
-
-    projects, seen = [], set()
-    for entry in data:
-        if entry['id'] in seen:
-            report(diagnostic(PROJECTS_ID_DUPLICATE, path, entry['id'], 'id',
-                              f"the id '{entry['id']}' is declared more than once"))
-        seen.add(entry['id'])
+    warn = _to(warnings)
+    records = _records(path, (PROJECTS_YAML_INVALID, PROJECTS_NOT_A_LIST,
+                              PROJECTS_FIELD_MISSING), ('id', 'title'), errors)
+    _repeated_ids(records, path, PROJECTS_ID_DUPLICATE, _to(diagnostics))
+    projects = []
+    for entry in records:
         status = entry.get('status', 'active')
         if status not in PROJECT_STATUSES:
             warn(diagnostic(PROJECTS_STATUS_INVALID, path, entry['id'],
@@ -196,22 +217,20 @@ class DeclaredCollaborator:
     aliases: List[str] = field(default_factory=list)
 
 
-def load_collaborators(path: str) -> List[DeclaredCollaborator]:
+def load_collaborators(path: str, errors: Optional[List[str]] = None
+                       ) -> List[DeclaredCollaborator]:
     """Load declared external co-authors from a YAML file.
 
     Expected format (list of dicts):
         - name: "Priya Patel"
           aliases: ["P. Patel"]
+
+    The file is checked as `load_people()` checks its own; a collaborator
+    needs a name.
     """
-    if not Path(path).exists():
-        return []
-
-    with open(path, 'r', encoding='utf-8') as f:
-        data = yaml.safe_load(f)
-
-    if not data or not isinstance(data, list):
-        return []
-
+    records = _records(path, (COLLABORATORS_YAML_INVALID,
+                              COLLABORATORS_NOT_A_LIST,
+                              COLLABORATORS_FIELD_MISSING), ('name',), errors)
     return [DeclaredCollaborator(name=entry['name'],
                                  aliases=entry.get('aliases', []))
-            for entry in data]
+            for entry in records]

@@ -102,6 +102,29 @@ latex.unknown_macro:
   locates: [macro.bib, unknown-macro, title]
   kept: [unknown-macro]
 
+# One line for the command, however many fields use it, with the count and
+# the first field in document order.
+latex.unknown_macro_repeated:
+  dir: unknown_macro_repeated
+  exit: any
+  reports: [fictionalmacro, 3 fields]
+  locates: [macro.bib, first-use, title]
+  kept: [first-use, second-use]
+
+# Valid input kept here as a regression case: on its own it must pass with
+# no LATEX-COMMAND-UNKNOWN, and the valid corpus stays unchanged.
+latex.text_macros:
+  dir: common_text_macros
+  exit: ok
+  kept: [text-macros]
+
+# The first byte that is not UTF-8 is on line 6 of latin1.bib.
+structure.not_utf8:
+  dir: bib_not_utf8
+  exit: error
+  reports: [BIB-ENCODING-INVALID, "0xfc"]
+  locates: [latin1.bib, line 6]
+
 # --- Projects, people and identity -------------------------------------------
 
 projects.undefined:
@@ -153,6 +176,30 @@ people.not_a_list:
   exit: error
   locates: [people.yaml]
 
+people.invalid_yaml:
+  dir: people_invalid_yaml
+  exit: error
+  reports: [PEOPLE-YAML-INVALID]
+  locates: [people.yaml, line 5]
+
+projects.invalid_yaml:
+  dir: projects_invalid_yaml
+  exit: error
+  reports: [PROJECTS-YAML-INVALID]
+  locates: [projects.yaml, line 3]
+
+collaborators.invalid_yaml:
+  dir: collaborators_invalid_yaml
+  exit: error
+  reports: [COLLABORATORS-YAML-INVALID]
+  locates: [collaborators.yaml, line 4]
+
+projects.missing_id:
+  dir: projects_missing_id
+  exit: error
+  reports: [PROJECTS-FIELD-MISSING]
+  locates: ["projects.yaml::id"]
+
 identity.ambiguous_alias:
   dir: ambiguous_alias
   exit: any
@@ -173,6 +220,18 @@ config.projects_file.not_found:
   exit: error
   reports: [projects_file]
   locates: [noprojects.yaml]
+
+config.collaborators_file.not_found:
+  dir: collaborators_file_not_found
+  exit: error
+  reports: [CONFIG-FILE-NOT-FOUND, collaborators_file]
+  locates: [nocollaborators.yaml]
+
+config.collaborators_file.wrong_type:
+  dir: config_collaborators_file_type
+  exit: error
+  reports: [CONFIG-TYPE-INVALID]
+  locates: ["lab.yaml:collaborators_file:"]
 
 config.bib_files.not_found:
   dir: bib_file_not_found

@@ -1,0 +1,6 @@
+# CASE structure.not_utf8
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "latin1.bib"
+    category: "Papers"
