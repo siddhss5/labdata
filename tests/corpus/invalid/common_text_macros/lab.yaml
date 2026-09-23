@@ -1,5 +1,6 @@
 # CASE latex.text_macros
-# Fictional invalid input for tests/COVERAGE.md.
+# Fictional regression input for tests/COVERAGE.md: valid, and kept in the
+# invalid corpus so the valid corpus output is unchanged.
 bib_dir: "."
 bib_files:
   - name: "macros.bib"

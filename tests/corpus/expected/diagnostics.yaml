@@ -111,16 +111,19 @@ latex.unknown_macro_repeated:
   locates: [macro.bib, first-use, title]
   kept: [first-use, second-use]
 
+# Valid input kept here as a regression case: on its own it must pass with
+# no LATEX-COMMAND-UNKNOWN, and the valid corpus stays unchanged.
 latex.text_macros:
   dir: common_text_macros
   exit: ok
   kept: [text-macros]
 
+# The first byte that is not UTF-8 is on line 6 of latin1.bib.
 structure.not_utf8:
   dir: bib_not_utf8
   exit: error
-  reports: [BIB-ENCODING-INVALID]
-  locates: [latin1.bib]
+  reports: [BIB-ENCODING-INVALID, "0xfc"]
+  locates: [latin1.bib, line 6]
 
 # --- Projects, people and identity -------------------------------------------
 

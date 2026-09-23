@@ -430,7 +430,7 @@ BibTeX are converted from LaTeX to Unicode by
 and `\textbf{Best Paper}` arrives as `Best Paper`. Beside the converter's own
 table, a few common text macros have a rule (`sslabdata.parsers.latex._TEXT_MACROS`):
 `\TeX`, `\LaTeX`, `\LaTeXe` and `\BibTeX` become their names, `\emdash` and
-`\endash` their dashes, `\slash` a `/`, and `\xspace` nothing. Exactly the fields in
+`\endash` their dashes, and `\slash` a `/`. Exactly the fields in
 `sslabdata.parsers.bibtex.TEXT_FIELDS` are converted — `title`, `abstract`,
 `note`, `journal`, `booktitle`, `school`, `institution`, `type`, `series`,
 `publisher`, `address`, `organization` — applied in `entry_fields()`. Name

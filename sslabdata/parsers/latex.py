@@ -27,7 +27,7 @@ from pylatexenc.latexwalker import LatexMacroNode, LatexMathNode, LatexWalker
 # `The  book 19902000`.
 _TEXT_MACROS = {
     "TeX": "TeX", "LaTeX": "LaTeX", "LaTeXe": "LaTeX2e", "BibTeX": "BibTeX",
-    "emdash": "\u2014", "endash": "\u2013", "slash": "/", "xspace": "",
+    "emdash": "\u2014", "endash": "\u2013", "slash": "/",
 }
 
 # The commands the converter has a rule for. A command outside it is dropped,

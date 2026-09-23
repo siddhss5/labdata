@@ -701,6 +701,9 @@ class TestUnknownCommands:
         value = r"\textbf{a} \'e \v c $\alpha$ \href{http://x_y}{site} 50\%"
         assert unknown_commands(value) == []
 
+    def test_xspace_is_unknown_so_it_never_silently_joins_words(self):
+        assert unknown_commands(r"Foo\xspace bar") == ["xspace"]
+
     def test_each_unknown_command_is_named_once_in_order(self):
         assert unknown_commands(r"\zz{x} \yy \zz") == ["zz", "yy"]
 
