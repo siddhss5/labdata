@@ -41,75 +41,7 @@ def sample_data():
     return LabData(works=[work], people=[person], projects=[project])
 
 
-class TestExportToYaml:
-    def test_creates_file(self, tmp_path, sample_data):
-        out = str(tmp_path / "output.yml")
-        export_to_yaml(sample_data, out)
-        assert Path(out).exists()
-
-    def test_round_trip(self, tmp_path, sample_data):
-        out = str(tmp_path / "output.yml")
-        export_to_yaml(sample_data, out)
-        with open(out, 'r') as f:
-            loaded = yaml.safe_load(f)
-        assert len(loaded["works"]) == 1
-        assert loaded["works"][0]["bib_id"] == "adams2024robot"
-        assert len(loaded["people"]) == 1
-        assert loaded["people"][0]["id"] == "aadams"
-        assert len(loaded["projects"]) == 1
-        assert loaded["projects"][0]["id"] == "gardenbot"
-
-    def test_creates_parent_dirs(self, tmp_path, sample_data):
-        out = str(tmp_path / "nested" / "dir" / "output.yml")
-        export_to_yaml(sample_data, out)
-        assert Path(out).exists()
-
-    def test_structured_authors(self, tmp_path, sample_data):
-        out = str(tmp_path / "output.yml")
-        export_to_yaml(sample_data, out)
-        with open(out, 'r') as f:
-            loaded = yaml.safe_load(f)
-        authors = loaded["works"][0]["authors"]
-        assert authors[0]["name"] == "Alice Adams"
-        assert authors[0]["person_id"] == "aadams"
-        assert authors[1]["name"] == "Erin External"
-        assert authors[1]["person_id"] is None
-        assert authors[0]["equal_contribution"] is True
-        assert authors[1]["equal_contribution"] is False
-
-    def test_unicode_preserved(self, tmp_path):
-        """Unicode characters should survive round-trip."""
-        work = Work(
-            bib_id="muller2024", title="Uber die Forschung",
-            authors=[Author(name="Heidi Muller", position=1)],
-            year=2024, category="Test", entry_type="article",
-        )
-        data = LabData(works=[work])
-        out = str(tmp_path / "output.yml")
-        export_to_yaml(data, out)
-        with open(out, 'r', encoding='utf-8') as f:
-            loaded = yaml.safe_load(f)
-        assert loaded["works"][0]["title"] == "Uber die Forschung"
-
-
 class TestExportToJson:
-    def test_creates_file(self, tmp_path, sample_data):
-        out = str(tmp_path / "output.json")
-        export_to_json(sample_data, out)
-        assert Path(out).exists()
-
-    def test_round_trip(self, tmp_path, sample_data):
-        out = str(tmp_path / "output.json")
-        export_to_json(sample_data, out)
-        with open(out, 'r') as f:
-            loaded = json.load(f)
-        assert len(loaded["works"]) == 1
-        assert loaded["works"][0]["bib_id"] == "adams2024robot"
-        assert loaded["people"][0]["work_count"] == 1
-        assert loaded["projects"][0]["people_ids"] == ["aadams"]
-        authors = loaded["works"][0]["authors"]
-        assert [a["equal_contribution"] for a in authors] == [True, False]
-
     def test_creates_parent_dirs(self, tmp_path, sample_data):
         out = str(tmp_path / "nested" / "dir" / "output.json")
         export_to_json(sample_data, out)

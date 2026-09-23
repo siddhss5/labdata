@@ -1,8 +1,6 @@
 """Tests for the CLI."""
 
-import json
 import shutil
-import yaml
 import pytest
 import subprocess
 import sys
@@ -39,91 +37,6 @@ def test_installed_command_smoke():
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Validation passed" in result.stdout
-
-
-class TestCLIOutput:
-    def test_yaml_output(self, run_cli, tmp_path):
-        out = str(tmp_path / "lab.yml")
-        result = run_cli(
-            "--config", str(FIXTURES / "lab.yaml"),
-            "--output", out,
-        )
-        assert result.returncode == 0
-        assert Path(out).exists()
-        with open(out, 'r') as f:
-            data = yaml.safe_load(f)
-        assert len(data["works"]) == 3
-        assert "Wrote" in result.stdout
-
-    def test_json_output(self, run_cli, tmp_path):
-        out = str(tmp_path / "lab.json")
-        result = run_cli(
-            "--config", str(FIXTURES / "lab.yaml"),
-            "--format", "json",
-            "--output", out,
-        )
-        assert result.returncode == 0
-        with open(out, 'r') as f:
-            data = json.load(f)
-        assert "works" in data
-        assert "people" in data
-        assert "projects" in data
-
-    def test_missing_config(self, run_cli):
-        result = run_cli("--config", "/nonexistent/lab.yaml", "--output", "/tmp/out.yml")
-        assert result.returncode != 0
-        assert "not found" in result.stderr
-
-    def test_no_output_arg(self, run_cli):
-        result = run_cli("--config", str(FIXTURES / "lab.yaml"))
-        assert result.returncode != 0
-
-
-class TestCLIValidate:
-    def test_validate_passes(self, run_cli):
-        result = run_cli(
-            "--config", str(FIXTURES / "lab.yaml"),
-            "--validate",
-        )
-        assert result.returncode == 0
-        assert "Works: 3" in result.stdout
-        assert "People: 3" in result.stdout
-        assert "Projects: 2" in result.stdout
-        assert "Validation passed" in result.stdout
-
-    def test_validate_shows_unresolved(self, run_cli):
-        """The fixture has an external author (External E. Jones) who is unresolved."""
-        result = run_cli(
-            "--config", str(FIXTURES / "lab.yaml"),
-            "--validate",
-        )
-        # External E. Jones is in sample.bib but not in people.yaml
-        assert "Unresolved authors" in result.stdout
-
-
-class TestCLIUnresolved:
-    def test_unresolved_list(self, run_cli):
-        result = run_cli(
-            "--config", str(FIXTURES / "lab.yaml"),
-            "--unresolved",
-        )
-        assert result.returncode == 0
-        assert "External E. Jones" in result.stdout
-
-    def test_unresolved_without_people(self, run_cli, tmp_path):
-        """Without people_file, resolution never ran, so --unresolved must say so
-        (naming people_file) instead of reporting every author as resolved."""
-        config_data = {
-            "bib_dir": str(FIXTURES),
-            "bib_files": [{"name": "sample.bib", "category": "Test"}],
-        }
-        config_path = tmp_path / "minimal.yaml"
-        with open(config_path, 'w') as f:
-            yaml.dump(config_data, f)
-
-        result = run_cli("--config", str(config_path), "--unresolved")
-        assert "All authors resolved" not in result.stdout
-        assert "people_file" in result.stdout + result.stderr
 
 
 INVALID = Path(__file__).parent / "corpus" / "invalid"

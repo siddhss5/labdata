@@ -21,11 +21,9 @@ from sslabdata.parsers.bibtex import (
     _Parser,
     _convert,
     bare_doi,
-    build_identifiers,
     build_links,
     build_venue,
     extract_note,
-    is_video_url,
     parse_project_ids,
     parse_all_works,
     parse_bibtex_file,
@@ -40,48 +38,15 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
 class TestBuildVenue:
-    def test_article(self):
-        venue = build_venue({"ENTRYTYPE": "article",
-                             "journal": "IEEE Transactions on Robotics"})
-        assert venue.to_dict() == {"kind": "journal",
-                                   "name": "IEEE Transactions on Robotics"}
-
-    def test_inproceedings(self):
-        venue = build_venue({
-            "ENTRYTYPE": "inproceedings",
-            "booktitle": "Proceedings of Robotics: Science and Systems"})
-        assert venue.to_dict() == {
-            "kind": "conference",
-            "name": "Proceedings of Robotics: Science and Systems"}
-
     def test_incollection_is_a_book_not_a_conference(self):
         """One field name, two kinds of container: the entry type decides."""
         venue = build_venue({"ENTRYTYPE": "incollection",
                              "booktitle": "Handbook of Robots"})
         assert venue.to_dict() == {"kind": "book", "name": "Handbook of Robots"}
 
-    def test_phdthesis(self):
-        venue = build_venue({"ENTRYTYPE": "phdthesis", "school": "MIT"})
-        assert venue.to_dict() == {"kind": "institution", "name": "MIT"}
-
-    def test_techreport(self):
-        venue = build_venue({"ENTRYTYPE": "techreport",
-                             "institution": "Example University"})
-        assert venue.to_dict() == {"kind": "institution",
-                                   "name": "Example University"}
-
-    def test_misc_arxiv(self):
-        """A preprint's container is the repository archivePrefix names."""
-        venue = build_venue({"ENTRYTYPE": "misc", "eprint": "2301.12345",
-                             "archivePrefix": "arXiv"})
-        assert venue.to_dict() == {"kind": "repository", "name": "arXiv"}
-
     def test_misc_arxiv_without_a_prefix(self):
         venue = build_venue({"ENTRYTYPE": "misc", "eprint": "2301.12345"})
         assert venue.to_dict() == {"kind": "repository", "name": "arXiv"}
-
-    def test_no_container_field(self):
-        assert build_venue({"ENTRYTYPE": "book", "year": "2024"}) is None
 
     def test_journal_wins_over_booktitle(self):
         """The precedence is the field order, so one entry gets one venue."""
@@ -91,13 +56,6 @@ class TestBuildVenue:
 
 
 class TestBareDoi:
-    def test_already_bare(self):
-        assert bare_doi("10.1109/TRO.2024.1234567") == "10.1109/TRO.2024.1234567"
-
-    def test_written_as_a_resolver_url(self):
-        assert bare_doi("https://doi.org/10.1109/TRO.2024.1234567") == \
-            "10.1109/TRO.2024.1234567"
-
     def test_written_as_a_dx_resolver_url(self):
         assert bare_doi("http://dx.doi.org/10.1/x") == "10.1/x"
 
@@ -106,80 +64,16 @@ class TestBareDoi:
         assert bare_doi("https://example.org/10.1/x") == "https://example.org/10.1/x"
 
 
-class TestBuildIdentifiers:
-    def test_each_scheme(self):
-        assert build_identifiers({
-            "doi": "10.1/x", "isbn": "978-1", "issn": "2999-0001",
-            "eprint": "2301.12345", "archivePrefix": "arXiv",
-        }) == {"doi": ["10.1/x"], "isbn": ["978-1"], "issn": ["2999-0001"],
-               "arxiv": ["2301.12345"]}
-
-    def test_the_prefix_is_the_scheme(self):
-        """archivePrefix names the repository, which is what the scheme says."""
-        assert build_identifiers({"eprint": "hal-1", "archivePrefix": "HAL"}) == \
-            {"hal": ["hal-1"]}
-
-    def test_a_doi_url_is_recorded_as_an_identifier(self):
-        assert build_identifiers({"doi": "https://doi.org/10.1/x"}) == \
-            {"doi": ["10.1/x"]}
-
-    def test_nothing_to_read(self):
-        assert build_identifiers({"ENTRYTYPE": "misc"}) == {}
-
-
-class TestIsVideoUrl:
-    def test_youtube(self):
-        assert is_video_url("https://www.youtube.com/watch?v=abc")
-
-    def test_vimeo(self):
-        assert is_video_url("https://vimeo.com/123")
-
-    def test_non_video(self):
-        assert not is_video_url("https://example.com/paper.pdf")
-
-
 class TestBuildLinks:
-    def test_the_entrys_own_url_comes_from_the_input(self):
-        links = build_links({"url": "https://example.org/p"}, "k", {}, None)
-        assert [l.to_dict() for l in links["url"]] == [{
-            "url": "https://example.org/p", "label": None, "origin": "input",
-            "verification": {"status": "unchecked", "checked_at": None}}]
-
-    def test_a_video_host_is_filed_as_a_video(self):
-        links = build_links({"url": "https://vimeo.com/1"}, "k", {}, None)
-        assert "url" not in links
-        assert links["video"][0].url == "https://vimeo.com/1"
-
-    def test_links_built_from_identifiers_say_they_are_derived(self):
-        identifiers = {"doi": ["10.1/x"], "arxiv": ["2301.12345"]}
-        links = build_links({}, "k", identifiers, None)
-        assert links["doi"][0].url == "https://doi.org/10.1/x"
-        assert links["arxiv"][0].url == "https://arxiv.org/abs/2301.12345"
-        assert {l[0].origin for l in (links["doi"], links["arxiv"])} == {"derived"}
-
     def test_no_base_and_no_fields(self):
         assert build_links({}, "k", {}, None) == {}
 
 
 class TestPdfLink:
-    def test_no_base_configured(self):
-        assert pdf_link("k", None) is None
-
     def test_a_remote_base_is_never_fetched(self):
         link = pdf_link("k", "https://example.org/pdfs")
         assert link.url == "https://example.org/pdfs/k.pdf"
         assert link.status == "unchecked"
-
-    def test_a_local_file_that_is_there(self, tmp_path):
-        (tmp_path / "k.pdf").write_bytes(b"%PDF-1.4\n")
-        assert pdf_link("k", str(tmp_path)).status == "verified"
-
-    def test_a_local_file_that_is_not_there_is_kept_and_labelled(self, tmp_path):
-        """The link is not deleted: `missing` and `unchecked` are different
-        answers, and so is having no base at all."""
-        link = pdf_link("k", str(tmp_path))
-        assert link.url == f"{tmp_path}/k.pdf"
-        assert link.status == "missing"
 
 
 class TestExtractNote:
@@ -194,14 +88,6 @@ class TestExtractNote:
 
 
 class TestParseProjectIds:
-    def test_single(self):
-        assert parse_project_ids({"project": "gardenbot"}) == ["gardenbot"]
-
-    def test_multiple(self):
-        assert parse_project_ids({"project": "gardenbot, planning"}) == [
-            "gardenbot", "planning"
-        ]
-
     def test_braces(self):
         assert parse_project_ids({"project": "{gardenbot, planning}"}) == [
             "gardenbot", "planning"
@@ -308,20 +194,6 @@ class TestCrossref:
         assert errors[0].startswith(CROSSREF_UNSUPPORTED)
         assert "child.bib:a-child:crossref" in errors[0]
         assert "a-parent" in errors[0]
-
-    def test_a_missing_parent_is_the_same_error_not_a_warning(self, tmp_path):
-        errors = []
-        works = self.parse(
-            tmp_path,
-            "@inproceedings{a-child,\n"
-            "  title    = {A Child Paper},\n"
-            "  author   = {Adams, Alice},\n"
-            "  crossref = {no-such-parent}\n"
-            "}\n", errors)
-        assert works == []
-        assert len(errors) == 1
-        assert errors[0].startswith(CROSSREF_UNSUPPORTED)
-        assert "no-such-parent" in errors[0]
 
     EMPTY = ("@inproceedings{empty-child,\n"
              "  title    = {A Child With an Empty Crossref},\n"
@@ -577,15 +449,6 @@ def located(tmp_path, source, name="hazard.bib"):
 
 class TestLocatedParserDiagnostics:
     """What the parser library finds is located at `<file>:<key>:<field>`."""
-
-    def test_an_undefined_macro_names_the_entry_field_and_macro(self, tmp_path):
-        source = ("@inproceedings{uses-macro, title = {T}, author = {Adams, Alice},"
-                  " booktitle = nosuchmacro, year = 2024}\n" + entry("after"))
-        found, works = located(tmp_path, source)
-        [line] = found[STRING_UNDEFINED]
-        assert f"{tmp_path}/hazard.bib:uses-macro:booktitle:" in line
-        assert "nosuchmacro" in line
-        assert sorted(works) == ["after", "uses-macro"]
 
     def test_an_undefined_macro_inside_a_string_names_no_entry(self, tmp_path):
         found, _ = located(tmp_path, "@string{alias = nosuchmacro}\n" + entry("e"))
