@@ -4,6 +4,9 @@ import pytest
 
 from sslabdata.models import Author, Contributor, Work, Person, Project, LabData
 from sslabdata.loaders import load_collaborators, load_people, load_projects
+from sslabdata.diagnostics import (
+    CLASSES, FATAL, VALIDATION_ERROR, WARNING, code_of,
+)
 from sslabdata.resolver import (
     normalize_name,
     is_abbreviated,
@@ -248,7 +251,7 @@ class TestMatchingPolicy:
                     year=2024, source_file="w.bib", authors=list(authors),
                     editors=list(editors))
         warnings = []
-        unresolved = resolve_authors([work], people, warnings=warnings,
+        unresolved = resolve_authors([work], people, diagnostics=warnings,
                                      bib_dir="bib")
         return work, unresolved, warnings
 
@@ -532,12 +535,12 @@ class TestComputeBacklinks:
 
 class TestLoadPeople:
     def test_missing_file(self):
-        assert load_people("/nonexistent/path.yaml") == []
+        assert load_people("/nonexistent/path.yaml", []) == []
 
 
 class TestLoadProjects:
     def test_missing_file(self):
-        assert load_projects("/nonexistent/path.yaml") == []
+        assert load_projects("/nonexistent/path.yaml", []) == []
 
 
 class TestLoadCollaborators:
@@ -545,15 +548,15 @@ class TestLoadCollaborators:
         path = tmp_path / "collaborators.yaml"
         path.write_text('- name: "Priya Patel"\n  aliases: ["P. Patel"]\n'
                         '- name: "Quentin Quinn"\n', encoding="utf-8")
-        loaded = load_collaborators(str(path))
+        loaded = load_collaborators(str(path), [])
         assert [(c.name, c.aliases) for c in loaded] == [
             ("Priya Patel", ["P. Patel"]), ("Quentin Quinn", [])]
 
     def test_missing_or_empty_file(self, tmp_path):
-        assert load_collaborators("/nonexistent/path.yaml") == []
+        assert load_collaborators("/nonexistent/path.yaml", []) == []
         empty = tmp_path / "empty.yaml"
         empty.write_text("", encoding="utf-8")
-        assert load_collaborators(str(empty)) == []
+        assert load_collaborators(str(empty), []) == []
 
 
 class TestDeclaredCollaboratorGrouping:
@@ -565,7 +568,7 @@ class TestDeclaredCollaboratorGrouping:
                       year=2020 + i, source_file="w.bib", authors=list(authors))
                  for i, authors in enumerate(authors_by_work)]
         warnings = []
-        resolve_authors(works, people, warnings=warnings, bib_dir="bib")
+        resolve_authors(works, people, diagnostics=warnings, bib_dir="bib")
         entries = declared_collaborators(declared, people, "c.yaml", warnings)
         return works, group_collaborators(works, "bib", warnings, entries, people), warnings
 
@@ -691,10 +694,13 @@ class TestPeopleAndProjectsFiles:
     def load(self, tmp_path, loader, text):
         path = tmp_path / "records.yaml"
         path.write_text(text, encoding="utf-8")
-        errors, diagnostics, warnings = [], [], []
-        records = loader(str(path), errors, diagnostics, warnings)
-        strip = lambda lines: [l.replace(str(path), "f.yaml") for l in lines]
-        return records, strip(errors), strip(diagnostics), strip(warnings)
+        found = []
+        records = loader(str(path), found)
+
+        def of(kind):
+            return [line.replace(str(path), "f.yaml") for line in found
+                    if CLASSES[code_of(line)] == kind]
+        return records, of(FATAL), of(VALIDATION_ERROR), of(WARNING)
 
     def test_an_empty_file_is_no_records(self, tmp_path):
         assert self.load(tmp_path, load_people, "") == ([], [], [], [])
@@ -724,7 +730,7 @@ class TestPeopleAndProjectsFiles:
         _, errors, _, _ = self.load(tmp_path, load_people, "- {name: No Id}\n")
         assert errors == ["PEOPLE-FIELD-MISSING f.yaml::id: entry 1 has no id"]
         declared, errors, _, _ = self.load(
-            tmp_path, lambda path, errors, *_: load_collaborators(path, errors),
+            tmp_path, load_collaborators,
             "- {aliases: [X]}\n- {name: Priya Patel}\n")
         assert [c.name for c in declared] == ["Priya Patel"]
         assert errors == ["COLLABORATORS-FIELD-MISSING f.yaml::name: entry 1 has no name"]
@@ -765,12 +771,6 @@ class TestPeopleAndProjectsFiles:
             tmp_path, load_people, f"- {{id: p, name: P, role: r, status: {status}}}\n")
         assert [w.startswith("PEOPLE-STATUS-INVALID f.yaml:p:status:")
                 for w in warnings] == ([True] if reported else [])
-
-    def test_without_lists_problems_go_to_standard_error(self, tmp_path, capsys):
-        path = tmp_path / "people.yaml"
-        path.write_text("- {id: p}\n", encoding="utf-8")
-        assert load_people(str(path)) == []
-        assert "Warning: PEOPLE-FIELD-MISSING" in capsys.readouterr().err
 
 
 class TestSharedDeclarations:

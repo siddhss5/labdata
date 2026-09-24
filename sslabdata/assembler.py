@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from .config import LabDataConfig, reject_absolute_name
-from .diagnostics import diagnostic
+from .diagnostics import ERROR, diagnostic, in_report_order, severity
 from .models import Author, Collaborator, LabData, Person, Work
 from .parsers.bibtex import parse_all_works
 from .loaders import (
@@ -102,17 +102,29 @@ BIB_FILES_MISSING = "CONFIG-BIB-FILES-MISSING"
 class AssemblyResult:
     """Result of assembling lab data, including diagnostics.
 
-    Three buckets, because three severities are already in use and severity
-    is carried by the run rather than by the code (SPEC.md, *Diagnostic
-    codes*): ``fatal_errors`` fail every mode, ``bibliography_errors`` fail
-    ``--validate``, and ``warnings`` never fail anything.
+    ``diagnostics`` holds every coded diagnostic in report order
+    (`sslabdata.diagnostics.in_report_order()`). Each one's severity is not
+    stored: it depends on the run as well as the code, and
+    `sslabdata.diagnostics.severity()` decides it (SPEC.md, *Diagnostic
+    codes*).
     """
     data: LabData
     unresolved_authors: List[str] = field(default_factory=list)
     unknown_projects: List[str] = field(default_factory=list)
-    bibliography_errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    fatal_errors: List[str] = field(default_factory=list)
+    diagnostics: List[str] = field(default_factory=list)
+
+
+class AssemblyError(ValueError):
+    """Raised by `assemble()` when a diagnostic is fatal, so no document is
+    returned from input sslabdata will not compile from.
+
+    The message is the fatal diagnostics, one per line; ``diagnostics``
+    holds every diagnostic the run found, in report order.
+    """
+
+    def __init__(self, fatal: List[str], diagnostics: List[str]):
+        super().__init__("\n".join(fatal))
+        self.diagnostics = diagnostics
 
 
 def collaborator_key(name_kind: str, normalized: str) -> str:
@@ -225,7 +237,7 @@ class _Grouping:
 
 def declared_collaborators(declared: List[DeclaredCollaborator],
                            people: List[Person], source: str,
-                           warnings: List[str]) -> List[Tuple[str, List[str]]]:
+                           diagnostics: List[str]) -> List[Tuple[str, List[str]]]:
     """The `collaborators_file` entries as ``(normalised name, spellings)``,
     minus any spelling a lab member already declares.
 
@@ -245,7 +257,7 @@ def declared_collaborators(declared: List[DeclaredCollaborator],
                 ("aliases", alias) for alias in collaborator.aliases]:
             owners = members.get(declared_form(name), set())
             if owners:
-                warnings.append(diagnostic(
+                diagnostics.append(diagnostic(
                     COLLABORATOR_ALIAS_IS_MEMBER, source, collaborator.name,
                     field_name,
                     f"'{name}' is also declared by {', '.join(sorted(owners))}; "
@@ -258,7 +270,7 @@ def declared_collaborators(declared: List[DeclaredCollaborator],
 
 
 def group_collaborators(works: List[Work], bib_dir: str,
-                        warnings: List[str],
+                        diagnostics: List[str],
                         declared: Optional[List[Tuple[str, List[str]]]] = None,
                         people: Optional[List[Person]] = None) -> List[Collaborator]:
     """Group every unresolved authorship, and say where the grouping is risky.
@@ -296,7 +308,7 @@ def group_collaborators(works: List[Work], bib_dir: str,
                     kind, grouped_by = PERSONAL, GROUPED_BY_DECLARED
                 elif found.status == AMBIGUOUS and any(
                         i.startswith("collaborator:") for i in ids):
-                    warnings.append(diagnostic(
+                    diagnostics.append(diagnostic(
                         GROUPING_AMBIGUOUS_DECLARED, *where,
                         f"position {author.position}, '{author.name}', fits "
                         "more than one collaborators_file entry, or an entry "
@@ -309,7 +321,7 @@ def group_collaborators(works: List[Work], bib_dir: str,
                 group = groups[key] = _Grouping(key, author, normalized, grouped_by)
             group.add(work, author, where)
 
-    warnings.extend(_grouping_warnings(groups))
+    diagnostics.extend(_grouping_warnings(groups))
 
     # `name` stays the tie-break it was, with `key` appended after it: two
     # keys can carry the same readable name -- a parsed and a brace-protected
@@ -369,6 +381,32 @@ def unresolved_name_diagnostics(works: List[Work], names: List[str],
 def assemble(config: LabDataConfig, diagnostics: bool = False):
     """Main entry point: config → fully resolved LabData.
 
+    Args:
+        config: Lab data configuration
+        diagnostics: If True, return AssemblyResult with diagnostics.
+                     If False (default), return LabData directly, and print
+                     each diagnostic to standard error.
+
+    Raises:
+        AssemblyError: when any diagnostic is fatal, whatever
+            ``diagnostics`` is: a document built from input sslabdata will
+            not compile from is never returned.
+    """
+    result = assemble_result(config)
+    fatal = [line for line in result.diagnostics
+             if severity(line, validating=False, strict=False) == ERROR]
+    if fatal:
+        raise AssemblyError(fatal, result.diagnostics)
+    if diagnostics:
+        return result
+    for message in result.diagnostics:
+        print(f"Warning: {message}", file=sys.stderr)
+    return result.data
+
+
+def assemble_result(config: LabDataConfig) -> AssemblyResult:
+    """The document and every diagnostic, whether or not one is fatal.
+
     1. Parse all BibTeX files into Works
     2. Load people and projects from YAML
     3. Resolve contributor names → person IDs
@@ -376,10 +414,8 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     5. Group the authorships that resolved to nobody
     6. Compute back-links (people→works, projects→works, projects→people)
 
-    Args:
-        config: Lab data configuration
-        diagnostics: If True, return AssemblyResult with diagnostics.
-                     If False (default), return LabData directly.
+    The CLI reads this rather than `assemble()` because it reports a run
+    with fatal diagnostics too; it never writes that run's document.
     """
     # Every configured name, checked before anything is parsed, so a
     # configuration sslabdata will not compile from fails here rather than
@@ -391,17 +427,15 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     for bib_file in config.bib_files:
         reject_absolute_name(getattr(bib_file, 'name', None))
 
-    bibliography_errors: List[str] = []
-    warnings: List[str] = []
-    fatal_errors: List[str] = []
+    found: List[str] = []
     source = config.path or 'lab.yaml'
 
     for key in config.unknown_keys:
-        warnings.append(diagnostic(
+        found.append(diagnostic(
             KEY_UNKNOWN, source, key, None,
             f"'{key}' is not a key sslabdata reads, and is ignored"))
     if not config.bib_files:
-        warnings.append(diagnostic(
+        found.append(diagnostic(
             BIB_FILES_MISSING, source, 'bib_files', None,
             "no bib_files are configured, so the document has no works"))
 
@@ -410,7 +444,7 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     def present(path: Optional[str], key: str, field_name=None) -> bool:
         if not path or Path(path).is_file():
             return True
-        fatal_errors.append(diagnostic(
+        found.append(diagnostic(
             FILE_NOT_FOUND, source, key, field_name,
             f"'{path}' does not exist"))
         return False
@@ -426,26 +460,22 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     works = parse_all_works(
         bib_dir=config.bib_dir,
         bib_files=bib_files,
+        diagnostics=found,
         pdf_base_url=config.pdf_base_url,
-        diagnostics=bibliography_errors,
-        warnings=warnings,
-        errors=fatal_errors,
     )
 
     # Load people and projects
-    lists = dict(errors=fatal_errors, diagnostics=bibliography_errors,
-                 warnings=warnings)
-    people = (load_people(config.people_file, **lists)
+    people = (load_people(config.people_file, found)
               if config.people_file and people_found else [])
-    projects = (load_projects(config.projects_file, **lists)
+    projects = (load_projects(config.projects_file, found)
                 if config.projects_file and projects_found else [])
     if people:
-        warnings.extend(shared_declarations(people, config.people_file))
+        found.extend(shared_declarations(people, config.people_file))
 
     # Resolve
-    unresolved_authors = resolve_authors(works, people, warnings=warnings,
+    unresolved_authors = resolve_authors(works, people, diagnostics=found,
                                          bib_dir=config.bib_dir)
-    unknown_projects = resolve_projects(works, projects, bibliography_errors,
+    unknown_projects = resolve_projects(works, projects, found,
                                         bib_dir=config.bib_dir)
 
     # Group the authorships that resolved to nobody, joining the spellings
@@ -453,9 +483,9 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     declared = None
     if config.collaborators_file and collaborators_found:
         declared = declared_collaborators(
-            load_collaborators(config.collaborators_file, fatal_errors), people,
-            config.collaborators_file, warnings)
-    collaborators = group_collaborators(works, config.bib_dir, warnings,
+            load_collaborators(config.collaborators_file, found), people,
+            config.collaborators_file, found)
+    collaborators = group_collaborators(works, config.bib_dir, found,
                                         declared, people)
 
     # A header a renderer cannot title a page from. A `lab` that is not a
@@ -464,7 +494,7 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     # its own code, so this one is not reported against it.
     if config.lab is None or isinstance(config.lab, dict):
         if not (config.lab or {}).get("name"):
-            warnings.append(diagnostic(
+            found.append(diagnostic(
                 LAB_NAME_MISSING, config.path or 'lab.yaml', "lab", "name",
                 "the lab header declares no name"))
 
@@ -480,18 +510,9 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
     # Back-link
     compute_backlinks(data)
 
-    if diagnostics:
-        return AssemblyResult(
-            data=data,
-            unresolved_authors=unresolved_authors,
-            unknown_projects=unknown_projects,
-            bibliography_errors=bibliography_errors,
-            warnings=warnings,
-            fatal_errors=fatal_errors,
-        )
-
-    # Without a caller to hand them to, every diagnostic still reaches the
-    # user: nothing sslabdata found is dropped because of how it was called.
-    for message in fatal_errors + bibliography_errors + warnings:
-        print(f"Warning: {message}", file=sys.stderr)
-    return data
+    return AssemblyResult(
+        data=data,
+        unresolved_authors=unresolved_authors,
+        unknown_projects=unknown_projects,
+        diagnostics=in_report_order(found),
+    )

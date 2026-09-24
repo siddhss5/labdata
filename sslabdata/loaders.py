@@ -6,10 +6,9 @@ Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
 MIT License - see LICENSE file for details.
 """
 
-import sys
 import yaml
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
+from typing import List
 from pathlib import Path
 
 from .diagnostics import diagnostic
@@ -42,17 +41,7 @@ PERSON_STATUSES = ("current", "alumni")
 PROJECT_STATUSES = ("active", "completed")
 
 
-def _to(collected: Optional[List[str]]) -> Callable[[str], None]:
-    """Report into a list, or to standard error when there is none."""
-    def report(message: str) -> None:
-        if collected is None:
-            print(f"Warning: {message}", file=sys.stderr)
-        else:
-            collected.append(message)
-    return report
-
-
-def _records(path: str, codes, required, errors) -> List[dict]:
+def _records(path: str, codes, required, diagnostics) -> List[dict]:
     """The records of one people, projects or collaborators file that can be
     emitted, every file checked the same way.
 
@@ -62,10 +51,10 @@ def _records(path: str, codes, required, errors) -> List[dict]:
     configuration key instead) and reads as no records, as does an empty one.
     A file that is not valid YAML or not a list, a record that is not a
     mapping and a record missing a required field are reported to
-    ``errors`` and left out.
+    ``diagnostics`` and left out.
     """
     yaml_invalid, not_a_list, field_missing = codes
-    fail = _to(errors)
+    fail = diagnostics.append
     if not Path(path).exists():
         return []
 
@@ -114,9 +103,7 @@ def _repeated_ids(records: List[dict], path: str, code: str, report) -> None:
         seen.add(key)
 
 
-def load_people(path: str, errors: Optional[List[str]] = None,
-                diagnostics: Optional[List[str]] = None,
-                warnings: Optional[List[str]] = None) -> List[Person]:
+def load_people(path: str, diagnostics: List[str]) -> List[Person]:
     """Load people from a YAML file.
 
     Expected format (list of dicts):
@@ -127,15 +114,13 @@ def load_people(path: str, errors: Optional[List[str]] = None,
           status: "current"
           ...
 
-    ``errors``, ``diagnostics`` and ``warnings`` receive what is wrong with
-    the file, in the three classes `sslabdata.assembler.AssemblyResult` keeps;
-    without a list, a problem is printed to standard error.
+    ``diagnostics`` receives what is wrong with the file.
     """
-    warn = _to(warnings)
+    warn = diagnostics.append
     people = []
     records = _records(path, (PEOPLE_YAML_INVALID, PEOPLE_NOT_A_LIST,
-                              PEOPLE_FIELD_MISSING), ('id', 'name'), errors)
-    _repeated_ids(records, path, PEOPLE_ID_DUPLICATE, _to(diagnostics))
+                              PEOPLE_FIELD_MISSING), ('id', 'name'), diagnostics)
+    _repeated_ids(records, path, PEOPLE_ID_DUPLICATE, diagnostics.append)
     for entry in records:
         role = entry.get('role')
         if not isinstance(role, str) or not role.strip():
@@ -168,9 +153,7 @@ def load_people(path: str, errors: Optional[List[str]] = None,
     return people
 
 
-def load_projects(path: str, errors: Optional[List[str]] = None,
-                  diagnostics: Optional[List[str]] = None,
-                  warnings: Optional[List[str]] = None) -> List[Project]:
+def load_projects(path: str, diagnostics: List[str]) -> List[Project]:
     """Load projects from a YAML file.
 
     Expected format (list of dicts):
@@ -183,10 +166,10 @@ def load_projects(path: str, errors: Optional[List[str]] = None,
     The file is checked as `load_people()` checks its own; a project needs
     an id and a title.
     """
-    warn = _to(warnings)
+    warn = diagnostics.append
     records = _records(path, (PROJECTS_YAML_INVALID, PROJECTS_NOT_A_LIST,
-                              PROJECTS_FIELD_MISSING), ('id', 'title'), errors)
-    _repeated_ids(records, path, PROJECTS_ID_DUPLICATE, _to(diagnostics))
+                              PROJECTS_FIELD_MISSING), ('id', 'title'), diagnostics)
+    _repeated_ids(records, path, PROJECTS_ID_DUPLICATE, diagnostics.append)
     projects = []
     for entry in records:
         status = entry.get('status', 'active')
@@ -217,7 +200,7 @@ class DeclaredCollaborator:
     aliases: List[str] = field(default_factory=list)
 
 
-def load_collaborators(path: str, errors: Optional[List[str]] = None
+def load_collaborators(path: str, diagnostics: List[str]
                        ) -> List[DeclaredCollaborator]:
     """Load declared external co-authors from a YAML file.
 
@@ -230,7 +213,7 @@ def load_collaborators(path: str, errors: Optional[List[str]] = None
     """
     records = _records(path, (COLLABORATORS_YAML_INVALID,
                               COLLABORATORS_NOT_A_LIST,
-                              COLLABORATORS_FIELD_MISSING), ('name',), errors)
+                              COLLABORATORS_FIELD_MISSING), ('name',), diagnostics)
     return [DeclaredCollaborator(name=entry['name'],
                                  aliases=entry.get('aliases', []))
             for entry in records]

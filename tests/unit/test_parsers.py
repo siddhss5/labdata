@@ -19,14 +19,12 @@ from sslabdata.parsers.bibtex import (
     YEAR_INVALID,
     YEAR_MISSING,
     _Parser,
-    _convert,
     bare_doi,
     build_links,
     build_venue,
     extract_note,
     parse_project_ids,
     parse_all_works,
-    parse_bibtex_file,
     pdf_link,
 )
 from sslabdata.config import ConfigurationError
@@ -106,6 +104,7 @@ class TestParseAllWorks:
         works = parse_all_works(
             bib_dir=str(FIXTURES),
             bib_files=bib_files,
+            diagnostics=[],
         )
         assert len(works) == 3
         # Should be sorted by year descending
@@ -124,7 +123,7 @@ class TestParseAllWorks:
         warnings = []
         works = parse_all_works(bib_dir=str(tmp_path),
                                 bib_files=[{"name": "y.bib", "category": "T"}],
-                                warnings=warnings)
+                                diagnostics=warnings)
         assert [w.bib_id for w in works] == ["old", "no-year"]
         assert works[-1].year is None
         assert len(warnings) == 1
@@ -149,7 +148,7 @@ class TestSourceFileIsNeverAbsolute:
         # An empty bib_dir with an absolute name still resolves to the file,
         # which is how a name that escapes bib_dir gets read at all.
         return parse_all_works(
-            bib_dir="", warnings=[],
+            bib_dir="", diagnostics=[],
             bib_files=[{"name": str(tmp_path / "journal.bib"),
                         "category": "Journal Papers"}])
 
@@ -184,7 +183,7 @@ class TestCrossref:
         return parse_all_works(
             bib_dir=str(tmp_path),
             bib_files=[{"name": "child.bib", "category": "Test Papers"}],
-            errors=errors)
+            diagnostics=errors)
 
     def test_the_child_is_rejected_and_the_parent_still_compiles(self, tmp_path):
         errors = []
@@ -359,6 +358,7 @@ def read_source(tmp_path, source, name="hazard.bib"):
     return parse_all_works(
         bib_dir=str(tmp_path),
         bib_files=[{"name": name, "category": "Test Papers"}],
+        diagnostics=[],
     )
 
 
@@ -395,19 +395,15 @@ class TestCommentHandling:
 class TestLatexFallback:
     """A field pylatexenc cannot read costs that field's markup, never the entry."""
 
-    def test_keeps_the_raw_text_and_says_where(self, capsys):
-        value = r"Speed: {\verb"
-        assert _convert(value, "papers.bib:someone2024:title") == r"Speed: \verb"
-        assert "papers.bib:someone2024:title" in capsys.readouterr().err
-
-    def test_the_entry_is_still_published(self, tmp_path, capsys):
+    def test_the_entry_is_still_published(self, tmp_path):
         """End to end: the entry is read, with the raw text of the bad field."""
-        works = read_source(tmp_path, entry("kept", title=r"Speed: \verb"))
-        assert [work.bib_id for work in works] == ["kept"]
-        assert works[0].title == r"Speed: \verb"
-        assert works[0].year == 2024
-        assert [a.name for a in works[0].authors] == ["Alice Adams"]
-        assert "hazard.bib:kept:title" in capsys.readouterr().err
+        found, works = located(tmp_path, entry("kept", title=r"Speed: \verb"))
+        assert list(works) == ["kept"]
+        assert works["kept"].title == r"Speed: \verb"
+        assert works["kept"].year == 2024
+        assert [a.name for a in works["kept"].authors] == ["Alice Adams"]
+        [line] = found[LATEX_CONVERSION_FAILED]
+        assert (line.key, line.field) == ("kept", "title")
 
 
 class TestEntryFiltering:
@@ -440,7 +436,7 @@ def located(tmp_path, source, name="hazard.bib"):
     warnings = []
     works = parse_all_works(bib_dir=str(tmp_path),
                             bib_files=[{"name": name, "category": "Test"}],
-                            warnings=warnings)
+                            diagnostics=warnings)
     by_code = {}
     for warning in warnings:
         by_code.setdefault(warning.split(" ", 1)[0], []).append(warning)
@@ -489,11 +485,6 @@ class TestLocatedParserDiagnostics:
         found, works = located(tmp_path, source)
         assert found == {}
         assert sorted(works) == ["hidden", "visible"]
-
-    def test_without_a_list_a_syntax_error_goes_to_standard_error(self, tmp_path, capsys):
-        (tmp_path / "x.bib").write_text("@article{early, = {x}}\n", encoding="utf-8")
-        parse_bibtex_file(str(tmp_path / "x.bib"))
-        assert f"Warning: {SYNTAX_ERROR} " in capsys.readouterr().err
 
     def test_other_parser_messages_are_coded_in_the_librarys_words(self, tmp_path,
                                                                    capsys):
@@ -587,7 +578,7 @@ class TestRedefinedStringSummary:
         for name, text in files.items():
             (tmp_path / name).write_text(text, encoding="utf-8")
         warnings = []
-        parse_all_works(bib_dir=str(tmp_path), warnings=warnings,
+        parse_all_works(bib_dir=str(tmp_path), diagnostics=warnings,
                         bib_files=[{"name": n, "category": "C"} for n in files])
         return [w for w in warnings if w.startswith(STRING_REDEFINED)]
 
@@ -610,15 +601,6 @@ class TestRedefinedStringSummary:
     def test_nothing_redefined_says_nothing(self, tmp_path):
         assert self.run(tmp_path, {"a.bib": "@string{x = 1}\n@string{y = 1}\n"}) == []
 
-    def test_a_file_read_on_its_own_is_summarised_on_its_own(self, tmp_path, capsys):
-        path = tmp_path / "a.bib"
-        path.write_text("@string{x = 1}\n@string{x = 2}\n", encoding="utf-8")
-        warnings = []
-        parse_bibtex_file(str(path), warnings=warnings)
-        assert [w.split(" ", 1)[0] for w in warnings] == [STRING_REDEFINED]
-        parse_bibtex_file(str(path))
-        assert f"Warning: {STRING_REDEFINED} {path}::: " in capsys.readouterr().err
-
 
 class TestRedefinitionsFollowTheParser:
     """Only what the parser reads as an @string definition is counted."""
@@ -627,7 +609,7 @@ class TestRedefinitionsFollowTheParser:
         path = tmp_path / "strings.bib"
         path.write_bytes(data)
         warnings = []
-        works = parse_all_works(bib_dir=str(tmp_path), warnings=warnings,
+        works = parse_all_works(bib_dir=str(tmp_path), diagnostics=warnings,
                                 bib_files=[{"name": "strings.bib", "category": "C"}])
         return str(path), warnings, {work.bib_id: work for work in works}
 

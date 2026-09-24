@@ -526,7 +526,7 @@ def resolve_authors(
     works: List[Work],
     people: List[Person],
     fuzzy_threshold: float = FUZZY_THRESHOLD,
-    warnings: Optional[List[str]] = None,
+    diagnostics: Optional[List[str]] = None,
     bib_dir: str = ".",
 ) -> List[str]:
     """Resolve contributor names in works to person IDs.
@@ -535,7 +535,7 @@ def resolve_authors(
     name that is itself abbreviated -- a declared alias. A name that fits
     more than one person is left unresolved, and a near miss is never
     linked. Both are reported under `AMBIGUOUS_NAME` and `SUGGESTION` into
-    ``warnings``, located at the work, when a list is given.
+    ``diagnostics``, located at the work, when a list is given.
 
     Editors are resolved by the same machinery. They are not authorships, so
     an editor that matches nobody is not reported as an unresolved author.
@@ -556,9 +556,9 @@ def resolve_authors(
         file = f"{bib_dir}/{work.source_file}"
         unresolved |= set(_resolve(work.authors, candidates, index,
                                    fuzzy_threshold,
-                                   (file, work.bib_id, "author"), warnings))
+                                   (file, work.bib_id, "author"), diagnostics))
         _resolve(work.editors, candidates, index, fuzzy_threshold,
-                 (file, work.bib_id, "editor"), warnings)
+                 (file, work.bib_id, "editor"), diagnostics)
 
     return sorted(unresolved)
 
@@ -566,13 +566,13 @@ def resolve_authors(
 def resolve_projects(
     works: List[Work],
     projects: List[Project],
-    errors: Optional[List[str]] = None,
+    diagnostics: Optional[List[str]] = None,
     bib_dir: str = ".",
 ) -> List[str]:
     """Validate project IDs in works against known projects.
 
     Returns list of unknown project IDs found in works, and reports each
-    unknown tag under `PROJECT_UNKNOWN` into ``errors``, located at the work,
+    unknown tag under `PROJECT_UNKNOWN` into ``diagnostics``, located at the work,
     when a list is given.
     Does NOT remove unknown project IDs from works (they're kept
     for debugging visibility).
@@ -584,8 +584,8 @@ def resolve_projects(
         for pid in work.project_ids:
             if pid not in known_ids:
                 unknown.add(pid)
-                if errors is not None:
-                    errors.append(diagnostic(
+                if diagnostics is not None:
+                    diagnostics.append(diagnostic(
                         PROJECT_UNKNOWN, f"{bib_dir}/{work.source_file}",
                         work.bib_id, "project",
                         f"'{pid}' is not a project id in the projects file"))

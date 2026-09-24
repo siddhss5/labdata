@@ -11,8 +11,12 @@ import json
 import pytest
 import yaml
 
+from sslabdata import (
+    AssemblyError, ConfigurationError, LabData, LabDataConfig, assemble,
+)
+
 from .support import (
-    EXPECTED, INVALID, case, export, run_sslabdata,
+    EXPECTED, INVALID, case, export, run_sslabdata, working_dir,
 )
 
 with open(EXPECTED / "diagnostics.yaml", encoding="utf-8") as f:
@@ -214,3 +218,40 @@ def test_an_alias_two_people_declare_resolves_to_neither(tmp_path):
     assert author["person_id"] is None, author
     assert author["resolution"]["status"] == "ambiguous", author
     assert "PEOPLE-ALIAS-AMBIGUOUS" in run.stderr
+
+
+# The cases whose configuration loads and whose assembly finds a fatal code.
+FATAL = ["bib_file_not_found", "bib_not_utf8", "collaborators_file_not_found",
+         "collaborators_invalid_yaml", "crossref_entry", "crossref_no_parent",
+         "crossref_undefined_parent", "people_file_not_found",
+         "people_invalid_yaml", "people_missing_name", "people_not_a_list",
+         "projects_file_not_found", "projects_invalid_yaml",
+         "projects_missing_id"]
+
+
+def assembled(name, diagnostics):
+    """`assemble()` on one case, or None when its configuration does not
+    load, which `from_yaml()` has already refused."""
+    with working_dir(INVALID / name):
+        try:
+            config = LabDataConfig.from_yaml("lab.yaml")
+        except ConfigurationError:
+            return None
+        return assemble(config, diagnostics=diagnostics)
+
+
+@pytest.mark.parametrize("name", FATAL)
+def test_the_python_api_returns_no_document_on_a_fatal_diagnostic(name):
+    """Whatever `diagnostics` is: it decides printing, never compiling."""
+    for diagnostics in (False, True):
+        with pytest.raises(AssemblyError):
+            assembled(name, diagnostics)
+
+
+@pytest.mark.parametrize("name", sorted(
+    d.name for d in INVALID.iterdir() if d.is_dir() and d.name not in FATAL))
+def test_the_python_api_returns_a_document_otherwise(name):
+    """A validation error, such as a repeated citation key, still returns a
+    document, as `--output` still writes one."""
+    data = assembled(name, False)
+    assert data is None or isinstance(data, LabData)
