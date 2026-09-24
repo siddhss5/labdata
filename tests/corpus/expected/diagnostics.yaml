@@ -160,6 +160,11 @@ people.invalid_status:
   reports: [retired]
   locates: [people.yaml, bbrown, status]
 
+records.unknown_key:
+  dir: record_unknown_key
+  exit: ok
+  reports: [RECORD-KEY-UNKNOWN, webiste, funding, affiliation]
+
 projects.invalid_status:
   dir: invalid_project_status
   exit: any

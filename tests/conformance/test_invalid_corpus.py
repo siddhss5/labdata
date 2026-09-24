@@ -175,6 +175,28 @@ def test_malformed_input_is_fatal_and_coded(tmp_path, case_id, code, location):
     assert not out.exists(), "a document was written despite a fatal diagnostic"
 
 
+# Covers records.unknown_key
+def test_an_unknown_record_key_is_located(tmp_path):
+    """One key in each file, each a warning at the file, the record and the
+    key, and an error under `--strict`; no key is emitted."""
+    where = INVALID / DIAGNOSTICS["records.unknown_key"]["dir"]
+    located = [("people.yaml", "aadams", "webiste"),
+               ("projects.yaml", "homebot", "funding"),
+               ("collaborators.yaml", "Priya Patel", "affiliation")]
+    for strict, level, code in (((), "warning", 0),
+                                (("--strict",), "error", 1)):
+        run = run_sslabdata(["--config", "lab.yaml", "--validate", *strict,
+                             "--format", "json"], where)
+        assert run.crash is None and run.code == code, run.output
+        records = [(r["code"], r["severity"], r["file"], r["key"], r["field"])
+                   for r in json.loads(run.stdout)]
+        assert records == [("RECORD-KEY-UNKNOWN", level, *location)
+                           for location in located], records
+    run, data = export(where, tmp_path)
+    assert run.code == 0, run.output
+    assert not [key for _, _, key in located if key in json.dumps(data)]
+
+
 # Covers latex.text_macros
 def test_common_text_macros_are_converted(tmp_path):
     """Each macro becomes its text, and none is reported as unknown."""

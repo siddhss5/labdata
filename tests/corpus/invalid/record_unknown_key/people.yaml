@@ -1,0 +1,8 @@
+# CASE records.unknown_key
+# A misspelt `website`, which sslabdata does not read.
+
+- id: "aadams"
+  name: "Alice Adams"
+  role: "professor"
+  status: "current"
+  webiste: "https://example.org/aadams"

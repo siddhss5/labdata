@@ -94,6 +94,7 @@ class TestDiagnosticClassesByMode:
         ("invalid_project_status", "PROJECTS-STATUS-INVALID"),
         ("ambiguous_alias", "PEOPLE-ALIAS-AMBIGUOUS"),
         ("config_unknown_key", "CONFIG-KEY-UNKNOWN"),
+        ("record_unknown_key", "RECORD-KEY-UNKNOWN"),
         ("config_bib_files_missing", "CONFIG-BIB-FILES-MISSING"),
         ("undefined_string", "BIB-STRING-UNDEFINED"),
         ("unclosed_brace", "BIB-SYNTAX-ERROR"),
