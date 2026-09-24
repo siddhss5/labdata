@@ -126,11 +126,15 @@ because of the second shape — or read `--format json`, which needs no
 parsing of text at all.
 
 **Where the severities live.** `sslabdata.assembler.AssemblyResult` carries the
-diagnostics that survive assembly in three lists: `fatal_errors` fail every
-mode, `bibliography_errors` fail `--validate` and are warnings elsewhere, and
-`warnings` never fail anything. A fourth class never reaches an
-`AssemblyResult` at all, because it stops the configuration from loading. The
-table under *Diagnostic codes* below says which class each code belongs to.
+diagnostics that survive assembly in one list, `diagnostics`, in the order
+every report lists them: fatal codes first, then validation errors, then
+warnings, each class in the order it was found. A diagnostic's severity is
+not stored with it; it follows from its class and the run
+(`sslabdata.diagnostics.severity()`). Fatal codes fail every mode, validation
+errors fail `--validate` and are warnings elsewhere, and warnings never fail
+anything. A fourth class never reaches an `AssemblyResult` at all, because it
+stops the configuration from loading. The table under *Diagnostic codes*
+below says which class each code belongs to.
 
 **Unresolved authors are not errors**, not even under `--strict`.
 `--validate` lists them and still exits `0`. This is intended, not a gap: an author who is not in `people.yaml`
@@ -366,9 +370,9 @@ What each mode puts in the array:
 > `config.people_file.missing` records the current behaviour as `pass`.
 
 **The Python API is convenience only.** Public: the names in `sslabdata.__all__`
-— `assemble`, `AssemblyResult`, the models `LabData`, `Work`, `Author`,
-`Contributor`, `Venue`, `Link`, `Person`, `Project`, `Collaborator`, the
-config loader `LabDataConfig` with `BibFile`, and the exporters
+— `assemble`, `AssemblyResult`, `AssemblyError`, the models `LabData`,
+`Work`, `Author`, `Contributor`, `Venue`, `Link`, `Person`, `Project`,
+`Collaborator`, the config loader `LabDataConfig` with `BibFile`, and the exporters
 `export_to_yaml` and `export_to_json`, and the exception
 `ConfigurationError`. `Publication` was renamed to `Work` at package version
 3.0.0, when the document's `publications` became `works`.
@@ -384,6 +388,20 @@ document passes through, so it is the one that holds whatever built the
 objects. For a `lab.yaml` of the wrong shape (`CONFIG-NOT-A-MAPPING`,
 `CONFIG-KEY-MISSING`, `CONFIG-TYPE-INVALID`) it is raised by `from_yaml()`
 alone. Its message is always one coded diagnostic line.
+
+**`sslabdata.AssemblyError`** (defined in `sslabdata.assembler`) is a subclass
+of `ValueError`, raised by `assemble()` when any diagnostic is of class
+*fatal* in the table under *Diagnostic codes*, whatever its `diagnostics`
+argument is, so no document is returned from input with a fatal-class code.
+That argument decides only printing: with `diagnostics=False`, every
+diagnostic of the run, fatal ones included, is printed to standard error in
+report order, each prefixed `Warning: `, before the exception is raised; with
+`diagnostics=True` nothing is printed, and the diagnostics are returned in an
+`AssemblyResult` or carried by the exception. The exception's message is the
+fatal diagnostics, one per line, and its `diagnostics` attribute holds every
+diagnostic of the run in report order. A validation error, such as a repeated
+citation key, does not raise: the document is returned, as `--output` writes
+it, with the diagnostic returned or printed alongside the rest.
 
 Private, and free to change without a version bump: `sslabdata.parsers.*`,
 `sslabdata.loaders`, `sslabdata.resolver`, `sslabdata.cli`'s internals, and every

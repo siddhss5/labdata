@@ -11,8 +11,12 @@ import json
 import pytest
 import yaml
 
+from sslabdata import (
+    AssemblyError, ConfigurationError, LabData, LabDataConfig, assemble,
+)
+
 from .support import (
-    EXPECTED, INVALID, case, export, run_sslabdata,
+    EXPECTED, INVALID, case, export, run_sslabdata, working_dir,
 )
 
 with open(EXPECTED / "diagnostics.yaml", encoding="utf-8") as f:
@@ -214,3 +218,48 @@ def test_an_alias_two_people_declare_resolves_to_neither(tmp_path):
     assert author["person_id"] is None, author
     assert author["resolution"]["status"] == "ambiguous", author
     assert "PEOPLE-ALIAS-AMBIGUOUS" in run.stderr
+
+
+# The cases whose configuration loads and whose assembly finds a fatal code.
+FATAL = ["bib_file_not_found", "bib_not_utf8", "collaborators_file_not_found",
+         "collaborators_invalid_yaml", "crossref_entry", "crossref_no_parent",
+         "crossref_undefined_parent", "people_file_not_found",
+         "people_invalid_yaml", "people_missing_name", "people_not_a_list",
+         "projects_file_not_found", "projects_invalid_yaml",
+         "projects_missing_id"]
+
+
+def loads(name):
+    """True when the case's configuration loads, so `assemble()` is reached."""
+    with working_dir(INVALID / name):
+        try:
+            LabDataConfig.from_yaml("lab.yaml")
+        except ConfigurationError:
+            return False
+    return True
+
+
+def assembled(name, diagnostics):
+    with working_dir(INVALID / name):
+        return assemble(LabDataConfig.from_yaml("lab.yaml"),
+                        diagnostics=diagnostics)
+
+
+@pytest.mark.parametrize("name", FATAL)
+def test_the_python_api_returns_no_document_on_a_fatal_diagnostic(name, capsys):
+    """Whatever `diagnostics` is: it decides printing, never compiling. With
+    False every diagnostic is printed first, fatal ones included."""
+    for diagnostics in (False, True):
+        with pytest.raises(AssemblyError) as raised:
+            assembled(name, diagnostics)
+        printed = "".join(f"Warning: {line}\n" for line in raised.value.diagnostics)
+        assert capsys.readouterr().err == ("" if diagnostics else printed)
+
+
+@pytest.mark.parametrize("name", sorted(
+    d.name for d in INVALID.iterdir()
+    if d.is_dir() and d.name not in FATAL and loads(d.name)))
+def test_the_python_api_returns_a_document_otherwise(name):
+    """A validation error, such as a repeated citation key, still returns a
+    document, as `--output` still writes one."""
+    assert isinstance(assembled(name, False), LabData)

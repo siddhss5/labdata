@@ -4,14 +4,15 @@ import pytest
 
 from sslabdata.models import Author, Contributor, Work, Person, Project, LabData
 from sslabdata.loaders import load_collaborators, load_people, load_projects
+from sslabdata.diagnostics import (
+    CLASSES, FATAL, VALIDATION_ERROR, WARNING, code_of,
+)
 from sslabdata.resolver import (
+    Candidates,
     normalize_name,
     is_abbreviated,
-    build_alias_index,
     shared_declarations,
-    fuzzy_match,
     fuzzy_matches,
-    match_form,
     resolve_authors,
     compute_backlinks,
 )
@@ -49,39 +50,7 @@ class TestIsAbbreviated:
         assert is_abbreviated("kim") is False
 
 
-class TestBuildAliasIndex:
-    def test_indexes_name_and_aliases(self):
-        people = [
-            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
-        ]
-        index = build_alias_index(people)
-        assert "alice adams" in index
-        assert "a adams" in index
-        assert index["alice adams"] == "aadams"
-        assert index["a adams"] == "aadams"
-
-    def test_multiple_people(self):
-        people = [
-            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
-            Person(id="bbrown", name="Bob Brown", aliases=["B. Brown"]),
-        ]
-        index = build_alias_index(people)
-        assert index["a adams"] == "aadams"
-        assert index["b brown"] == "bbrown"
-
-    def test_collision_detection(self):
-        """Ambiguous aliases shared by multiple people are excluded."""
-        people = [
-            Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
-            Person(id="alankim", name="Alan Kim", aliases=["A. Kim"]),
-        ]
-        index = build_alias_index(people)
-        # "a kim" is ambiguous — should NOT be in the index
-        assert "a kim" not in index
-        # Canonical names are still indexed (they're unique)
-        assert index["alex kim"] == "akim"
-        assert index["alan kim"] == "alankim"
-
+class TestSameInitial:
     def test_same_initial_collision_without_alias(self):
         """An alias shared implicitly with another person's initials is ambiguous.
 
@@ -102,66 +71,26 @@ class TestBuildAliasIndex:
         assert "A. Kim" in unresolved
 
 
-class TestFuzzyMatch:
+class TestFuzzyMatches:
     def test_abbreviated_name_skipped(self):
         """Single-initial names should NOT fuzzy match — too ambiguous."""
-        index = {"y zhang": "yzhang"}
-        assert fuzzy_match("H. Zhang", index) is None
+        assert fuzzy_matches("H. Zhang", Candidates([("yzhang", ["Y. Zhang"])])) == []
 
     def test_close_match(self):
-        index = {"alice adams": "aadams"}
-        # "alice a adams" is close to "alice adams"
-        result = fuzzy_match("Alice A. Adams", index, threshold=0.75)
-        assert result == "aadams"
-
-    def test_no_match(self):
-        index = {"alice adams": "aadams"}
-        result = fuzzy_match("Completely Different Name", index)
-        assert result is None
+        candidates = Candidates([("aadams", ["Alice Adams"])])
+        assert fuzzy_matches("Alice A. Adams", candidates, threshold=0.75) == ["aadams"]
+        assert fuzzy_matches("Completely Different Name", candidates) == []
 
     def test_ties_are_all_returned_sorted(self):
-        index = {"dina lee": "zlee", "dena lee": "alee", "alice adams": "aadams"}
-        assert fuzzy_matches("Dana Lee", index, threshold=0.8) == ["alee", "zlee"]
-        assert fuzzy_match("Dana Lee", index, threshold=0.8) == "alee"
-        assert fuzzy_matches("H. Zhang", {"h zhang": "hz"}) == []
+        candidates = Candidates([("zlee", ["Dina Lee"]), ("alee", ["Dena Lee"]),
+                                 ("aadams", ["Alice Adams"])])
+        assert fuzzy_matches("Dana Lee", candidates, threshold=0.8) == ["alee", "zlee"]
 
-
-class TestMatchForm:
-    """The abbreviated form, which the document never shows.
-
-    The resolver reads it only where the input is itself abbreviated, and
-    only against a declared name or alias (#24).
-    """
-
-    def test_given_names_are_abbreviated(self):
-        assert match_form(Author(name="Alice Jane Adams", given="Alice Jane",
-                                 family="Adams")) == "A. J. Adams"
-
-    def test_run_together_initials_are_one_initial_each(self):
-        assert match_form(Author(name="S.S. Ivers", given="S.S.",
-                                 family="Ivers")) == "S. S. Ivers"
-
-    def test_a_hyphenated_given_name_keeps_both_initials(self):
-        assert match_form(Author(name="Grace-Ann Green", given="Grace-Ann",
-                                 family="Green")) == "G.-A. Green"
-
-    def test_particles_and_suffixes(self):
-        assert match_form(Author(name="Victor van den Berg", given="Victor",
-                                 von="van den", family="Berg")) == \
-            "V. van den Berg"
-        assert match_form(Author(name="John Smith Jr.", given="John",
-                                 family="Smith", suffix="Jr.")) == "J. Smith, Jr."
-
-    def test_a_brace_protected_name_has_nothing_to_abbreviate(self):
-        assert match_form(Author(name="Example Robotics Consortium",
-                                 literal="Example Robotics Consortium")) == \
-            "Example Robotics Consortium"
-
-    def test_it_is_not_the_emitted_name(self):
-        """The two are independent, which is the whole point of the split."""
-        author = Author(name="Alice Adams", given="Alice", family="Adams")
-        assert match_form(author) == "A. Adams"
-        assert author.name == "Alice Adams"
+    def test_a_form_two_people_declare_suggests_neither(self):
+        """`ab kim` is nearest `a kim`, which both Kims declare."""
+        candidates = Candidates([("akim", ["Alex Kim", "A. Kim"]),
+                                 ("alankim", ["Alan Kim", "A. Kim"])])
+        assert fuzzy_matches("Ab Kim", candidates) == []
 
 
 # The three corpus authorships #56 section 7 predicted would move once
@@ -206,15 +135,6 @@ class TestTheResolverMatchesTheFullName:
                         position=1, given=given, von=von, family=family)
         assert self.resolve(author) == on_full_name
 
-    def test_the_abbreviated_form_would_have_answered_differently(self):
-        """So the rows above are about which form is matched, not a coincidence."""
-        index = build_alias_index(self.PEOPLE)
-        moved = [row for row in MATCHED_ON_THE_FULL_NAME if row[3] != row[4]]
-        assert len(moved) == 2
-        for given, von, family, on_match_form, _ in moved:
-            author = Author(name=f"{given} {family}", given=given, family=family)
-            assert index.get(normalize_name(match_form(author))) == on_match_form
-
     @pytest.mark.parametrize(
         "given,von,family,on_match_form,on_full_name",
         MATCHED_ON_THE_FULL_NAME,
@@ -248,7 +168,7 @@ class TestMatchingPolicy:
                     year=2024, source_file="w.bib", authors=list(authors),
                     editors=list(editors))
         warnings = []
-        unresolved = resolve_authors([work], people, warnings=warnings,
+        unresolved = resolve_authors([work], people, diagnostics=warnings,
                                      bib_dir="bib")
         return work, unresolved, warnings
 
@@ -532,12 +452,12 @@ class TestComputeBacklinks:
 
 class TestLoadPeople:
     def test_missing_file(self):
-        assert load_people("/nonexistent/path.yaml") == []
+        assert load_people("/nonexistent/path.yaml", []) == []
 
 
 class TestLoadProjects:
     def test_missing_file(self):
-        assert load_projects("/nonexistent/path.yaml") == []
+        assert load_projects("/nonexistent/path.yaml", []) == []
 
 
 class TestLoadCollaborators:
@@ -545,15 +465,15 @@ class TestLoadCollaborators:
         path = tmp_path / "collaborators.yaml"
         path.write_text('- name: "Priya Patel"\n  aliases: ["P. Patel"]\n'
                         '- name: "Quentin Quinn"\n', encoding="utf-8")
-        loaded = load_collaborators(str(path))
+        loaded = load_collaborators(str(path), [])
         assert [(c.name, c.aliases) for c in loaded] == [
             ("Priya Patel", ["P. Patel"]), ("Quentin Quinn", [])]
 
     def test_missing_or_empty_file(self, tmp_path):
-        assert load_collaborators("/nonexistent/path.yaml") == []
+        assert load_collaborators("/nonexistent/path.yaml", []) == []
         empty = tmp_path / "empty.yaml"
         empty.write_text("", encoding="utf-8")
-        assert load_collaborators(str(empty)) == []
+        assert load_collaborators(str(empty), []) == []
 
 
 class TestDeclaredCollaboratorGrouping:
@@ -565,7 +485,7 @@ class TestDeclaredCollaboratorGrouping:
                       year=2020 + i, source_file="w.bib", authors=list(authors))
                  for i, authors in enumerate(authors_by_work)]
         warnings = []
-        resolve_authors(works, people, warnings=warnings, bib_dir="bib")
+        resolve_authors(works, people, diagnostics=warnings, bib_dir="bib")
         entries = declared_collaborators(declared, people, "c.yaml", warnings)
         return works, group_collaborators(works, "bib", warnings, entries, people), warnings
 
@@ -691,10 +611,13 @@ class TestPeopleAndProjectsFiles:
     def load(self, tmp_path, loader, text):
         path = tmp_path / "records.yaml"
         path.write_text(text, encoding="utf-8")
-        errors, diagnostics, warnings = [], [], []
-        records = loader(str(path), errors, diagnostics, warnings)
-        strip = lambda lines: [l.replace(str(path), "f.yaml") for l in lines]
-        return records, strip(errors), strip(diagnostics), strip(warnings)
+        found = []
+        records = loader(str(path), found)
+
+        def of(kind):
+            return [line.replace(str(path), "f.yaml") for line in found
+                    if CLASSES[code_of(line)] == kind]
+        return records, of(FATAL), of(VALIDATION_ERROR), of(WARNING)
 
     def test_an_empty_file_is_no_records(self, tmp_path):
         assert self.load(tmp_path, load_people, "") == ([], [], [], [])
@@ -724,7 +647,7 @@ class TestPeopleAndProjectsFiles:
         _, errors, _, _ = self.load(tmp_path, load_people, "- {name: No Id}\n")
         assert errors == ["PEOPLE-FIELD-MISSING f.yaml::id: entry 1 has no id"]
         declared, errors, _, _ = self.load(
-            tmp_path, lambda path, errors, *_: load_collaborators(path, errors),
+            tmp_path, load_collaborators,
             "- {aliases: [X]}\n- {name: Priya Patel}\n")
         assert [c.name for c in declared] == ["Priya Patel"]
         assert errors == ["COLLABORATORS-FIELD-MISSING f.yaml::name: entry 1 has no name"]
@@ -765,12 +688,6 @@ class TestPeopleAndProjectsFiles:
             tmp_path, load_people, f"- {{id: p, name: P, role: r, status: {status}}}\n")
         assert [w.startswith("PEOPLE-STATUS-INVALID f.yaml:p:status:")
                 for w in warnings] == ([True] if reported else [])
-
-    def test_without_lists_problems_go_to_standard_error(self, tmp_path, capsys):
-        path = tmp_path / "people.yaml"
-        path.write_text("- {id: p}\n", encoding="utf-8")
-        assert load_people(str(path)) == []
-        assert "Warning: PEOPLE-FIELD-MISSING" in capsys.readouterr().err
 
 
 class TestSharedDeclarations:

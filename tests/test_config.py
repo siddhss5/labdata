@@ -214,4 +214,4 @@ class TestConfigurationShape:
                                path="lab.yaml")
         result = assemble(config, diagnostics=True)
         assert any(w.startswith("CONFIG-BIB-FILES-MISSING lab.yaml:bib_files::")
-                   for w in result.warnings), result.warnings
+                   for w in result.diagnostics), result.diagnostics

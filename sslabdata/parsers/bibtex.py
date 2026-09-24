@@ -16,7 +16,6 @@ MIT License - see LICENSE file for details.
 """
 
 import re
-import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -29,7 +28,7 @@ from pybtex.database.input.bibtex import (
 from pybtex.scanner import PybtexSyntaxError
 
 from .latex import latex_to_text, strip_braces, unknown_commands
-from ..diagnostics import diagnostic
+from ..diagnostics import Diagnostic, diagnostic
 from ..models import Author, Contributor, Link, Venue, Work
 
 
@@ -142,15 +141,6 @@ _MARKER_ARGUMENT = re.compile(rf"\{{\*\}}(?:{_ANY_MARKER})*")
 
 # The command name pybtex is about to read, when that name is `comment`.
 _COMMENT_COMMAND = re.compile(r'\s*comment\s*[{(]', re.IGNORECASE)
-
-
-def _warn(message: str) -> None:
-    """Report a problem with an input file in sslabdata's own voice.
-
-    Parser messages are relayed as the library phrased them: naming the file,
-    entry key and field of every diagnostic is #26.
-    """
-    print(f"Warning: {message}", file=sys.stderr)
 
 
 # --- Reading the files -------------------------------------------------------
@@ -378,18 +368,16 @@ def _syntax_diagnostic(path: str, error: PybtexSyntaxError,
 
 def parse_bibtex_file(
     path: str,
-    duplicate_errors: Optional[List[str]] = None,
-    warnings: Optional[List[str]] = None,
-    redefinitions: Optional[List[Tuple[str, str, int]]] = None,
+    diagnostics: List[Diagnostic],
+    redefinitions: List[Tuple[str, str, int]],
 ) -> Dict[str, Entry]:
     """Parse one BibTeX file into pybtex entries, keyed by citation key.
 
     Anything the parser has to say is captured and reported by sslabdata, so no
-    library logging reaches the user. Syntax errors and undefined macros go
-    to ``warnings``, located at the entry and field they were found in, or to
-    standard error when no list is given. Redefined ``@string`` macros are
-    added to ``redefinitions``, for a caller summarising a whole run; without
-    that list, this file's are summarised on their own.
+    library logging reaches the user. Syntax errors, undefined macros and
+    repeated citation keys go to ``diagnostics``, located at the entry and
+    field they were found in. Redefined ``@string`` macros are added to
+    ``redefinitions``, for the caller to summarise over a whole run.
     """
     text = Path(path).read_text(encoding="utf-8-sig")
 
@@ -398,41 +386,21 @@ def parse_bibtex_file(
         parser = _Parser(duplicate_keys=duplicate_keys)
         data = parser.parse_string(text)
 
-    found = [(path, name, line) for name, line
-             in _redefined_macros(text, parser.string_definitions)]
-    if redefinitions is not None:
-        redefinitions.extend(found)
-    elif found:
-        summary = redefined_summary(found)
-        if warnings is None:
-            _warn(summary)
-        else:
-            warnings.append(summary)
+    redefinitions.extend((path, name, line) for name, line
+                         in _redefined_macros(text, parser.string_definitions))
     for error, key, field_name, start in parser.syntax_errors:
         if key is None and _on_comment_line(text, start):
             continue
-        message = _syntax_diagnostic(path, error, key, field_name)
-        if warnings is None:
-            _warn(message)
-        else:
-            warnings.append(message)
+        diagnostics.append(_syntax_diagnostic(path, error, key, field_name))
     for key in duplicate_keys:
-        message = _duplicate_key_error(path, key)
-        if duplicate_errors is None:
-            _warn(message)
-        else:
-            duplicate_errors.append(message)
+        diagnostics.append(_duplicate_key_error(path, key))
     for error in errors:
         # The duplicate has already been recorded with sslabdata's stable code.
         if str(error).startswith("repeated bibliography entry:"):
             continue
-        message = diagnostic(PARSER_MESSAGE, path,
-                             parser.message_keys.get(id(error)), None,
-                             str(error))
-        if warnings is None:
-            _warn(message)
-        else:
-            warnings.append(message)
+        diagnostics.append(diagnostic(PARSER_MESSAGE, path,
+                                      parser.message_keys.get(id(error)), None,
+                                      str(error)))
 
     return data.entries
 
@@ -443,24 +411,20 @@ _UNREADABLE_LATEX = ("could not read the LaTeX in this field; keeping the text "
                      "as written")
 
 
-def _convert(value: str, where: str, on_unknown=None) -> str:
+def _convert(value: str, on_unknown) -> str:
     """Convert one field from LaTeX, keeping the raw text if that fails.
 
     Each command the converter does not know is passed to ``on_unknown``,
     which knows where the field is, and so is a value it cannot read at all
-    (``on_unknown.failed()``). Without one, that is reported at ``where``.
+    (``on_unknown.failed()``).
     """
     try:
         text = latex_to_text(value)
     except Exception:  # noqa: BLE001 - never drop an entry over one field
-        if on_unknown is not None:
-            on_unknown.failed()
-        else:
-            _warn(f"{LATEX_CONVERSION_FAILED} {where}: {_UNREADABLE_LATEX}")
+        on_unknown.failed()
         return strip_braces(value)
-    if on_unknown is not None:
-        for command in unknown_commands(value):
-            on_unknown(command)
+    for command in unknown_commands(value):
+        on_unknown(command)
     return text
 
 
@@ -512,12 +476,6 @@ def _unknown_command_reporter(report, file: str, key: str,
         on_unknown.failed = failed
         return on_unknown
     return in_field
-
-
-def _initials(given: str) -> str:
-    """Abbreviate one given name: ``Alice`` → ``A.``, ``Grace-Ann`` → ``G.-A.``"""
-    parts = [part for part in given.split("-") if part]
-    return "-".join(f"{part[0]}." for part in parts)
 
 
 def _name_part_groups(person: Person) -> List[List[str]]:
@@ -590,8 +548,7 @@ def _is_literal(person: Person) -> bool:
             and person.last_names[0].endswith("}"))
 
 
-def person_name_parts(person: Person, where: str,
-                      on_unknown=None) -> Dict[str, Optional[str]]:
+def person_name_parts(person: Person, on_unknown) -> Dict[str, Optional[str]]:
     """One pybtex Person as the parts BibTeX split it into, converted to text.
 
     ``given``, ``von``, ``family`` and ``suffix`` are BibTeX's four parts; a
@@ -603,7 +560,7 @@ def person_name_parts(person: Person, where: str,
     in any part; ``marks_equal_contribution`` reports it separately.
     """
     def text(parts) -> Optional[str]:
-        joined = " ".join(_convert(_without_marker(part), where, on_unknown)
+        joined = " ".join(_convert(_without_marker(part), on_unknown)
                           for part in _with_marker_joined(parts)).strip()
         return joined or None
 
@@ -648,8 +605,7 @@ def readable_name(parts: Dict[str, Optional[str]]) -> str:
     return " ".join(part for part in ordered if part)
 
 
-def _contributors(entry: Entry, role: str, where: str,
-                  on_unknown=None) -> List[Dict]:
+def _contributors(entry: Entry, role: str, on_unknown) -> List[Dict]:
     """The entry's names for one role, in source order, as parts plus position.
 
     A terminal ``and others`` is BibTeX's "et al." and is dropped rather than
@@ -662,7 +618,7 @@ def _contributors(entry: Entry, role: str, where: str,
 
     found = []
     for person in persons:
-        parts = person_name_parts(person, where, on_unknown)
+        parts = person_name_parts(person, on_unknown)
         name = readable_name(parts)
         if name:
             found.append({"name": name, "position": len(found) + 1,
@@ -670,8 +626,7 @@ def _contributors(entry: Entry, role: str, where: str,
     return found
 
 
-def parse_author_list(entry: Entry, where: str,
-                      on_unknown=None) -> List[Author]:
+def parse_author_list(entry: Entry, on_unknown) -> List[Author]:
     """The entry's authors, in source order, with no contributor resolved yet.
 
     Each authorship carries the parts BibTeX split its name into, a readable
@@ -683,11 +638,10 @@ def parse_author_list(entry: Entry, where: str,
                    position=found["position"],
                    equal_contribution=marks_equal_contribution(found["person"]),
                    **found["parts"])
-            for found in _contributors(entry, "author", where, on_unknown)]
+            for found in _contributors(entry, "author", on_unknown)]
 
 
-def parse_editor_list(entry: Entry, where: str,
-                      on_unknown=None) -> List[Contributor]:
+def parse_editor_list(entry: Entry, on_unknown) -> List[Contributor]:
     """The entry's editors, read by the same machinery as its authors.
 
     An editor is name-parsed and resolved to a person the same way, but
@@ -697,11 +651,10 @@ def parse_editor_list(entry: Entry, where: str,
     """
     return [Contributor(name=found["name"], position=found["position"],
                         **found["parts"])
-            for found in _contributors(entry, "editor", where, on_unknown)]
+            for found in _contributors(entry, "editor", on_unknown)]
 
 
-def entry_fields(bib_id: str, entry: Entry, source: str,
-                 unknown_in=None) -> Dict[str, str]:
+def entry_fields(bib_id: str, entry: Entry, unknown_in) -> Dict[str, str]:
     """The entry's fields, with prose converted from LaTeX.
 
     ``ENTRYTYPE`` and ``ID`` are included so the rules below read one plain
@@ -710,9 +663,7 @@ def entry_fields(bib_id: str, entry: Entry, source: str,
     """
     fields = {name.lower(): value for name, value in entry.fields.items()}
     read = {
-        name: (_convert(value, f"{source}:{bib_id}:{name}",
-                        unknown_in(name) if unknown_in else None)
-               if name in TEXT_FIELDS else value)
+        name: _convert(value, unknown_in(name)) if name in TEXT_FIELDS else value
         for name, value in fields.items()
     }
     read["ENTRYTYPE"] = entry.type.lower()
@@ -720,8 +671,8 @@ def entry_fields(bib_id: str, entry: Entry, source: str,
     return read
 
 
-def format_bibtex(bib_id: str, entry: Entry, source: Optional[str] = None,
-                  report=None) -> Optional[str]:
+def format_bibtex(bib_id: str, entry: Entry, source: str,
+                  report) -> Optional[str]:
     """The entry written back out as BibTeX, for readers to copy.
 
     This is the entry as it was read, before LaTeX conversion, so fields
@@ -732,7 +683,7 @@ def format_bibtex(bib_id: str, entry: Entry, source: Optional[str] = None,
     try:
         return entry.to_string("bibtex").strip()
     except Exception:  # noqa: BLE001 - a copyable string is not worth an entry
-        (report or _warn)(diagnostic(
+        report(diagnostic(
             WRITE_BACK_FAILED, source, bib_id, "bibtex",
             "could not write this entry back out as BibTeX; bibtex is null"))
         return None
@@ -981,31 +932,28 @@ def entry_to_work(
     bib_id: str,
     entry: Entry,
     category: str,
-    pdf_base_url: Optional[str] = None,
-    source: str = "",
-    source_file: str = "",
-    report=None,
-    unknown_commands_seen: Optional[Dict[str, list]] = None,
+    pdf_base_url: Optional[str],
+    source: str,
+    source_file: str,
+    report,
+    unknown_commands_seen: Optional[Dict[str, list]],
 ) -> Work:
     """Convert one pybtex Entry to a Work dataclass.
 
     Unknown LaTeX commands are reported through ``report``, or added to
     ``unknown_commands_seen`` when it is given (`_unknown_command_reporter`).
     """
-    report = report if report is not None else _warn
     unknown_in = _unknown_command_reporter(report, source, bib_id,
                                            unknown_commands_seen)
-    fields = entry_fields(bib_id, entry, source, unknown_in)
+    fields = entry_fields(bib_id, entry, unknown_in)
     identifiers = build_identifiers(fields)
     check_entry_type(fields, source, report)
 
     return Work(
         bib_id=bib_id,
         title=fields.get("title", ""),
-        authors=parse_author_list(entry, f"{source}:{bib_id}:author",
-                                  unknown_in("author")),
-        editors=parse_editor_list(entry, f"{source}:{bib_id}:editor",
-                                  unknown_in("editor")),
+        authors=parse_author_list(entry, unknown_in("author")),
+        editors=parse_editor_list(entry, unknown_in("editor")),
         year=entry_year(fields, source, report),
         category=category,
         entry_type=fields["ENTRYTYPE"],
@@ -1048,10 +996,8 @@ def _crossref_error(path: str, bib_id: str, parent: str) -> str:
 def parse_all_works(
     bib_dir: str,
     bib_files: list,
+    diagnostics: List[Diagnostic],
     pdf_base_url: Optional[str] = None,
-    diagnostics: Optional[List[str]] = None,
-    warnings: Optional[List[str]] = None,
-    errors: Optional[List[str]] = None,
 ) -> List[Work]:
     """Parse all configured BibTeX files and return a flat list of Works.
 
@@ -1061,13 +1007,10 @@ def parse_all_works(
     Args:
         bib_dir: Directory containing the BibTeX files
         bib_files: List of dicts with 'name' and 'category' keys
+        diagnostics: The list that receives every coded diagnostic, in the
+            order found; its class in `sslabdata.diagnostics.CLASSES` decides
+            its severity
         pdf_base_url: Base URL/path for PDFs
-        diagnostics: Optional list that receives coded diagnostics that make
-            ``--validate`` fail. Without one they are emitted as warnings.
-        warnings: Optional list that receives coded diagnostics that never
-            fail a run. Without one they are emitted as warnings.
-        errors: Optional list that receives coded diagnostics that fail every
-            mode. Without one they are emitted as warnings.
 
     Returns:
         List of Work objects, sorted by year descending, works with no year
@@ -1076,17 +1019,7 @@ def parse_all_works(
     read: List[Tuple[str, str, str, Entry, str]] = []
     first_source: Dict[str, Tuple[str, str]] = {}
 
-    def to(collected: Optional[List[str]]):
-        def report(message: str) -> None:
-            if collected is None:
-                _warn(message)
-            else:
-                collected.append(message)
-        return report
-
-    report = to(diagnostics)
-    warn = to(warnings)
-    fail = to(errors)
+    report = diagnostics.append
 
     # Every file's redefined macros, summarised once when all are read.
     redefinitions: List[Tuple[str, str, int]] = []
@@ -1094,16 +1027,11 @@ def parse_all_works(
         name = bib_file['name'] if isinstance(bib_file, dict) else bib_file.name
         category = bib_file['category'] if isinstance(bib_file, dict) else bib_file.category
         path = f"{bib_dir}/{name}"
-        file_errors: List[str] = []
         try:
-            parsed = parse_bibtex_file(path, duplicate_errors=file_errors,
-                                       warnings=warnings,
-                                       redefinitions=redefinitions)
+            parsed = parse_bibtex_file(path, diagnostics, redefinitions)
         except UnicodeDecodeError as error:
-            fail(_encoding_error(path, error))
+            report(_encoding_error(path, error))
             continue
-        for error in file_errors:
-            report(error)
         for bib_id, entry in parsed.items():
             normalized = bib_id.lower()
             if normalized in first_source:
@@ -1119,24 +1047,24 @@ def parse_all_works(
             crossref = [value for field_name, value in entry.fields.items()
                         if field_name.lower() == "crossref"]
             if crossref:
-                fail(_crossref_error(path, bib_id, str(crossref[0]).strip()))
+                report(_crossref_error(path, bib_id, str(crossref[0]).strip()))
                 continue
             read.append((path, name, bib_id, entry, category))
 
     summary = redefined_summary(redefinitions)
     if summary:
-        warn(summary)
+        report(summary)
 
     # One line per unknown command for the whole run: a real bibliography
     # can use one command in thousands of fields, and a line for each would
     # bury every other diagnostic.
     unknown: Dict[str, list] = {}
     works = [
-        entry_to_work(bib_id, entry, category, pdf_base_url, path, name, warn,
+        entry_to_work(bib_id, entry, category, pdf_base_url, path, name, report,
                       unknown)
         for path, name, bib_id, entry, category in read
     ]
     for command, (fields, where) in unknown.items():
-        warn(unknown_command_diagnostic(command, where, fields))
+        report(unknown_command_diagnostic(command, where, fields))
     works.sort(key=lambda w: (w.year is not None, w.year or 0), reverse=True)
     return works

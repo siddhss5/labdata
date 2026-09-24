@@ -15,7 +15,7 @@ from .models import (
     LabData, Work, Author, Contributor, Venue, Link, Person, Project,
     Collaborator,
 )
-from .assembler import assemble, AssemblyResult
+from .assembler import assemble, AssemblyError, AssemblyResult
 from .exporters import export_to_yaml, export_to_json
 
 __all__ = [
@@ -36,6 +36,7 @@ __all__ = [
     # Pipeline
     "assemble",
     "AssemblyResult",
+    "AssemblyError",
     # Export
     "export_to_yaml",
     "export_to_json",

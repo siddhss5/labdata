@@ -10,7 +10,7 @@ Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
 MIT License - see LICENSE file for details.
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 
 class Diagnostic(str):
@@ -143,6 +143,13 @@ def severity(line: str, validating: bool, strict: bool) -> str:
     if strict and code not in NEVER_AN_ERROR:
         return ERROR
     return WARN
+
+
+def in_report_order(lines: List[Diagnostic]) -> List[Diagnostic]:
+    """Fatal codes first, then validation errors, then warnings, each class
+    in the order it was found: the order every report lists them in."""
+    order = (FATAL_AT_LOAD, FATAL, VALIDATION_ERROR, WARNING)
+    return sorted(lines, key=lambda line: order.index(CLASSES[code_of(line)]))
 
 
 def record(line: str, level: str) -> Dict[str, Optional[str]]:

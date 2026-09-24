@@ -11,7 +11,7 @@ import json
 import sys
 
 from .config import ConfigurationError, LabDataConfig
-from .assembler import assemble, unresolved_name_diagnostics
+from .assembler import assemble_result, unresolved_name_diagnostics
 from .diagnostics import ERROR, diagnostic, record, severity
 from .exporters import export_to_yaml, export_to_json
 
@@ -95,13 +95,14 @@ Examples:
         stop(diagnostic(CONFIG_UNREADABLE, args.config, None, None, str(e)),
              "Error loading configuration: ", as_json)
 
-    # Assemble data with diagnostics. `assemble()` rejects a configuration it
-    # will not compile from, but `from_yaml()` above has already rejected the
-    # same thing with the file named, so from here that cannot happen: the
-    # check downstream is for callers who built a configuration themselves.
-    result = assemble(config, diagnostics=True)
+    # Assemble data with diagnostics. `assemble_result()` raises
+    # `ConfigurationError` for an absolute `bib_files` name, but `from_yaml()`
+    # above has already rejected that with the file named, so it cannot
+    # happen here: the check is for callers who built a configuration
+    # themselves.
+    result = assemble_result(config)
     data = result.data
-    found = result.fatal_errors + result.bibliography_errors + result.warnings
+    found = result.diagnostics
 
     def level(line):
         return severity(line, validating=args.validate, strict=args.strict)
