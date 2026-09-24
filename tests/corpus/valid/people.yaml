@@ -8,7 +8,6 @@
 # CASE output.person.photo
 # CASE output.person.email
 # CASE output.person.start_year
-# CASE output.person.work_count
 # CASE output.person.work_ids
 # CASE output.person.derived
 # CASE identity.alias

@@ -532,11 +532,10 @@ def compute_backlinks(data: LabData) -> None:
     """Populate back-references on people and projects.
 
     Editing a volume is not an authorship, so `work.editors` contribute to
-    none of these: not to a person's works, not to their count, and not to a
-    project's people.
+    none of these: not to a person's works and not to a project's people.
 
     Mutates data in place:
-    - Person.work_ids, Person.work_count
+    - Person.work_ids
     - Project.work_ids, Project.people_ids
     """
     people_by_id = {p.id: p for p in data.people}
@@ -554,9 +553,6 @@ def compute_backlinks(data: LabData) -> None:
                 project = projects_by_id[pid]
                 if work.bib_id not in project.work_ids:
                     project.work_ids.append(work.bib_id)
-
-    for person in data.people:
-        person.work_count = len(person.work_ids)
 
     for project in data.projects:
         people_set: Set[str] = set()

@@ -26,11 +26,15 @@ VALID = CORPUS / "valid"
 INVALID = CORPUS / "invalid"
 EXPECTED = CORPUS / "expected"
 REPO_ROOT = TESTS_DIR.parent
-SCHEMA_PATH = REPO_ROOT / "schema" / "v4" / "output.schema.json"
+SCHEMA_PATH = REPO_ROOT / "schema" / "v5" / "output.schema.json"
 
-# The previous version's schema, which stays reachable byte for byte after v4
-# ships: a consumer pinned to v3 keeps a stable target (SPEC.md section 6).
-PREVIOUS_SCHEMA_PATH = REPO_ROOT / "schema" / "v3" / "output.schema.json"
+# The earlier versions' schemas, which stay reachable byte for byte after v5
+# ships: a consumer pinned to v3 or v4 keeps a stable target (SPEC.md
+# section 6).
+PREVIOUS_SCHEMA_PATHS = {
+    version: REPO_ROOT / "schema" / f"v{version}" / "output.schema.json"
+    for version in (3, 4)
+}
 
 
 def case(case_id, *values, marks=()):

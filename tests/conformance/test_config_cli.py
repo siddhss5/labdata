@@ -138,7 +138,7 @@ def test_config_people_file_missing(tmp_path):
     # falls out of the graph when there is nobody to resolve against.
     assert [a for w in data["works"] for a in w["authors"]
             if not a["collaborator_key"]] == []
-    assert item(data, "collaborators", "name", "Alice Adams")["work_count"] > 1
+    assert len(item(data, "collaborators", "name", "Alice Adams")["work_ids"]) > 1
 
 
 # Covers config.people_file.missing

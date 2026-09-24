@@ -23,7 +23,7 @@ def demo_result(monkeypatch):
 class TestDemoLab:
     def test_every_person_is_linked_to_a_work(self, demo_result):
         for person in demo_result.data.people:
-            assert person.work_count > 0, person.id
+            assert person.work_ids, person.id
 
     def test_every_project_has_works(self, demo_result):
         for project in demo_result.data.projects:
