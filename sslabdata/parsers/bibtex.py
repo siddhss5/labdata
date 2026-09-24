@@ -478,12 +478,6 @@ def _unknown_command_reporter(report, file: str, key: str,
     return in_field
 
 
-def _initials(given: str) -> str:
-    """Abbreviate one given name: ``Alice`` → ``A.``, ``Grace-Ann`` → ``G.-A.``"""
-    parts = [part for part in given.split("-") if part]
-    return "-".join(f"{part[0]}." for part in parts)
-
-
 def _name_part_groups(person: Person) -> List[List[str]]:
     """A pybtex name's parts, grouped as the BibTeX parts that read them.
 

@@ -8,13 +8,11 @@ from sslabdata.diagnostics import (
     CLASSES, FATAL, VALIDATION_ERROR, WARNING, code_of,
 )
 from sslabdata.resolver import (
+    Candidates,
     normalize_name,
     is_abbreviated,
-    build_alias_index,
     shared_declarations,
-    fuzzy_match,
     fuzzy_matches,
-    match_form,
     resolve_authors,
     compute_backlinks,
 )
@@ -33,9 +31,6 @@ class TestNormalizeName:
     def test_whitespace(self):
         assert normalize_name("  A.  Adams  ") == "a adams"
 
-    def test_superscript(self):
-        assert normalize_name("A. Adams<sup>*</sup>") == "a adams"
-
 
 class TestIsAbbreviated:
     def test_single_initial_surname(self):
@@ -52,39 +47,7 @@ class TestIsAbbreviated:
         assert is_abbreviated("kim") is False
 
 
-class TestBuildAliasIndex:
-    def test_indexes_name_and_aliases(self):
-        people = [
-            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
-        ]
-        index = build_alias_index(people)
-        assert "alice adams" in index
-        assert "a adams" in index
-        assert index["alice adams"] == "aadams"
-        assert index["a adams"] == "aadams"
-
-    def test_multiple_people(self):
-        people = [
-            Person(id="aadams", name="Alice Adams", aliases=["A. Adams"]),
-            Person(id="bbrown", name="Bob Brown", aliases=["B. Brown"]),
-        ]
-        index = build_alias_index(people)
-        assert index["a adams"] == "aadams"
-        assert index["b brown"] == "bbrown"
-
-    def test_collision_detection(self):
-        """Ambiguous aliases shared by multiple people are excluded."""
-        people = [
-            Person(id="akim", name="Alex Kim", aliases=["A. Kim"]),
-            Person(id="alankim", name="Alan Kim", aliases=["A. Kim"]),
-        ]
-        index = build_alias_index(people)
-        # "a kim" is ambiguous — should NOT be in the index
-        assert "a kim" not in index
-        # Canonical names are still indexed (they're unique)
-        assert index["alex kim"] == "akim"
-        assert index["alan kim"] == "alankim"
-
+class TestSameInitial:
     def test_same_initial_collision_without_alias(self):
         """An alias shared implicitly with another person's initials is ambiguous.
 
@@ -105,66 +68,26 @@ class TestBuildAliasIndex:
         assert "A. Kim" in unresolved
 
 
-class TestFuzzyMatch:
+class TestFuzzyMatches:
     def test_abbreviated_name_skipped(self):
         """Single-initial names should NOT fuzzy match — too ambiguous."""
-        index = {"y zhang": "yzhang"}
-        assert fuzzy_match("H. Zhang", index) is None
+        assert fuzzy_matches("H. Zhang", Candidates([("yzhang", ["Y. Zhang"])])) == []
 
     def test_close_match(self):
-        index = {"alice adams": "aadams"}
-        # "alice a adams" is close to "alice adams"
-        result = fuzzy_match("Alice A. Adams", index, threshold=0.75)
-        assert result == "aadams"
-
-    def test_no_match(self):
-        index = {"alice adams": "aadams"}
-        result = fuzzy_match("Completely Different Name", index)
-        assert result is None
+        candidates = Candidates([("aadams", ["Alice Adams"])])
+        assert fuzzy_matches("Alice A. Adams", candidates, threshold=0.75) == ["aadams"]
+        assert fuzzy_matches("Completely Different Name", candidates) == []
 
     def test_ties_are_all_returned_sorted(self):
-        index = {"dina lee": "zlee", "dena lee": "alee", "alice adams": "aadams"}
-        assert fuzzy_matches("Dana Lee", index, threshold=0.8) == ["alee", "zlee"]
-        assert fuzzy_match("Dana Lee", index, threshold=0.8) == "alee"
-        assert fuzzy_matches("H. Zhang", {"h zhang": "hz"}) == []
+        candidates = Candidates([("zlee", ["Dina Lee"]), ("alee", ["Dena Lee"]),
+                                 ("aadams", ["Alice Adams"])])
+        assert fuzzy_matches("Dana Lee", candidates, threshold=0.8) == ["alee", "zlee"]
 
-
-class TestMatchForm:
-    """The abbreviated form, which the document never shows.
-
-    The resolver reads it only where the input is itself abbreviated, and
-    only against a declared name or alias (#24).
-    """
-
-    def test_given_names_are_abbreviated(self):
-        assert match_form(Author(name="Alice Jane Adams", given="Alice Jane",
-                                 family="Adams")) == "A. J. Adams"
-
-    def test_run_together_initials_are_one_initial_each(self):
-        assert match_form(Author(name="S.S. Ivers", given="S.S.",
-                                 family="Ivers")) == "S. S. Ivers"
-
-    def test_a_hyphenated_given_name_keeps_both_initials(self):
-        assert match_form(Author(name="Grace-Ann Green", given="Grace-Ann",
-                                 family="Green")) == "G.-A. Green"
-
-    def test_particles_and_suffixes(self):
-        assert match_form(Author(name="Victor van den Berg", given="Victor",
-                                 von="van den", family="Berg")) == \
-            "V. van den Berg"
-        assert match_form(Author(name="John Smith Jr.", given="John",
-                                 family="Smith", suffix="Jr.")) == "J. Smith, Jr."
-
-    def test_a_brace_protected_name_has_nothing_to_abbreviate(self):
-        assert match_form(Author(name="Example Robotics Consortium",
-                                 literal="Example Robotics Consortium")) == \
-            "Example Robotics Consortium"
-
-    def test_it_is_not_the_emitted_name(self):
-        """The two are independent, which is the whole point of the split."""
-        author = Author(name="Alice Adams", given="Alice", family="Adams")
-        assert match_form(author) == "A. Adams"
-        assert author.name == "Alice Adams"
+    def test_a_form_two_people_declare_suggests_neither(self):
+        """`ab kim` is nearest `a kim`, which both Kims declare."""
+        candidates = Candidates([("akim", ["Alex Kim", "A. Kim"]),
+                                 ("alankim", ["Alan Kim", "A. Kim"])])
+        assert fuzzy_matches("Ab Kim", candidates) == []
 
 
 # The three corpus authorships #56 section 7 predicted would move once
@@ -208,15 +131,6 @@ class TestTheResolverMatchesTheFullName:
         author = Author(name=" ".join(p for p in (given, von, family) if p),
                         position=1, given=given, von=von, family=family)
         assert self.resolve(author) == on_full_name
-
-    def test_the_abbreviated_form_would_have_answered_differently(self):
-        """So the rows above are about which form is matched, not a coincidence."""
-        index = build_alias_index(self.PEOPLE)
-        moved = [row for row in MATCHED_ON_THE_FULL_NAME if row[3] != row[4]]
-        assert len(moved) == 2
-        for given, von, family, on_match_form, _ in moved:
-            author = Author(name=f"{given} {family}", given=given, family=family)
-            assert index.get(normalize_name(match_form(author))) == on_match_form
 
     @pytest.mark.parametrize(
         "given,von,family,on_match_form,on_full_name",
@@ -439,15 +353,6 @@ class TestRunTogetherInitials:
         people = [Person(id="ssr", name="S.S. Robotics")]
         assert _resolved(people, name="S.S. Robotics",
                          literal="S.S. Robotics") == "ssr"
-
-    def test_a_declaration_whose_words_normalise_apart_is_read_whole(self):
-        """A `<sup>` span across two words is removed from the whole string
-        only, so the words do not line up with it; the declaration is then
-        compared as normalised, without spacing any initials."""
-        people = [Person(id="sivers", name="Stella Sky Ivers",
-                         aliases=["S.S. Ivers<sup>1 2</sup>"])]
-        assert _resolved(people, given="S. S.", family="Ivers") is None
-        assert _resolved(people, given="SS", family="Ivers") == "sivers"
 
     @pytest.mark.parametrize("written", ["\u0160.S.", "S\u030c.S."])
     @pytest.mark.parametrize("declared", ["\u0160. S.", "S\u030c. S."])

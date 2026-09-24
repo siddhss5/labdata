@@ -110,8 +110,6 @@ def normalize_name(name: str) -> str:
     )
     # Remove periods
     name = name.replace('.', '')
-    # Remove superscript HTML tags
-    name = re.sub(r'<sup>.*?</sup>', '', name)
     # Collapse whitespace
     name = re.sub(r'\s+', ' ', name).strip()
     return name
@@ -205,24 +203,6 @@ def full_form(contributor: Contributor) -> str:
     return _joined(contributor.given or "", contributor)
 
 
-def match_form(contributor: Contributor) -> str:
-    """The abbreviated form of a name: ``A. J. van Last, Jr.``
-
-    Matched only where the input is itself abbreviated -- where some part of
-    the given name is an initial -- and then only against a declared name or
-    alias. A full name is never abbreviated to find a match: that is how
-    `Alan Kim` used to resolve to another Kim who declared `A. Kim`.
-
-    A name written as one brace-protected unit has nothing to abbreviate and
-    is matched as written.
-    """
-    if contributor.literal:
-        return contributor.literal
-    given = contributor.given or ""
-    initials = " ".join(_initials(part) for part in _given_parts(given))
-    return _joined(initials, contributor)
-
-
 def is_abbreviated(name: str) -> bool:
     """Check if a normalized name is a single-initial abbreviation.
 
@@ -230,38 +210,6 @@ def is_abbreviated(name: str) -> bool:
     too little information for reliable fuzzy matching.
     """
     return bool(_ABBREVIATED_NAME_RE.match(name))
-
-
-def build_alias_index(people: List[Person]) -> Dict[str, str]:
-    """Build a normalized name → person_id lookup from people data.
-
-    Indexes both the canonical name and all explicit aliases.
-    Skips ambiguous aliases (same normalized form for different people);
-    `shared_declarations()` is what reports them.
-    """
-    index = {}
-    # Track which aliases are ambiguous (map to multiple people)
-    ambiguous: Dict[str, List[str]] = {}
-
-    for person in people:
-        # Index the canonical name
-        normalized = normalize_name(person.name)
-        if normalized in index and index[normalized] != person.id:
-            ambiguous.setdefault(normalized, [index.pop(normalized)]).append(person.id)
-        elif normalized not in ambiguous:
-            index[normalized] = person.id
-
-        # Index all aliases
-        for alias in person.aliases:
-            normalized_alias = normalize_name(alias)
-            if normalized_alias in index and index[normalized_alias] != person.id:
-                ambiguous.setdefault(normalized_alias, [index.pop(normalized_alias)]).append(person.id)
-            elif normalized_alias in ambiguous:
-                ambiguous[normalized_alias].append(person.id)
-            else:
-                index[normalized_alias] = person.id
-
-    return index
 
 
 def shared_declarations(people: List[Person], source: str) -> List[str]:
@@ -294,38 +242,31 @@ def shared_declarations(people: List[Person], source: str) -> List[str]:
     return reported
 
 
-def fuzzy_match(name: str, index: Dict[str, str], threshold: float = FUZZY_THRESHOLD) -> Optional[str]:
-    """Try fuzzy matching a name against the alias index.
-
-    Skips matching for single-initial abbreviated names (e.g. "S. Zhang")
-    since they lack enough information for reliable fuzzy matching.
-
-    Returns the first of `fuzzy_matches()`, or None. The resolver reads the
-    answer as a suggestion only.
-    """
-    matches = fuzzy_matches(name, index, threshold)
-    return matches[0] if matches else None
-
-
-def fuzzy_matches(name: str, index: Dict[str, str],
+def fuzzy_matches(name: str, candidates: "Candidates",
                   threshold: float = FUZZY_THRESHOLD) -> List[str]:
-    """Every person_id tied at the best similarity at or above the threshold,
-    sorted, so a tie does not depend on the order of `people.yaml`."""
-    normalized = normalize_name(name)
+    """Every id tied at the best similarity at or above the threshold,
+    sorted, so a tie does not depend on the order of `people.yaml`.
 
-    # Don't fuzzy-match abbreviated names — too ambiguous
+    Compared against each normalised form exactly one entity declares: a form
+    more than one declares suggests nobody, and `shared_declarations()`
+    reports it. A single-initial name such as ``S. Zhang`` is never compared,
+    because it carries too little to suggest anyone.
+    """
+    normalized = normalize_name(name)
     if is_abbreviated(normalized):
         return []
 
     best_ratio = 0.0
     best_ids: Set[str] = set()
 
-    for indexed_name, person_id in index.items():
-        ratio = SequenceMatcher(None, normalized, indexed_name).ratio()
+    for key, ids in candidates.exact.items():
+        if len(ids) != 1:
+            continue
+        ratio = SequenceMatcher(None, normalized, key).ratio()
         if ratio > best_ratio:
-            best_ratio, best_ids = ratio, {person_id}
+            best_ratio, best_ids = ratio, set(ids)
         elif ratio == best_ratio:
-            best_ids.add(person_id)
+            best_ids |= ids
 
     return sorted(best_ids) if best_ratio >= threshold else []
 
@@ -484,7 +425,7 @@ def person_candidates(people: Sequence[Person]) -> Candidates:
 
 
 def _resolve(contributors: Sequence[Contributor], candidates: Candidates,
-             index: Dict[str, str], fuzzy_threshold: float,
+             fuzzy_threshold: float,
              where: Tuple[str, str, str],
              report: Optional[List[str]]) -> List[str]:
     """Resolve one list of contributors in place; return the names left over.
@@ -512,7 +453,7 @@ def _resolve(contributors: Sequence[Contributor], candidates: Candidates,
                 f"{', '.join(found.ids)}"))
             continue
         suggested = set(found.ids) | set(
-            fuzzy_matches(full_form(contributor), index, fuzzy_threshold))
+            fuzzy_matches(full_form(contributor), candidates, fuzzy_threshold))
         if suggested:
             report.append(diagnostic(
                 SUGGESTION, *where,
@@ -549,15 +490,13 @@ def resolve_authors(
         return []
 
     candidates = person_candidates(people)
-    index = build_alias_index(people)
     unresolved: Set[str] = set()
 
     for work in works:
         file = f"{bib_dir}/{work.source_file}"
-        unresolved |= set(_resolve(work.authors, candidates, index,
-                                   fuzzy_threshold,
+        unresolved |= set(_resolve(work.authors, candidates, fuzzy_threshold,
                                    (file, work.bib_id, "author"), diagnostics))
-        _resolve(work.editors, candidates, index, fuzzy_threshold,
+        _resolve(work.editors, candidates, fuzzy_threshold,
                  (file, work.bib_id, "editor"), diagnostics)
 
     return sorted(unresolved)
