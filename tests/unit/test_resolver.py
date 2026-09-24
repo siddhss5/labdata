@@ -436,7 +436,7 @@ class TestComputeBacklinks:
         project = Project(id="gardenbot", title="Robot Gardening")
         data = LabData(works=[work], people=[person], projects=[project])
         compute_backlinks(data)
-        assert person.work_ids == [] and person.work_count == 0
+        assert person.work_ids == []
         assert project.work_ids == ["adams2024"]
         assert project.people_ids == []
 

@@ -343,7 +343,7 @@ def test_near_miss_reported_as_a_suggestion(valid_validate, valid_unresolved, va
 def test_external_author_listed(valid_unresolved, valid_output):
     assert "Quentin Quinn" in valid_unresolved.stdout
     quinn = item(valid_output, "collaborators", "name", "Quentin Quinn")
-    assert quinn["work_count"] == 2
+    assert len(quinn["work_ids"]) == 2
 
 
 # --- LaTeX and text ----------------------------------------------------------
@@ -418,9 +418,9 @@ LINKS = [
          Contains("missing.pdf")),
     case("links.pdf.local_missing", "missing", "links.pdf.0.verification.status",
          "missing"),
-    # A build never fetches, so nothing records a time of its own.
-    case("links.pdf.local_present", "present", "links.pdf.0.verification.checked_at",
-         None),
+    # A build never fetches, so the verification carries a status and no time.
+    case("links.pdf.local_present", "present", "links.pdf.0.verification",
+         {"status": "verified"}),
     case("links.note_link_award", "link-note-award", "note",
          Contains("https://example.org/papers/award")),
     case("links.note_link_award", "link-note-award", "award", "Best Paper Award Finalist",
@@ -444,7 +444,7 @@ def test_video_field_beside_a_website_url(tmp_path):
     assert run.code == 0 and run.crash is None, run.output
     found = work(data, "link-video-field")
     input_link = {"label": None, "origin": "input",
-                  "verification": {"status": "unchecked", "checked_at": None}}
+                  "verification": {"status": "unchecked"}}
     assert found["links"] == {
         "url": [{"url": "https://example.org/projects/link-video-field",
                  **input_link}],
@@ -465,11 +465,11 @@ def test_pdf_field_replaces_the_base_url_link(valid_output, tmp_path):
     is set; an empty one is read as absent and draws no diagnostic."""
     pdf_link = [{"url": "https://example.org/papers/link-pdf-field.pdf",
                  "label": None, "origin": "input",
-                 "verification": {"status": "unchecked", "checked_at": None}}]
+                 "verification": {"status": "unchecked"}}]
     assert work(valid_output, "link-pdf-field")["links"] == {"pdf": pdf_link}
     assert work(valid_output, "link-pdf-empty")["links"] == {"pdf": [
         {"url": "pdfs/link-pdf-empty.pdf", "label": None, "origin": "derived",
-         "verification": {"status": "missing", "checked_at": None}}]}
+         "verification": {"status": "missing"}}]}
 
     variant = write_variant(tmp_path, pdf_base_url=None, bib_files=[
         {"name": "links.bib", "category": "Links"}])
@@ -648,9 +648,9 @@ def test_project_backlinks(valid_output):
 # (case_id, section, lookup key, lookup value, field path, expected)
 
 OUTPUT_FIELDS = [
-    case("output.schema_version", "", "", "", "schema_version", 4),
+    case("output.schema_version", "", "", "", "schema_version", 5),
     case("output.generator", "", "", "", "generator.name", "sslabdata"),
-    case("output.generator", "", "", "", "generator.schema_version", 4),
+    case("output.generator", "", "", "", "generator.schema_version", 5),
     case("output.lab", "", "", "", "lab.name", "Corpus Lab"),
     case("output.work.bib_id", "works", "bib_id", "type-article", "bib_id",
          "type-article"),
@@ -713,7 +713,7 @@ OUTPUT_FIELDS = [
     case("output.work.links", "works", "bib_id", "link-url", "links.url",
          [{"url": "https://example.org/papers/link-url", "label": None,
            "origin": "input",
-           "verification": {"status": "unchecked", "checked_at": None}}]),
+           "verification": {"status": "unchecked"}}]),
     case("output.work.project_ids", "works", "bib_id", "proj-multiple",
          "project_ids", ["homebot", "sharedarm"]),
     case("output.work.bibtex", "works", "bib_id", "type-article", "bibtex",
@@ -740,7 +740,6 @@ OUTPUT_FIELDS = [
          "Learning to Tidy"),
     case("output.person.current_position", "people", "id", "eevans", "current_position",
          "Research Scientist, Example Robotics Inc."),
-    case("output.person.work_count", "people", "id", "ccote", "work_count", 8),
     case("output.person.work_ids", "people", "id", "ccote", "work_ids",
          ["proj-multiple", "name-accent-tex", "name-accent-utf8", "name-equal-dollar",
           "name-equal-caret", "name-equal-superscript", "name-equal-star",
@@ -752,6 +751,8 @@ OUTPUT_FIELDS = [
          "Robots that tidy up a fictional kitchen."),
     case("output.project.website", "projects", "id", "homebot", "website",
          "https://example.org/projects/homebot"),
+    case("output.project.image", "projects", "id", "homebot", "image",
+         "images/projects/homebot.jpg"),
     case("output.project.status", "projects", "id", "sharedarm", "status", "completed"),
     case("output.project.work_ids", "projects", "id", "homebot", "work_ids",
          ["proj-single", "proj-multiple"]),
@@ -779,10 +780,6 @@ OUTPUT_FIELDS = [
                          {"work_id": "id-grouping", "position": 2}]),
     case("output.collaborator.work_ids", "collaborators", "name", "Quentin Quinn",
          "work_ids", ["id-external-2023", "id-external-2019"]),
-    case("output.collaborator.work_count", "collaborators", "name", "Quentin Quinn",
-         "work_count", 2),
-    case("output.collaborator.authorship_count", "collaborators", "name",
-         "Quentin Quinn", "authorship_count", 2),
     case("output.collaborator.last_year", "collaborators", "name", "Quentin Quinn",
          "last_year", 2023),
     case("output.collaborator.derived", "collaborators", "name", "Quentin Quinn",
@@ -805,7 +802,7 @@ def test_collaborators_order(valid_output):
     parsed and a brace-protected spelling of one string are two keys -- so
     the name alone is no longer total.
     """
-    rows = [(c["last_year"] is None, -(c["last_year"] or 0), -c["work_count"],
+    rows = [(c["last_year"] is None, -(c["last_year"] or 0), -len(c["work_ids"]),
              c["name"], c["key"]) for c in valid_output["collaborators"]]
     assert rows == sorted(rows)
     assert valid_output["collaborators"][0]["name"] == "Quentin Quinn"
@@ -842,8 +839,6 @@ def test_two_authorships_written_alike_stay_apart(valid_output):
 
     entry = item(valid_output, "collaborators", "key", alike[0]["collaborator_key"])
     assert entry["work_ids"] == ["id-alike"]
-    assert entry["work_count"] == 1
-    assert entry["authorship_count"] == 2
     assert entry["authorships"] == [{"work_id": "id-alike", "position": 2},
                                     {"work_id": "id-alike", "position": 3}]
 

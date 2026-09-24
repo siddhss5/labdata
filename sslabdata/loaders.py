@@ -42,7 +42,7 @@ RECORD_KEY_UNKNOWN = "RECORD-KEY-UNKNOWN"
 PERSON_KEYS = ("id", "name", "aliases", "role", "status", "photo", "website",
                "email", "co_advisor", "start_year", "end_year", "degree",
                "thesis_title", "current_position")
-PROJECT_KEYS = ("id", "title", "description", "website", "status")
+PROJECT_KEYS = ("id", "title", "description", "website", "image", "status")
 COLLABORATOR_KEYS = ("name", "aliases")
 
 # A person's `status` is one of these. A `role` is any non-empty string, so
@@ -204,6 +204,7 @@ def load_projects(path: str, diagnostics: List[Diagnostic]) -> List[Project]:
             title=entry['title'],
             description=entry.get('description'),
             website=entry.get('website'),
+            image=entry.get('image'),
             status=status,
         )
         projects.append(project)

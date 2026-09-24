@@ -230,8 +230,6 @@ class _Grouping:
             name_variants=sorted(self.variants),
             authorships=self.authorships,
             work_ids=self.work_ids,
-            work_count=len(self.work_ids),
-            authorship_count=len(self.authorships),
             last_year=self.last_year,
         )
 

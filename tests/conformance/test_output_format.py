@@ -18,7 +18,7 @@ import pytest
 import yaml
 
 from .support import (
-    EXPECTED, PREVIOUS_SCHEMA_PATH, REPO_ROOT, SCHEMA_PATH, VALID, export, item,
+    EXPECTED, PREVIOUS_SCHEMA_PATHS, REPO_ROOT, SCHEMA_PATH, VALID, export, item,
 )
 
 DEMO_CONFIG = "examples/demo/lab.yaml"
@@ -68,7 +68,6 @@ def check_references(data):
             assert editor["person_id"] in people | {None}, (work["bib_id"], editor)
     for person in data["people"]:
         assert set(person["work_ids"]) <= works, person["id"]
-        assert person["work_count"] == len(person["work_ids"])
     for project in data["projects"]:
         assert set(project["work_ids"]) <= works, project["id"]
         assert set(project["people_ids"]) <= people, project["id"]
@@ -77,8 +76,6 @@ def check_references(data):
     for collaborator in data["collaborators"]:
         grouped = [(a["work_id"], a["position"]) for a in collaborator["authorships"]]
         assert set(grouped) <= positions, collaborator["key"]
-        assert collaborator["authorship_count"] == len(grouped)
-        assert collaborator["work_count"] == len(set(w for w, _ in grouped))
         assert collaborator["work_ids"] == sorted(
             {w for w, _ in grouped}, key=[w for w, _ in grouped].index)
     # Every unresolved authorship is grouped, and every grouping is used.
@@ -131,41 +128,44 @@ def test_schema_rejects_an_authorship_with_two_references_or_none(validator,
         assert schema_errors(validator, data), change
 
 
-# The v3 schema as it stood at `78570e6`, the last commit before v4, digested
-# byte for byte. "Unchanged" is a claim about bytes, and only bytes can make
-# it: a check that v3 still parses and still says `3` stays green while its
-# title, its descriptions or any of its constraints are rewritten under a
-# consumer that pinned it.
-PREVIOUS_SCHEMA_SHA256 = (
-    "97f85113822cffb47d36b415716563b50bfe4bf2bc30e892e4cc45b9e377aa92")
+# The SHA-256 of each published schema, pinned byte for byte. "Unchanged" is
+# a claim about bytes, and only bytes can make it: a check that a schema
+# parses and states its version stays green while its title, its
+# descriptions or any of its constraints are rewritten under a consumer that
+# pinned it.
+PREVIOUS_SCHEMA_SHA256 = {
+    3: "97f85113822cffb47d36b415716563b50bfe4bf2bc30e892e4cc45b9e377aa92",
+    4: "58baac01027d2f6b1a6451e395d6569bcb4318041ee204649aee8029adda24ba",
+}
 
-# The v4 `$id`, stated here as the literal a consumer would resolve. It is
+# The v5 `$id`, stated here as the literal a consumer would resolve. It is
 # served from a tag created when this version ships and never moved (SPEC.md
 # section 6), so changing this string is a contract change and has to be a
 # deliberate edit in two places.
-SCHEMA_ID = ("https://raw.githubusercontent.com/siddhss5/labdata/schema-v4"
-             "/schema/v4/output.schema.json")
+SCHEMA_ID = ("https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v5"
+             "/schema/v5/output.schema.json")
 
 
 # Covers output.versioned_schema
 def test_the_previous_schema_stays_reachable_unchanged(validator):
-    """v3 is still at its own path, byte for byte, and v4 is a second one.
+    """v3 and v4 are each at their own path, byte for byte, and v5 is at a
+    third.
 
-    A consumer pinned to v3 keeps a stable target only if nothing in the file
-    moves, so the assertion is on the digest rather than on any property of
-    the parsed document.
+    A consumer pinned to an earlier version keeps a stable target only if
+    nothing in the file moves, so the assertion is on the digest rather than
+    on any property of the parsed document.
     """
-    raw = PREVIOUS_SCHEMA_PATH.read_bytes()
-    assert hashlib.sha256(raw).hexdigest() == PREVIOUS_SCHEMA_SHA256
+    assert validator.schema["properties"]["schema_version"]["const"] == 5
+    for version, path in PREVIOUS_SCHEMA_PATHS.items():
+        raw = path.read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == PREVIOUS_SCHEMA_SHA256[version]
 
-    previous = json.loads(raw.decode("utf-8"))
-    jsonschema.Draft202012Validator.check_schema(previous)
-    assert previous["properties"]["schema_version"]["const"] == 3
-    assert validator.schema["properties"]["schema_version"]["const"] == 4
-    # The two are different documents at different paths, not one file read
-    # twice.
-    assert PREVIOUS_SCHEMA_PATH != SCHEMA_PATH
-    assert previous["$id"] != validator.schema["$id"]
+        previous = json.loads(raw.decode("utf-8"))
+        jsonschema.Draft202012Validator.check_schema(previous)
+        assert previous["properties"]["schema_version"]["const"] == version
+        # Different documents at different paths, not one file read twice.
+        assert path != SCHEMA_PATH
+        assert previous["$id"] != validator.schema["$id"]
 
 
 # Covers output.versioned_schema
@@ -178,7 +178,7 @@ def test_the_published_id_is_the_string_consumers_resolve(validator):
     """
     schema_id = validator.schema["$id"]
     assert schema_id == SCHEMA_ID
-    assert "/schema-v4/" in schema_id, schema_id
+    assert "/schema-v5/" in schema_id, schema_id
     assert "/main/" not in schema_id and "/blob/" not in schema_id, schema_id
 
 
@@ -294,6 +294,60 @@ def test_every_derived_bag_is_empty(valid_output, demo_exports):
         assert filled == [], filled
     # The walk has to have found the bags it is reporting on.
     assert len(bags(valid_output)) > 100, len(bags(valid_output))
+
+
+
+def keys_anywhere(data):
+    """Every key of every object in the document, at any depth."""
+    found = set()
+
+    def walk(value):
+        if isinstance(value, dict):
+            found.update(value)
+            for inner in value.values():
+                walk(inner)
+        elif isinstance(value, list):
+            for inner in value:
+                walk(inner)
+
+    walk(data)
+    return found
+
+
+# Covers output.project.image
+def test_a_project_image_is_emitted_or_null_and_never_reported(valid_output,
+                                                               valid_validate):
+    """`image` is read from `projects.yaml` like any other key: carried as
+    written where a project has one, declared and null where it has none,
+    and never reported as a key sslabdata does not read."""
+    homebot = item(valid_output, "projects", "id", "homebot")
+    sharedarm = item(valid_output, "projects", "id", "sharedarm")
+    assert homebot["image"] == "images/projects/homebot.jpg"
+    assert "image" in sharedarm and sharedarm["image"] is None
+    assert valid_validate.code == 0 and valid_validate.crash is None
+    assert "RECORD-KEY-UNKNOWN" not in valid_validate.output
+    assert "image" not in valid_validate.output
+
+
+# Covers output.link.verification
+def test_a_link_verification_is_only_its_status(valid_output, demo_exports):
+    """A build never fetches and records no time, so `verification` carries
+    a status and nothing else."""
+    for data in [valid_output] + list(demo_exports):
+        verifications = [link["verification"] for w in data["works"]
+                         for links in w["links"].values() for link in links]
+        assert verifications, "the document is supposed to carry links"
+        assert [v for v in verifications if set(v) != {"status"}] == []
+        assert "checked_at" not in keys_anywhere(data)
+
+
+# Covers output.no_duplicate_counts
+def test_no_count_repeats_the_length_of_a_list(valid_output, demo_exports):
+    """A person's and a collaborator's counts would only restate the length
+    of `work_ids` or `authorships` beside them, so neither is emitted."""
+    for data in [valid_output] + list(demo_exports):
+        assert data["people"] and data["collaborators"]
+        assert keys_anywhere(data) & {"work_count", "authorship_count"} == set()
 
 
 # Covers output.yaml_json_same

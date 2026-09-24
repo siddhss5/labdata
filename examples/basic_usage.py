@@ -43,4 +43,4 @@ for work in data.works[:3]:
 
 for person in data.people:
     print(f"\n{person.name} ({person.role}, {person.status})")
-    print(f"  {person.work_count} works")
+    print(f"  {len(person.work_ids)} works")

@@ -299,9 +299,8 @@
 % CASE output.collaborator.name_variants
 % CASE output.collaborator.authorships
 % CASE output.collaborator.work_ids
-% CASE output.collaborator.authorship_count
+% CASE output.no_duplicate_counts
 % CASE output.collaborator.derived
-% CASE output.collaborator.work_count
 % CASE output.collaborator.last_year
 % CASE output.collaborators.order
 @article{id-external-2023,
@@ -335,8 +334,8 @@
 % Two different people listed on one work under one written name, as a
 % collaboration's style sometimes requires. Any grouping by name puts them
 % together, so what has to survive is the occurrence: two authorships at two
-% positions under one key, with a work_count of 1 and an authorship_count
-% of 2.
+% positions under one key, with one work in its work_ids and two
+% occurrences in its authorships.
 % CASE identity.alike_authorships
 @article{id-alike,
   title   = {Two Co-authors Written Alike},

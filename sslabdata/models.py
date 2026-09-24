@@ -21,10 +21,10 @@ from typing import Dict, List, Optional
 from .config import reject_absolute_name
 
 
-# Version of the output format (see schema/v4/output.schema.json). Bump it when
+# Version of the output format (see schema/v5/output.schema.json). Bump it when
 # a change to to_dict() output could break a consumer. SPEC.md section 6 says
 # what each version changed.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # The name of the compiler, as the document's `generator` record reports it.
 GENERATOR_NAME = "sslabdata"
@@ -61,21 +61,18 @@ class Link:
     ``inferred`` and ``derived``: only ``input`` means the entry's own field
     supplied it. ``status`` is ``unchecked``, ``verified`` or ``missing``; a
     link that fails verification is kept and labelled, never deleted.
-    ``checked_at`` is null unless a committed cache supplied it — a build
-    never fetches, so it never records a time of its own.
     """
     url: str
     label: Optional[str] = None
     origin: str = "input"
     status: str = "unchecked"
-    checked_at: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
             'url': self.url,
             'label': self.label,
             'origin': self.origin,
-            'verification': {'status': self.status, 'checked_at': self.checked_at},
+            'verification': {'status': self.status},
         }
 
 
@@ -267,7 +264,6 @@ class Person:
     current_position: Optional[str] = None
 
     # Back-linked (computed, not from YAML input)
-    work_count: int = 0
     work_ids: List[str] = field(default_factory=list)
     derived: Dict[str, object] = field(default_factory=dict)
 
@@ -292,7 +288,6 @@ class Person:
             'degree': self.degree,
             'thesis_title': self.thesis_title,
             'current_position': self.current_position,
-            'work_count': self.work_count,
             'work_ids': list(self.work_ids),
             'derived': dict(self.derived),
         }
@@ -329,8 +324,6 @@ class Collaborator:
     name_variants: List[str] = field(default_factory=list)
     authorships: List[Dict[str, object]] = field(default_factory=list)
     work_ids: List[str] = field(default_factory=list)
-    work_count: int = 0
-    authorship_count: int = 0
     last_year: Optional[int] = None
     derived: Dict[str, object] = field(default_factory=dict)
 
@@ -348,8 +341,6 @@ class Collaborator:
             'name_variants': list(self.name_variants),
             'authorships': [dict(a) for a in self.authorships],
             'work_ids': list(self.work_ids),
-            'work_count': self.work_count,
-            'authorship_count': self.authorship_count,
             'last_year': self.last_year,
             'derived': dict(self.derived),
         }
@@ -369,6 +360,10 @@ class Project:
     people_ids: List[str] = field(default_factory=list)
     derived: Dict[str, object] = field(default_factory=dict)
 
+    # Declared last so it takes no other field's position in a positional
+    # call; to_dict() emits it beside `website`.
+    image: Optional[str] = None
+
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {
@@ -376,6 +371,7 @@ class Project:
             'title': self.title,
             'description': self.description,
             'website': self.website,
+            'image': self.image,
             'status': self.status,
             'work_ids': list(self.work_ids),
             'people_ids': list(self.people_ids),

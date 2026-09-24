@@ -32,7 +32,7 @@ def sample_data():
     )
     person = Person(
         id="aadams", name="Alice Adams", role="pi", status="current",
-        work_count=1, work_ids=["adams2024robot"],
+        work_ids=["adams2024robot"],
     )
     project = Project(
         id="gardenbot", title="Robot-Assisted Gardening", status="active",
@@ -56,9 +56,9 @@ class TestExportToJson:
         with open(out, 'r') as f:
             loaded = json.load(f)
         assert loaded == {
-            "schema_version": 4,
+            "schema_version": 5,
             "generator": {"name": "sslabdata", "version": sslabdata.__version__,
-                          "schema_version": 4},
+                          "schema_version": 5},
             "lab": {}, "works": [], "people": [], "projects": [],
             "collaborators": [],
         }

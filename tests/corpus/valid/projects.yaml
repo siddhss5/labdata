@@ -4,6 +4,7 @@
 # CASE output.project.title
 # CASE output.project.description
 # CASE output.project.website
+# CASE output.project.image
 # CASE output.project.status
 # CASE output.project.work_ids
 # CASE output.project.people_ids
@@ -12,6 +13,7 @@
   title: "Household Manipulation"
   description: "Robots that tidy up a fictional kitchen."
   website: "https://example.org/projects/homebot"
+  image: "images/projects/homebot.jpg"
   status: "active"
 
 - id: "sharedarm"

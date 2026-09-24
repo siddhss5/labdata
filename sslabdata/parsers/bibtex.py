@@ -638,8 +638,7 @@ def parse_editor_list(entry: Entry, on_unknown) -> List[Contributor]:
 
     An editor is name-parsed and resolved to a person the same way, but
     editing a volume is not an authorship: editors are excluded from
-    `work_count`, from `person.work_ids`, from a project's people and from
-    `collaborators`, so an editor who matches nobody is simply unresolved.
+    `person.work_ids`, from a project's people and from `collaborators`, so an editor who matches nobody is simply unresolved.
     """
     return [Contributor(name=found["name"], position=found["position"],
                         **found["parts"])
