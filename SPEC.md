@@ -392,14 +392,16 @@ alone. Its message is always one coded diagnostic line.
 **`sslabdata.AssemblyError`** (defined in `sslabdata.assembler`) is a subclass
 of `ValueError`, raised by `assemble()` when any diagnostic is of class
 *fatal* in the table under *Diagnostic codes*, whatever its `diagnostics`
-argument is. That argument decides only whether the diagnostics are returned
-in an `AssemblyResult` or printed to standard error, each prefixed `Warning: `;
-no document is ever returned from input the CLI refuses to write. The
-exception's message is the fatal diagnostics, one per line, and its
-`diagnostics` attribute holds every diagnostic of the run in report order. A
-validation error, such as a repeated citation key, does not raise: the
-document is returned, as `--output` writes it, with the diagnostic returned
-or printed alongside the rest.
+argument is, so no document is returned from input with a fatal-class code.
+That argument decides only printing: with `diagnostics=False`, every
+diagnostic of the run, fatal ones included, is printed to standard error in
+report order, each prefixed `Warning: `, before the exception is raised; with
+`diagnostics=True` nothing is printed, and the diagnostics are returned in an
+`AssemblyResult` or carried by the exception. The exception's message is the
+fatal diagnostics, one per line, and its `diagnostics` attribute holds every
+diagnostic of the run in report order. A validation error, such as a repeated
+citation key, does not raise: the document is returned, as `--output` writes
+it, with the diagnostic returned or printed alongside the rest.
 
 Private, and free to change without a version bump: `sslabdata.parsers.*`,
 `sslabdata.loaders`, `sslabdata.resolver`, `sslabdata.cli`'s internals, and every

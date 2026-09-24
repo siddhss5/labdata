@@ -17,7 +17,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from .config import LabDataConfig, reject_absolute_name
-from .diagnostics import ERROR, diagnostic, in_report_order, severity
+from .diagnostics import (
+    ERROR, Diagnostic, diagnostic, in_report_order, severity,
+)
 from .models import Author, Collaborator, LabData, Person, Work
 from .parsers.bibtex import parse_all_works
 from .loaders import (
@@ -111,7 +113,7 @@ class AssemblyResult:
     data: LabData
     unresolved_authors: List[str] = field(default_factory=list)
     unknown_projects: List[str] = field(default_factory=list)
-    diagnostics: List[str] = field(default_factory=list)
+    diagnostics: List[Diagnostic] = field(default_factory=list)
 
 
 class AssemblyError(ValueError):
@@ -122,7 +124,7 @@ class AssemblyError(ValueError):
     holds every diagnostic the run found, in report order.
     """
 
-    def __init__(self, fatal: List[str], diagnostics: List[str]):
+    def __init__(self, fatal: List[Diagnostic], diagnostics: List[Diagnostic]):
         super().__init__("\n".join(fatal))
         self.diagnostics = diagnostics
 
@@ -237,7 +239,8 @@ class _Grouping:
 
 def declared_collaborators(declared: List[DeclaredCollaborator],
                            people: List[Person], source: str,
-                           diagnostics: List[str]) -> List[Tuple[str, List[str]]]:
+                           diagnostics: List[Diagnostic]
+                           ) -> List[Tuple[str, List[str]]]:
     """The `collaborators_file` entries as ``(normalised name, spellings)``,
     minus any spelling a lab member already declares.
 
@@ -270,7 +273,7 @@ def declared_collaborators(declared: List[DeclaredCollaborator],
 
 
 def group_collaborators(works: List[Work], bib_dir: str,
-                        diagnostics: List[str],
+                        diagnostics: List[Diagnostic],
                         declared: Optional[List[Tuple[str, List[str]]]] = None,
                         people: Optional[List[Person]] = None) -> List[Collaborator]:
     """Group every unresolved authorship, and say where the grouping is risky.
@@ -385,7 +388,7 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
         config: Lab data configuration
         diagnostics: If True, return AssemblyResult with diagnostics.
                      If False (default), return LabData directly, and print
-                     each diagnostic to standard error.
+                     each diagnostic to standard error first, fatal or not.
 
     Raises:
         AssemblyError: when any diagnostic is fatal, whatever
@@ -393,15 +396,14 @@ def assemble(config: LabDataConfig, diagnostics: bool = False):
             not compile from is never returned.
     """
     result = assemble_result(config)
+    if not diagnostics:
+        for message in result.diagnostics:
+            print(f"Warning: {message}", file=sys.stderr)
     fatal = [line for line in result.diagnostics
              if severity(line, validating=False, strict=False) == ERROR]
     if fatal:
         raise AssemblyError(fatal, result.diagnostics)
-    if diagnostics:
-        return result
-    for message in result.diagnostics:
-        print(f"Warning: {message}", file=sys.stderr)
-    return result.data
+    return result if diagnostics else result.data
 
 
 def assemble_result(config: LabDataConfig) -> AssemblyResult:
@@ -427,7 +429,7 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
     for bib_file in config.bib_files:
         reject_absolute_name(getattr(bib_file, 'name', None))
 
-    found: List[str] = []
+    found: List[Diagnostic] = []
     source = config.path or 'lab.yaml'
 
     for key in config.unknown_keys:

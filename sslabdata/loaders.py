@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import List
 from pathlib import Path
 
-from .diagnostics import diagnostic
+from .diagnostics import Diagnostic, diagnostic
 from .models import Person, Project
 
 
@@ -103,7 +103,7 @@ def _repeated_ids(records: List[dict], path: str, code: str, report) -> None:
         seen.add(key)
 
 
-def load_people(path: str, diagnostics: List[str]) -> List[Person]:
+def load_people(path: str, diagnostics: List[Diagnostic]) -> List[Person]:
     """Load people from a YAML file.
 
     Expected format (list of dicts):
@@ -153,7 +153,7 @@ def load_people(path: str, diagnostics: List[str]) -> List[Person]:
     return people
 
 
-def load_projects(path: str, diagnostics: List[str]) -> List[Project]:
+def load_projects(path: str, diagnostics: List[Diagnostic]) -> List[Project]:
     """Load projects from a YAML file.
 
     Expected format (list of dicts):
@@ -200,7 +200,7 @@ class DeclaredCollaborator:
     aliases: List[str] = field(default_factory=list)
 
 
-def load_collaborators(path: str, diagnostics: List[str]
+def load_collaborators(path: str, diagnostics: List[Diagnostic]
                        ) -> List[DeclaredCollaborator]:
     """Load declared external co-authors from a YAML file.
 

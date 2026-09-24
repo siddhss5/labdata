@@ -16,7 +16,7 @@ import unicodedata
 from difflib import SequenceMatcher
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
-from .diagnostics import diagnostic
+from .diagnostics import Diagnostic, diagnostic
 from .models import Contributor, Work, Person, Project, LabData
 from .parsers.bibtex import given_words
 
@@ -429,7 +429,7 @@ def person_candidates(people: Sequence[Person]) -> Candidates:
 def _resolve(contributors: Sequence[Contributor], candidates: Candidates,
              fuzzy_threshold: float,
              where: Tuple[str, str, str],
-             report: Optional[List[str]]) -> List[str]:
+             report: Optional[List[Diagnostic]]) -> List[str]:
     """Resolve one list of contributors in place; return the names left over.
 
     ``where`` is the ``(file, key, field)`` a diagnostic is located at.
@@ -469,7 +469,7 @@ def resolve_authors(
     works: List[Work],
     people: List[Person],
     fuzzy_threshold: float = FUZZY_THRESHOLD,
-    diagnostics: Optional[List[str]] = None,
+    diagnostics: Optional[List[Diagnostic]] = None,
     bib_dir: str = ".",
 ) -> List[str]:
     """Resolve contributor names in works to person IDs.
@@ -507,7 +507,7 @@ def resolve_authors(
 def resolve_projects(
     works: List[Work],
     projects: List[Project],
-    diagnostics: Optional[List[str]] = None,
+    diagnostics: Optional[List[Diagnostic]] = None,
     bib_dir: str = ".",
 ) -> List[str]:
     """Validate project IDs in works against known projects.

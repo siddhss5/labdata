@@ -145,7 +145,7 @@ def severity(line: str, validating: bool, strict: bool) -> str:
     return WARN
 
 
-def in_report_order(lines: List[str]) -> List[str]:
+def in_report_order(lines: List[Diagnostic]) -> List[Diagnostic]:
     """Fatal codes first, then validation errors, then warnings, each class
     in the order it was found: the order every report lists them in."""
     order = (FATAL_AT_LOAD, FATAL, VALIDATION_ERROR, WARNING)

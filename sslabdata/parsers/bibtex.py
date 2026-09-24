@@ -28,7 +28,7 @@ from pybtex.database.input.bibtex import (
 from pybtex.scanner import PybtexSyntaxError
 
 from .latex import latex_to_text, strip_braces, unknown_commands
-from ..diagnostics import diagnostic
+from ..diagnostics import Diagnostic, diagnostic
 from ..models import Author, Contributor, Link, Venue, Work
 
 
@@ -368,7 +368,7 @@ def _syntax_diagnostic(path: str, error: PybtexSyntaxError,
 
 def parse_bibtex_file(
     path: str,
-    diagnostics: List[str],
+    diagnostics: List[Diagnostic],
     redefinitions: List[Tuple[str, str, int]],
 ) -> Dict[str, Entry]:
     """Parse one BibTeX file into pybtex entries, keyed by citation key.
@@ -996,7 +996,7 @@ def _crossref_error(path: str, bib_id: str, parent: str) -> str:
 def parse_all_works(
     bib_dir: str,
     bib_files: list,
-    diagnostics: List[str],
+    diagnostics: List[Diagnostic],
     pdf_base_url: Optional[str] = None,
 ) -> List[Work]:
     """Parse all configured BibTeX files and return a flat list of Works.

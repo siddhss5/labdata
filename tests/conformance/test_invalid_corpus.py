@@ -229,29 +229,37 @@ FATAL = ["bib_file_not_found", "bib_not_utf8", "collaborators_file_not_found",
          "projects_missing_id"]
 
 
-def assembled(name, diagnostics):
-    """`assemble()` on one case, or None when its configuration does not
-    load, which `from_yaml()` has already refused."""
+def loads(name):
+    """True when the case's configuration loads, so `assemble()` is reached."""
     with working_dir(INVALID / name):
         try:
-            config = LabDataConfig.from_yaml("lab.yaml")
+            LabDataConfig.from_yaml("lab.yaml")
         except ConfigurationError:
-            return None
-        return assemble(config, diagnostics=diagnostics)
+            return False
+    return True
+
+
+def assembled(name, diagnostics):
+    with working_dir(INVALID / name):
+        return assemble(LabDataConfig.from_yaml("lab.yaml"),
+                        diagnostics=diagnostics)
 
 
 @pytest.mark.parametrize("name", FATAL)
-def test_the_python_api_returns_no_document_on_a_fatal_diagnostic(name):
-    """Whatever `diagnostics` is: it decides printing, never compiling."""
+def test_the_python_api_returns_no_document_on_a_fatal_diagnostic(name, capsys):
+    """Whatever `diagnostics` is: it decides printing, never compiling. With
+    False every diagnostic is printed first, fatal ones included."""
     for diagnostics in (False, True):
-        with pytest.raises(AssemblyError):
+        with pytest.raises(AssemblyError) as raised:
             assembled(name, diagnostics)
+        printed = "".join(f"Warning: {line}\n" for line in raised.value.diagnostics)
+        assert capsys.readouterr().err == ("" if diagnostics else printed)
 
 
 @pytest.mark.parametrize("name", sorted(
-    d.name for d in INVALID.iterdir() if d.is_dir() and d.name not in FATAL))
+    d.name for d in INVALID.iterdir()
+    if d.is_dir() and d.name not in FATAL and loads(d.name)))
 def test_the_python_api_returns_a_document_otherwise(name):
     """A validation error, such as a repeated citation key, still returns a
     document, as `--output` still writes one."""
-    data = assembled(name, False)
-    assert data is None or isinstance(data, LabData)
+    assert isinstance(assembled(name, False), LabData)
