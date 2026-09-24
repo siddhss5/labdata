@@ -353,13 +353,16 @@ class Project:
     title: str
     description: Optional[str] = None
     website: Optional[str] = None
-    image: Optional[str] = None
     status: str = "active"
 
     # Back-linked (computed)
     work_ids: List[str] = field(default_factory=list)
     people_ids: List[str] = field(default_factory=list)
     derived: Dict[str, object] = field(default_factory=dict)
+
+    # Declared last so it takes no other field's position in a positional
+    # call; to_dict() emits it beside `website`.
+    image: Optional[str] = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""

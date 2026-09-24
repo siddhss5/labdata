@@ -28,8 +28,8 @@ EXPECTED = CORPUS / "expected"
 REPO_ROOT = TESTS_DIR.parent
 SCHEMA_PATH = REPO_ROOT / "schema" / "v5" / "output.schema.json"
 
-# The earlier versions' schemas, which stay reachable byte for byte after v5
-# ships: a consumer pinned to v3 or v4 keeps a stable target (SPEC.md
+# The published schemas before v5. Each stays reachable byte for byte at its
+# own path, so a consumer pinned to v3 or v4 keeps a stable target (SPEC.md
 # section 6).
 PREVIOUS_SCHEMA_PATHS = {
     version: REPO_ROOT / "schema" / f"v{version}" / "output.schema.json"

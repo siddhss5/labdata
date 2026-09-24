@@ -128,12 +128,11 @@ def test_schema_rejects_an_authorship_with_two_references_or_none(validator,
         assert schema_errors(validator, data), change
 
 
-# The v3 schema as it stood at `78570e6`, the last commit before v4, and the
-# v4 schema as it stood at `89d6f0d`, the last commit before v5, each digested
-# byte for byte. "Unchanged" is a claim about bytes, and only bytes can make
-# it: a check that a schema still parses and still says its version stays
-# green while its title, its descriptions or any of its constraints are
-# rewritten under a consumer that pinned it.
+# The SHA-256 of each published schema, pinned byte for byte. "Unchanged" is
+# a claim about bytes, and only bytes can make it: a check that a schema
+# parses and states its version stays green while its title, its
+# descriptions or any of its constraints are rewritten under a consumer that
+# pinned it.
 PREVIOUS_SCHEMA_SHA256 = {
     3: "97f85113822cffb47d36b415716563b50bfe4bf2bc30e892e4cc45b9e377aa92",
     4: "58baac01027d2f6b1a6451e395d6569bcb4318041ee204649aee8029adda24ba",
@@ -149,8 +148,8 @@ SCHEMA_ID = ("https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v5"
 
 # Covers output.versioned_schema
 def test_the_previous_schema_stays_reachable_unchanged(validator):
-    """v3 and v4 are still at their own paths, byte for byte, and v5 is a
-    third one.
+    """v3 and v4 are each at their own path, byte for byte, and v5 is at a
+    third.
 
     A consumer pinned to an earlier version keeps a stable target only if
     nothing in the file moves, so the assertion is on the digest rather than
