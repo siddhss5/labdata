@@ -743,6 +743,16 @@ class TestSharedDeclarations:
         [line] = shared_declarations(people, "people.yaml")
         assert "p1, p2" in line
 
+    def test_a_declaration_bibtex_cannot_split_is_compared_as_normalised(self):
+        """A word nested more than 100 braces deep makes pybtex raise, so the
+        name's given words are not read and it is compared as written."""
+        deep = "{" * 101 + "x" + "}" * 101
+        people = [Person(id="p1", name="One", aliases=[f"S.S. {deep} Ivers"]),
+                  Person(id="p2", name="Two", aliases=[f"s.s. {deep} ivers"]),
+                  Person(id="p3", name="Three", aliases=[f"S. S. {deep} Ivers"])]
+        [line] = shared_declarations(people, "people.yaml")
+        assert "declared by p1, p2;" in line
+
     def test_a_person_repeating_their_own_spelling_is_not_reported(self):
         people = [Person(id="aadams", name="Alice Adams",
                          aliases=["Alice Adams", "A. Adams", "A Adams"])]

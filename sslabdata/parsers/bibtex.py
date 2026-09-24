@@ -580,6 +580,9 @@ def given_words(name: str) -> List[str]:
     try:
         person = Person(name)
     except PybtexError:
+        # pybtex raises for more than three commas, and for a word nested
+        # more than 100 braces deep. `declared_form()` passes no comma, so
+        # from there only the nesting reaches this.
         return []
     return list(person.first_names) + list(person.middle_names)
 
