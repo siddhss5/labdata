@@ -450,7 +450,6 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
             f"'{path}' does not exist"))
         return False
 
-    # Parse works
     bib_files = [{'name': bf.name, 'category': bf.category}
                  for bf in config.bib_files
                  if present(f"{config.bib_dir}/{bf.name}", 'bib_files', 'name')]
@@ -465,7 +464,6 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
         pdf_base_url=config.pdf_base_url,
     )
 
-    # Load people and projects
     people = (load_people(config.people_file, found)
               if config.people_file and people_found else [])
     projects = (load_projects(config.projects_file, found)
@@ -473,14 +471,11 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
     if people:
         found.extend(shared_declarations(people, config.people_file))
 
-    # Resolve
     unresolved_authors = resolve_authors(works, people, diagnostics=found,
                                          bib_dir=config.bib_dir)
     unknown_projects = resolve_projects(works, projects, found,
                                         bib_dir=config.bib_dir)
 
-    # Group the authorships that resolved to nobody, joining the spellings
-    # `collaborators_file` declares
     declared = None
     if config.collaborators_file and collaborators_found:
         declared = declared_collaborators(
@@ -499,7 +494,6 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
                 LAB_NAME_MISSING, config.path or 'lab.yaml', "lab", "name",
                 "the lab header declares no name"))
 
-    # Assemble
     data = LabData(
         works=works,
         people=people,
@@ -508,7 +502,6 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
         lab=config.lab,
     )
 
-    # Back-link
     compute_backlinks(data)
 
     return AssemblyResult(

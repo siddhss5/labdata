@@ -19,11 +19,9 @@ from .assembler import assemble, AssemblyError, AssemblyResult
 from .exporters import export_to_yaml, export_to_json
 
 __all__ = [
-    # Config
     "LabDataConfig",
     "BibFile",
     "ConfigurationError",
-    # Data model
     "LabData",
     "Work",
     "Author",
@@ -33,11 +31,9 @@ __all__ = [
     "Person",
     "Project",
     "Collaborator",
-    # Pipeline
     "assemble",
     "AssemblyResult",
     "AssemblyError",
-    # Export
     "export_to_yaml",
     "export_to_json",
 ]

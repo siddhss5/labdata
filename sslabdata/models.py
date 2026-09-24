@@ -261,7 +261,6 @@ class Person:
     co_advisor: Optional[str] = None
     start_year: Optional[int] = None
 
-    # Alumni-specific
     end_year: Optional[int] = None
     degree: Optional[str] = None
     thesis_title: Optional[str] = None

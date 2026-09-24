@@ -75,7 +75,6 @@ Examples:
 
     args = parser.parse_args(argv)
 
-    # Validate arguments
     if not args.output and not args.validate and not args.unresolved:
         parser.error("One of --output, --validate, or --unresolved is required")
 
@@ -83,7 +82,6 @@ Examples:
     # printed; with --output alone it names the document's format.
     as_json = args.format == 'json' and (args.validate or args.unresolved)
 
-    # Load configuration
     try:
         config = LabDataConfig.from_yaml(args.config)
     except FileNotFoundError:
@@ -95,11 +93,10 @@ Examples:
         stop(diagnostic(CONFIG_UNREADABLE, args.config, None, None, str(e)),
              "Error loading configuration: ", as_json)
 
-    # Assemble data with diagnostics. `assemble_result()` raises
-    # `ConfigurationError` for an absolute `bib_files` name, but `from_yaml()`
-    # above has already rejected that with the file named, so it cannot
-    # happen here: the check is for callers who built a configuration
-    # themselves.
+    # `assemble_result()` raises `ConfigurationError` for an absolute
+    # `bib_files` name, but `from_yaml()` above has already rejected that with
+    # the file named, so it cannot happen here: the check is for callers who
+    # built a configuration themselves.
     result = assemble_result(config)
     data = result.data
     found = result.diagnostics
@@ -121,7 +118,6 @@ Examples:
             sys.exit(1)
         return
 
-    # --validate mode
     if args.validate:
         print(f"Works: {len(data.works)}")
         print(f"People: {len(data.people)}")
@@ -156,7 +152,6 @@ Examples:
     if errors:
         sys.exit(1)
 
-    # --unresolved mode
     if args.unresolved:
         if not config.people_file:
             print("Author resolution is not configured (no people_file).")
@@ -169,7 +164,6 @@ Examples:
                 print(f"  {name}")
         return
 
-    # Export
     export_func = export_to_yaml if args.format == 'yaml' else export_to_json
     export_func(data, args.output)
 
