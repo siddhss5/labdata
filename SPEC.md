@@ -7,7 +7,7 @@ them.
 This file states the parts of that contract a JSON Schema cannot express:
 what the strings in the document are, what order the lists are in, what an
 absent key means, which fields are computed, when the version changes, and
-how a repeated `@string` macro resolves. `schema/v4/output.schema.json`
+how a repeated `@string` macro resolves. `schema/v5/output.schema.json`
 states the rest.
 
 Everything here is normative unless it carries a `Target` note. A `Target`
@@ -16,7 +16,7 @@ names the issue that will make it true. Until that issue lands, the rule is
 the intent and the note is the fact. A `Version note` marks behaviour that
 changed at a known release boundary, and states both sides.
 
-- Applies to: `schema_version` 4 (`sslabdata.models.SCHEMA_VERSION`), package
+- Applies to: `schema_version` 5 (`sslabdata.models.SCHEMA_VERSION`), package
   version 3.0.0 (`sslabdata.__version__`).
 
 ### How this file cites the code
@@ -25,7 +25,7 @@ Every rule below is grounded in a named part of the code rather than a line
 number, because line numbers rot silently: a function such as
 `sslabdata.parsers.bibtex.parse_all_works()`, a method such as
 `Person.to_dict()`, a module-level constant such as `TEXT_FIELDS`, a JSON
-Pointer into `schema/v4/output.schema.json` such as `/$defs/person/required`, or
+Pointer into `schema/v5/output.schema.json` such as `/$defs/person/required`, or
 a `tests/COVERAGE.md` row key such as `config.people_file.missing`. A bare
 statement is cited by its enclosing function.
 
@@ -354,9 +354,9 @@ What each mode puts in the array:
 > occurrences becoming `Priya Patel`, `Pradeep Patel` and `P. Patel`. The
 > counts change meaning as well as value: v3's `publication_count` counted
 > occurrences and v4 has both `work_count`, deduplicated per work, and
-> `authorship_count`. The displayed `name` expands, because it is now the
-> parts joined rather than the abbreviated form: `T. Turner` becomes
-> `Trent Turner`. The **order §3 promises keeps its rule** — `last_year`
+> `authorship_count` (v5 removes both; see the version note under §6). The
+> displayed `name` expands, because it is now the parts joined rather than
+> the abbreviated form: `T. Turner` becomes `Trent Turner`. The **order §3 promises keeps its rule** — `last_year`
 > descending, then work count descending, then `name` — with `key` appended
 > after `name`, because two keys can now carry the same readable name and the
 > name alone is no longer total. What moves in the list moves because the
@@ -511,7 +511,7 @@ rule does not apply to the input itself — only to whatever it produces.
 | `video` | Becomes a link of kind `video` whatever its host, with `origin: input`, after any video link `url` gave (`build_links()`). |
 | `pdf` | Becomes the work's one link of kind `pdf`, with `origin: input`, in place of the one `pdf_base_url` would give (`build_links()`). Empty or whitespace-only is read as absent. |
 | `author` | Parsed into the `authors` list (`parse_author_list()`); the name parts are converted under heading 1. |
-| `editor` | Parsed into the `editors` list (`parse_editor_list()`), resolved by the same machinery, and excluded from `work_count`, from `person.work_ids`, from a project's people and from `collaborators`. |
+| `editor` | Parsed into the `editors` list (`parse_editor_list()`), resolved by the same machinery, and excluded from `person.work_ids`, from a project's people and from `collaborators`. |
 | `year` | Emitted as the integer `year` — not a string — or `null` with a `BIB-YEAR-MISSING` diagnostic when the entry supplied none. It drives the works order (§3). |
 | `crossref` | **Rejected, on presence rather than on value.** An entry carrying the field is an error under `BIB-CROSSREF-UNSUPPORTED`, whatever is inside it: an empty `crossref = {}` is a field the entry carries, and letting it through would put the silent path back under a different spelling. The entry is not emitted and the run fails in every mode (`parse_all_works()`). No field of any entry is filled in from any other entry. |
 | `journal`, `booktitle`, `school`, `institution` | Converted under heading 1, then consumed by `build_venue()` into `venue.name`, with the `venue.kind` each implies. |
@@ -603,7 +603,7 @@ accident.
 | `person.work_ids` | The order of the `works` list, filtered to that person's authorships, first occurrence only (`sslabdata.resolver.compute_backlinks()`). Editors are not authorships and do not appear. |
 | `project.work_ids` | The order of the `works` list, filtered to that project, first occurrence only (`compute_backlinks()`). |
 | `project.people_ids` | Person id **ascending**, by Unicode code point (`compute_backlinks()` sorts the set it collects). |
-| `collaborators` | `last_year` **descending** with `null` last, then `work_count` **descending**, then `name` **ascending** by Unicode code point, then `key` **ascending** by Unicode code point (the sort in `sslabdata.assembler.group_collaborators()`; `tests/COVERAGE.md` row `output.collaborators.order`). `key` is appended after `name` rather than replacing it: two keys can carry the same readable name — a parsed and a brace-protected spelling of one string are two keys — so the name alone is no longer total, but it is still what decides. |
+| `collaborators` | `last_year` **descending** with `null` last, then the number of `work_ids` **descending**, then `name` **ascending** by Unicode code point, then `key` **ascending** by Unicode code point (the sort in `sslabdata.assembler.group_collaborators()`; `tests/COVERAGE.md` row `output.collaborators.order`). `key` is appended after `name` rather than replacing it: two keys can carry the same readable name — a parsed and a brace-protected spelling of one string are two keys — so the name alone is no longer total, but it is still what decides. |
 | `collaborator.authorships` | The order of the `works` list, then `position` within a work (`group_collaborators()`). |
 | `collaborator.work_ids` | The same order, first occurrence only. |
 | `collaborator.name_variants` | **Ascending** by Unicode code point. `collaborator.name` is the *first* spelling in document order, which need not be the first variant. |
@@ -644,8 +644,8 @@ authoritative.
 
 **The document is deterministic.** Nothing in it records when it was built:
 `generator` carries the compiler's name and version and no timestamp, and a
-link's `verification.checked_at` is `null` unless a committed cache supplied
-it, because a build never fetches. Two runs over the same inputs with the
+link's `verification` carries a status and no time, because a build never
+fetches. Two runs over the same inputs with the
 same package version produce the same bytes, which is what makes
 `tests/corpus/expected/valid.yaml` a reviewable record rather than noise.
 
@@ -759,8 +759,8 @@ sslabdata's own output as input, and a wrong derivation becomes permanent.
 | `author.equal_contribution` | **Derived** — whether the entry wrote a `*` marker on any part of the name (`sslabdata.parsers.bibtex.marks_equal_contribution()`). |
 | `work.editors[*]` | The same, minus `collaborator_key` and `equal_contribution`. An editor that matched nobody is simply `person_id: null` (`parse_editor_list()`). |
 | `person.*` except the two below | Input — the fields of `people_file` (`sslabdata.loaders.load_people()`). `aliases` is read for matching and is **not** emitted. `status` is `current` or `alumni`, and `current` when absent; `role` is open, any non-empty string (`PEOPLE-STATUS-INVALID`, `PEOPLE-ROLE-INVALID`). |
-| `person.work_ids`, `work_count` | **Derived** — back-links over authorships, and their count (`sslabdata.resolver.compute_backlinks()`). Editors are not authorships and are not counted. |
-| `project.id`, `title`, `description`, `website`, `status` | Input — the fields of `projects_file` (`sslabdata.loaders.load_projects()`). `status` is one of `active` and `completed`, and `active` when absent (`PROJECTS-STATUS-INVALID`). |
+| `person.work_ids` | **Derived** — back-links over authorships (`sslabdata.resolver.compute_backlinks()`). Editors are not authorships and are not listed. |
+| `project.id`, `title`, `description`, `website`, `image`, `status` | Input — the fields of `projects_file` (`sslabdata.loaders.load_projects()`). `status` is one of `active` and `completed`, and `active` when absent (`PROJECTS-STATUS-INVALID`). `image` is a URL or a site path, the same kind of value as a person's `photo`, carried as plain text: deciding which URLs are safe to render is the renderer's job. |
 | `project.work_ids`, `people_ids` | **Derived** — back-links, and the people reached through them (`compute_backlinks()`). |
 | `collaborators` | **Derived, entirely** — see below (`sslabdata.assembler.group_collaborators()`). |
 | `derived` | Reserved for sslabdata; empty today. See below. |
@@ -886,9 +886,8 @@ check or from a committed cache, never from a network fetch, because a fetch
 would cost determinism and make the document depend on the weather. So for
 an entry without its own `pdf` field, a local `pdf_base_url` yields `verified`
 or `missing` and a remote one yields `unchecked`; an entry's own `pdf` is
-`unchecked` whatever the base. `checked_at` is `null` in every case v4
-produces — only a committed cache could supply a time. Three states replace a
-null: "no base configured" is no link at all for an entry without a `pdf`
+`unchecked` whatever the base. `verification` is `{status}` and records no
+time. Three states replace a null: "no base configured" is no link at all for an entry without a `pdf`
 field, "the file is not there" is `missing`, and "nobody has looked" is
 `unchecked`. Verifying a remote link is #20.
 
@@ -941,9 +940,9 @@ it. What that buys, and what it does not:
   Brace protection in BibTeX means "do not parse this", which covers
   organisations but also mononyms, so the document must not assert
   corporate-ness.
-- **`work_count` is deduplicated per work; `authorship_count` counts
-  occurrences.** One work listing two authorships under one key contributes
-  `1` and `2` respectively.
+- **`work_ids` is deduplicated per work; `authorships` lists occurrences.**
+  One work listing two authorships under one key contributes one entry to
+  `work_ids` and two to `authorships`.
 - **The policy.** An unresolved authorship is keyed on its normalised full
   name, which removes most of the merge risk but over-splits: one person
   written `Priya Patel` on two works and `P. Patel` on a third is two keys.
@@ -1085,14 +1084,14 @@ meaning and guarantees, and each of them is a bump.
 **Published schemas are immutable and live at versioned paths.** A schema that
 has been published is never edited. Version `N`'s schema stays reachable, byte
 for byte, at its own path after version `N+1` ships, so a consumer pinned to
-`N` keeps a stable target. `schema/v3/output.schema.json` and
-`schema/v4/output.schema.json` are those paths, and
-`tests/COVERAGE.md` row `output.versioned_schema` asserts that the older one
-still resolves and still says `3`.
+`N` keeps a stable target. `schema/v3/output.schema.json`,
+`schema/v4/output.schema.json` and `schema/v5/output.schema.json` are those
+paths, and `tests/COVERAGE.md` row `output.versioned_schema` asserts that the
+older two are unchanged byte for byte and still say `3` and `4`.
 
-**The `$id` is a pinned tag URL.** v4's `$id` is
-`https://raw.githubusercontent.com/siddhss5/labdata/schema-v4/schema/v4/output.schema.json`.
-The rule that makes it a contract rather than a guess: **the `schema-v4` tag
+**The `$id` is a pinned tag URL.** v5's `$id` is
+`https://raw.githubusercontent.com/siddhss5/sslabdata/schema-v5/schema/v5/output.schema.json`.
+The rule that makes it a contract rather than a guess: **the `schema-v5` tag
 is created when this version ships and is never moved.** A branch URL such as
 `blob/main` is not usable — it serves an HTML page rather than the schema, so
 no consumer can ever have resolved v3's `$id` — and this repository publishes
@@ -1110,8 +1109,8 @@ their `$id`s, and the titles and descriptions inside them, still say
 `labdata`, and they are left byte for byte as published rather than
 rewritten. v4's raw `$id` still resolves: GitHub redirects the old repository
 name to the new one. v3's `blob/main` `$id` still does not resolve, as above.
-The first schema published under the new name will be
-the next one, set up by #37.
+v5 is the first schema published under the new name: its `$id`, title and
+descriptions say `sslabdata`.
 
 **Version history** of `sslabdata.models.SCHEMA_VERSION`:
 
@@ -1121,6 +1120,23 @@ the next one, set up by #37.
 | 2 | Authors carry their structured name parts (#23). Breaking: the object is closed, so a v1 consumer rejects the new keys. |
 | 3 | Authors carry `equal_contribution` (#46). Breaking, for the same reason. |
 | 4 | One consolidated breaking change (#56): `publications` becomes `works`, the bibliography is structured, `links` and `identifiers` are open registries, `collaborators` is a declared grouping over unresolved authorships, every closed object declares every property it can carry, and `crossref` is rejected (#65). |
+| 5 | A project carries an optional `image`; `verification.checked_at` is removed; `work_count` and `authorship_count` are removed (#101). Breaking: each adds or removes a property of a closed object. |
+
+> **Version note (#101, `schema_version` 5).** Three changes, and nothing
+> else in the document moves:
+>
+> 1. **A project carries `image`.** `projects.yaml` accepts it — a URL or a
+>    site path, the same kind of value as a person's `photo` — and every
+>    project emits it, `null` when absent (§4). It is plain text; deciding
+>    which URLs are safe to render is the renderer's job.
+> 2. **`verification.checked_at` is removed.** Nothing produced it and it was
+>    always `null`. A link's `verification` is `{status}`.
+> 3. **Counts that repeat the length of a list are removed:** `work_count` and
+>    `authorship_count` from collaborators, and `work_count` from people. A
+>    consumer reads `len(work_ids)` or `len(authorships)` instead.
+>
+> A consumer that needs the old document pins `schema_version` 4 and the
+> schema at `schema/v4/output.schema.json`.
 
 ---
 
@@ -1228,7 +1244,7 @@ vocabularies, not over arbitrary content.
 
 ## 9. What this file is not
 
-It does not list the document's fields; `schema/v4/output.schema.json` does.
+It does not list the document's fields; `schema/v5/output.schema.json` does.
 It does not describe renderers such as
 [sslabdata-site](https://github.com/siddhss5/sslabdata-site), which are
 downstream consumers in their own repositories. It does not describe the input formats `lab.yaml`,

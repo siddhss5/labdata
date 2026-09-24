@@ -17,9 +17,10 @@ sslabdata --config lab.yaml --output lab.yml
 
 - [`SPEC.md`](SPEC.md) — the normative contract: what the strings are, what
   order the lists are in, which fields are derived, when the version changes.
-- [`schema/v4/output.schema.json`](schema/v4/output.schema.json) — the
+- [`schema/v5/output.schema.json`](schema/v5/output.schema.json) — the
   document's JSON Schema. Published versions are immutable and live at their
-  own paths; [`schema/v3/`](schema/v3/output.schema.json) is still there.
+  own paths; [`schema/v3/`](schema/v3/output.schema.json) and
+  [`schema/v4/`](schema/v4/output.schema.json) are still there.
 - [`tests/COVERAGE.md`](tests/COVERAGE.md) — every input case sslabdata
   supports, and every case it does not, with the fixture and test for each.
 
@@ -112,7 +113,7 @@ nothing else:
 |-------|---------|
 | `title` | `title`, LaTeX converted to plain Unicode text; `$...$` math kept as TeX |
 | `author` | `authors`, one authorship per name, each with its `position`, a readable `name`, its `given` / `von` / `family` / `suffix` parts (or `literal` for a brace-protected name), `equal_contribution`, a `resolution` record, and exactly one of `person_id` and `collaborator_key` |
-| `editor` | `editors`, read by the same machinery. Editing a volume is not an authorship: editors count towards nobody's `work_count` and produce no collaborator |
+| `editor` | `editors`, read by the same machinery. Editing a volume is not an authorship: editors are in nobody's `work_ids` and produce no collaborator |
 | `year` | `year`, and the sort order of the works list. `null`, with a diagnostic, when the entry has none |
 | `journal` / `booktitle` / `school` / `institution` | `venue`, as `{kind, name}` — the one place sslabdata normalises across entry types. `null` when the entry names no container |
 | `volume`, `number`, `pages`, `series`, `edition`, `publisher`, `address`, `organization`, `chapter`, `month`, `howpublished`, `type` | Properties of the work, under BibTeX's own names and with BibTeX's own meanings |
@@ -206,11 +207,14 @@ reported under `RESOLVE-COLLABORATOR-ALIAS-IS-MEMBER` and left to the member.
   title: "Household Manipulation"
   description: "Robots that tidy up, fetch things and put them away in real homes."
   website: "https://example.org/projects/homebot"
+  image: "images/projects/homebot.jpg"
   status: "active"
 ```
 
 `id` and `title` are required; `status` is `active` (the default) or
-`completed`.
+`completed`. `image` is a URL or a site path, the same kind of value as a
+person's `photo`, and is `null` when absent. It is carried as plain text:
+deciding which URLs are safe to render is the renderer's job.
 
 ## How author matching works
 
@@ -290,7 +294,7 @@ is a test-only dependency, so install it first:
 pip install jsonschema
 python -c "
 import json, yaml, jsonschema
-schema = json.load(open('schema/v4/output.schema.json'))
+schema = json.load(open('schema/v5/output.schema.json'))
 jsonschema.Draft202012Validator(schema).validate(yaml.safe_load(open('lab.yml')))
 print('valid')
 "
