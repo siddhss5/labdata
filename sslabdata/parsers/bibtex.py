@@ -847,7 +847,13 @@ def build_links(entry: dict, bib_id: str, identifiers: Dict[str, List[str]],
     video = (entry.get("video") or "").strip()
     if video:
         add("video", Link(url=video, origin=FROM_INPUT, status=UNCHECKED))
-    add("pdf", pdf_link(bib_id, pdf_base_url))
+    # A `pdf` the entry names is the work's PDF, so it replaces the one
+    # guessed from `pdf_base_url` rather than sitting beside it.
+    pdf = (entry.get("pdf") or "").strip()
+    if pdf:
+        add("pdf", Link(url=pdf, origin=FROM_INPUT, status=UNCHECKED))
+    else:
+        add("pdf", pdf_link(bib_id, pdf_base_url))
     for doi in identifiers.get("doi", []):
         add("doi", Link(url=DOI_BASE + doi, origin=DERIVED, status=UNCHECKED))
     for eprint in identifiers.get(ARXIV.lower(), []):

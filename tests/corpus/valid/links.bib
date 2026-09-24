@@ -110,3 +110,23 @@
   year      = {2023},
   note      = {\href{https://example.org/papers/award}{Website}, Best Paper Award Finalist}
 }
+
+% A `pdf` field names the work's PDF, in place of the one pdf_base_url gives.
+% CASE links.pdf_field
+@inproceedings{link-pdf-field,
+  title     = {A Paper That Names Its Own PDF},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2023},
+  pdf       = {https://example.org/papers/link-pdf-field.pdf}
+}
+
+% An empty `pdf` field is read as absent. There is no pdfs/link-pdf-empty.pdf.
+% CASE links.pdf_field
+@inproceedings{link-pdf-empty,
+  title     = {A Paper with an Empty PDF Field},
+  author    = {Adams, Alice},
+  booktitle = {Proceedings of the Fictional Conference},
+  year      = {2023},
+  pdf       = { }
+}
