@@ -1,0 +1,72 @@
+"""Each known-key list names exactly the keys its loader reads.
+
+A key a loader reads but its list lacks makes valid data warn as unknown; a
+key the list names but no loader reads is accepted and silently dropped. Each
+test hands the loader mappings that record every key looked up in them, and
+compares what was looked up with the list.
+"""
+
+import yaml
+
+from sslabdata.config import KNOWN_KEYS, LabDataConfig
+from sslabdata.loaders import (
+    COLLABORATOR_KEYS, PERSON_KEYS, PROJECT_KEYS, load_collaborators,
+    load_people, load_projects,
+)
+
+
+class Recording(dict):
+    """A mapping that records each key read from it by ``[]`` or ``get()``."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.read = set()
+
+    def __getitem__(self, key):
+        self.read.add(key)
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        self.read.add(key)
+        return super().get(key, default)
+
+
+def read_by(load, record, monkeypatch, tmp_path):
+    """The keys ``load`` reads from ``record``, the one record in its file."""
+    record = Recording(record)
+    monkeypatch.setattr(yaml, "safe_load", lambda _: [record])
+    path = tmp_path / "records.yaml"
+    path.write_text("", encoding="utf-8")
+    load(str(path), [])
+    return record.read
+
+
+def test_person_keys_are_the_keys_load_people_reads(monkeypatch, tmp_path):
+    read = read_by(load_people, {"id": "aadams", "name": "Alice Adams"},
+                   monkeypatch, tmp_path)
+    assert read == set(PERSON_KEYS)
+
+
+def test_project_keys_are_the_keys_load_projects_reads(monkeypatch, tmp_path):
+    read = read_by(load_projects, {"id": "homebot", "title": "HomeBot"},
+                   monkeypatch, tmp_path)
+    assert read == set(PROJECT_KEYS)
+
+
+def test_collaborator_keys_are_the_keys_load_collaborators_reads(
+        monkeypatch, tmp_path):
+    read = read_by(load_collaborators, {"name": "Priya Patel"},
+                   monkeypatch, tmp_path)
+    assert read == set(COLLABORATOR_KEYS)
+
+
+def test_lab_yaml_keys_are_the_keys_from_yaml_reads(monkeypatch, tmp_path):
+    """`site` is known without being read: renderers read it, sslabdata
+    passes it by."""
+    data = Recording({"bib_dir": "bib"})
+    monkeypatch.setattr(yaml, "safe_load", lambda _: data)
+    path = tmp_path / "lab.yaml"
+    path.write_text("", encoding="utf-8")
+    LabDataConfig.from_yaml(str(path))
+    assert data.read == set(KNOWN_KEYS) - {"site"}
+
