@@ -842,6 +842,11 @@ def build_links(entry: dict, bib_id: str, identifiers: Dict[str, List[str]],
     if url:
         add("video" if is_video_url(url) else "url",
             Link(url=url, origin=FROM_INPUT, status=UNCHECKED))
+    # `video` is always a video, whatever its host, so an entry can name a
+    # project website in `url` and its video here.
+    video = (entry.get("video") or "").strip()
+    if video:
+        add("video", Link(url=video, origin=FROM_INPUT, status=UNCHECKED))
     add("pdf", pdf_link(bib_id, pdf_base_url))
     for doi in identifiers.get("doi", []):
         add("doi", Link(url=DOI_BASE + doi, origin=DERIVED, status=UNCHECKED))

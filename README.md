@@ -120,6 +120,7 @@ nothing else:
 | `abstract` | `abstract` |
 | `note` | `note` |
 | `url` | A link of kind `video` when it points at YouTube or Vimeo, otherwise of kind `url` |
+| `video` | A link of kind `video`, whatever its host, so `url` can hold the work's website |
 | `project` | `project_ids` (see below) |
 | `crossref` | **An error.** Partial inheritance dropped every author a child entry did not write itself, silently; sslabdata rejects the field instead, names the file, the key and the parent, and fails the run. Write the fields out on the entry itself |
 
