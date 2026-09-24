@@ -459,6 +459,30 @@ def test_video_field_beside_a_website_url(tmp_path):
     assert json.loads(report.stdout) == []
 
 
+# Covers links.pdf_field
+def test_pdf_field_replaces_the_base_url_link(valid_output, tmp_path):
+    """A `pdf` field is the work's one PDF link whether or not `pdf_base_url`
+    is set; an empty one is read as absent and draws no diagnostic."""
+    pdf_link = [{"url": "https://example.org/papers/link-pdf-field.pdf",
+                 "label": None, "origin": "input",
+                 "verification": {"status": "unchecked", "checked_at": None}}]
+    assert work(valid_output, "link-pdf-field")["links"] == {"pdf": pdf_link}
+    assert work(valid_output, "link-pdf-empty")["links"] == {"pdf": [
+        {"url": "pdfs/link-pdf-empty.pdf", "label": None, "origin": "derived",
+         "verification": {"status": "missing", "checked_at": None}}]}
+
+    variant = write_variant(tmp_path, pdf_base_url=None, bib_files=[
+        {"name": "links.bib", "category": "Links"}])
+    run, data = export(VALID, tmp_path, variant)
+    assert run.code == 0 and run.crash is None, run.output
+    assert work(data, "link-pdf-field")["links"] == {"pdf": pdf_link}
+    assert work(data, "link-pdf-empty")["links"] == {}
+    report = run_sslabdata(["--config", variant, "--validate", "--format", "json"],
+                           VALID)
+    assert report.code == 0 and report.crash is None, report.output
+    assert json.loads(report.stdout) == []
+
+
 # --- BibTeX structure, entry types and fields -------------------------------
 
 STRUCTURE = [
