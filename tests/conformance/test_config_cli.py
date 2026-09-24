@@ -116,8 +116,9 @@ def test_config_lab_missing(tmp_path):
 
 # Covers config.pdf_base_url.missing
 def test_config_pdf_base_url_missing(tmp_path):
-    """No base configured is a third answer, distinct from `missing`: there is
-    no PDF link at all rather than one labelled as absent."""
+    """No base configured is a third answer, distinct from `missing`: a work
+    without its own `pdf` field has no PDF link at all rather than one
+    labelled as absent."""
     run, data = export(VALID, tmp_path, write_variant(tmp_path, pdf_base_url=None))
     assert run.code == 0 and run.crash is None, run.output
     # Only a PDF the entry names itself (`origin: input`) is left.

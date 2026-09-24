@@ -883,12 +883,14 @@ means the entry's own field supplied the link. `verification.status` is
 
 **A build never fetches.** `verification` is set only from a local filesystem
 check or from a committed cache, never from a network fetch, because a fetch
-would cost determinism and make the document depend on the weather. So a
-local `pdf_base_url` yields `verified` or `missing`, a remote one yields
-`unchecked`, and `checked_at` is `null` in every case v4 produces — only a
-committed cache could supply a time. Three states replace a null: "no base
-configured" is no link at all, "the file is not there" is `missing`, and
-"nobody has looked" is `unchecked`. Verifying a remote link is #20.
+would cost determinism and make the document depend on the weather. So for
+an entry without its own `pdf` field, a local `pdf_base_url` yields `verified`
+or `missing` and a remote one yields `unchecked`; an entry's own `pdf` is
+`unchecked` whatever the base. `checked_at` is `null` in every case v4
+produces — only a committed cache could supply a time. Three states replace a
+null: "no base configured" is no link at all for an entry without a `pdf`
+field, "the file is not there" is `missing`, and "nobody has looked" is
+`unchecked`. Verifying a remote link is #20.
 
 A link does **not** name the identifier it was built from. That is redundant
 with its kind and its origin, and it would be a cross-record constraint JSON
