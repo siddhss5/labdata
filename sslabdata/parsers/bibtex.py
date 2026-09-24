@@ -427,16 +427,11 @@ def _convert(value: str, on_unknown) -> str:
 
 
 def unknown_command_diagnostic(command: str, where: Tuple[str, str, str],
-                               fields: Optional[int] = None) -> str:
-    """One `LATEX_COMMAND_UNKNOWN` line, located at ``(file, key, field)``.
-
-    With ``fields``, the line summarises a whole run: how many fields use the
-    command, located at the first of them.
-    """
-    uses = ""
-    if fields is not None:
-        uses = (f"; used in {fields} field{'s' if fields != 1 else ''}, "
-                "located at the first")
+                               fields: int) -> str:
+    """One `LATEX_COMMAND_UNKNOWN` line for a whole run: how many fields use
+    the command, located at ``(file, key, field)``, the first of them."""
+    uses = (f"; used in {fields} field{'s' if fields != 1 else ''}, "
+            "located at the first")
     return diagnostic(
         LATEX_COMMAND_UNKNOWN, *where,
         f"the LaTeX command '\\{command}' is not one sslabdata converts; it "
@@ -445,13 +440,13 @@ def unknown_command_diagnostic(command: str, where: Tuple[str, str, str],
 
 
 def _unknown_command_reporter(report, file: str, key: str,
-                              tally: Optional[Dict[str, list]] = None):
+                              tally: Dict[str, list]):
     """For one entry: a field name → the ``on_unknown`` for that field.
 
-    A command is counted once per field, however many times it is used.
-    Without ``tally`` each is reported at once; with it, each is added to
-    ``tally[command]`` as ``[fields, first location]``, for a caller that
-    reports a whole run in one line per command.
+    A command is counted once per field, however many times it is used, and
+    added to ``tally[command]`` as ``[fields, first location]``, for a caller
+    that reports a whole run in one line per command. A field whose LaTeX
+    cannot be read is reported to ``report`` at once.
     """
     reported = set()
 
@@ -461,9 +456,7 @@ def _unknown_command_reporter(report, file: str, key: str,
                 return
             reported.add((field_name, command))
             where = (file, key, field_name)
-            if tally is None:
-                report(unknown_command_diagnostic(command, where))
-            elif command in tally:
+            if command in tally:
                 tally[command][0] += 1
             else:
                 tally[command] = [1, where]
@@ -937,12 +930,12 @@ def entry_to_work(
     source: str,
     source_file: str,
     report,
-    unknown_commands_seen: Optional[Dict[str, list]],
+    unknown_commands_seen: Dict[str, list],
 ) -> Work:
     """Convert one pybtex Entry to a Work dataclass.
 
-    Unknown LaTeX commands are reported through ``report``, or added to
-    ``unknown_commands_seen`` when it is given (`_unknown_command_reporter`).
+    Unknown LaTeX commands are added to ``unknown_commands_seen``
+    (`_unknown_command_reporter`); every other diagnostic goes to ``report``.
     """
     unknown_in = _unknown_command_reporter(report, source, bib_id,
                                            unknown_commands_seen)
