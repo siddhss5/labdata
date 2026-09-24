@@ -106,10 +106,10 @@ CLASSES: Dict[str, str] = {
 # The codes `--strict` leaves as warnings (SPEC.md section 1). A redefined
 # `@string` macro is settled by BibTeX's own last-wins rule. Every other one is
 # about an author who matched no lab member, and such an author is never an
-# error under `--strict`: an author cannot be declared external, so sslabdata
-# cannot tell an outside co-author from a possible member. The known cost is
-# that a misspelt member's name passes `--strict`, reported as a
-# `RESOLVE-SUGGESTION` warning.
+# error under `--strict`: `collaborators_file` declares a grouping, not an
+# identity, so sslabdata cannot tell an outside co-author from a possible
+# member. The known cost is that a misspelt member's name passes `--strict`,
+# reported as a `RESOLVE-SUGGESTION` warning.
 NEVER_AN_ERROR = frozenset({
     "BIB-STRING-REDEFINED",
     "ID-GROUPING-SPANS-SPELLINGS",

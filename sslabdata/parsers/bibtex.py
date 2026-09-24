@@ -142,7 +142,6 @@ _MARKER_ARGUMENT = re.compile(rf"\{{\*\}}(?:{_ANY_MARKER})*")
 _COMMENT_COMMAND = re.compile(r'\s*comment\s*[{(]', re.IGNORECASE)
 
 
-# --- Reading the files -------------------------------------------------------
 
 def _redefined_macros(text: str,
                       definitions: List[Tuple[str, int]]) -> List[Tuple[str, int]]:
@@ -403,7 +402,6 @@ def parse_bibtex_file(
     return data.entries
 
 
-# --- pybtex objects → sslabdata values ----------------------------------------
 
 _UNREADABLE_LATEX = ("could not read the LaTeX in this field; keeping the text "
                      "as written")
@@ -573,7 +571,7 @@ def given_words(name: str) -> List[str]:
     try:
         person = Person(name)
     except PybtexError:
-        # pybtex raises for more than three commas, and for a word nested
+        # pybtex raises for three or more commas, and for a word nested
         # more than 100 braces deep. `declared_form()` passes no comma, so
         # from there only the nesting reaches this.
         return []
@@ -608,7 +606,7 @@ def _contributors(entry: Entry, role: str, on_unknown) -> List[Dict]:
     """
     persons = list(entry.persons.get(role, []))
     if persons and _is_others(persons[-1]):
-        persons.pop()             # a terminal "and others" is BibTeX's et al.
+        persons.pop()
 
     found = []
     for person in persons:
@@ -683,7 +681,6 @@ def format_bibtex(bib_id: str, entry: Entry, source: str,
         return None
 
 
-# --- The structured bibliography ---------------------------------------------
 
 # The one place sslabdata normalises across entry types: the field that names
 # the container a work appeared in. Everything else bibliographic is flat on
