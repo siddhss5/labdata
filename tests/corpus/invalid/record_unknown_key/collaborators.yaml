@@ -1,0 +1,6 @@
+# CASE records.unknown_key
+# A key no collaborator field is read from.
+
+- name: "Priya Patel"
+  aliases: ["P. Patel"]
+  affiliation: "Example University"

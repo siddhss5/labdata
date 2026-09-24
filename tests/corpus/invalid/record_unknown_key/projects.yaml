@@ -1,0 +1,7 @@
+# CASE records.unknown_key
+# A key no project field is read from.
+
+- id: "homebot"
+  title: "Household Manipulation"
+  status: "active"
+  funding: "Fictional Robotics Fund"

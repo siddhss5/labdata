@@ -16,7 +16,8 @@ from .models import Person, Project
 
 
 # What can be wrong with a people, projects or collaborators file, one code
-# per condition and file. A file that is not valid YAML or not a list of
+# per condition and file; an unknown key is one code for all three, as the
+# check is the same in each. A file that is not valid YAML or not a list of
 # records, and a record missing a field it cannot be emitted without, fail
 # every mode; a repeated id fails `--validate`, as a repeated citation key
 # does; the rest are warnings.
@@ -34,6 +35,15 @@ PEOPLE_ROLE_INVALID = "PEOPLE-ROLE-INVALID"
 PEOPLE_STATUS_INVALID = "PEOPLE-STATUS-INVALID"
 PROJECTS_ID_DUPLICATE = "PROJECTS-ID-DUPLICATE"
 PROJECTS_STATUS_INVALID = "PROJECTS-STATUS-INVALID"
+RECORD_KEY_UNKNOWN = "RECORD-KEY-UNKNOWN"
+
+# The keys each file's records are read for. Any other key is reported and
+# ignored, so a misspelt `webiste` is not silently dropped from the document.
+PERSON_KEYS = ("id", "name", "aliases", "role", "status", "photo", "website",
+               "email", "co_advisor", "start_year", "end_year", "degree",
+               "thesis_title", "current_position")
+PROJECT_KEYS = ("id", "title", "description", "website", "status")
+COLLABORATOR_KEYS = ("name", "aliases")
 
 # A person's `status` is one of these. A `role` is any non-empty string, so
 # that any lab's roles fit (SPEC.md, *The people and projects files*).
@@ -41,17 +51,20 @@ PERSON_STATUSES = ("current", "alumni")
 PROJECT_STATUSES = ("active", "completed")
 
 
-def _records(path: str, codes, required, diagnostics) -> List[dict]:
+def _records(path: str, codes, required, known, diagnostics) -> List[dict]:
     """The records of one people, projects or collaborators file that can be
     emitted, every file checked the same way.
 
     ``codes`` are the file's YAML-invalid, not-a-list and field-missing
-    codes, and ``required`` the fields a record cannot be emitted without.
+    codes, ``required`` the fields a record cannot be emitted without, and
+    ``known`` the keys the file's records are read for.
     A missing file is not this function's to report (the assembler names the
     configuration key instead) and reads as no records, as does an empty one.
     A file that is not valid YAML or not a list, a record that is not a
     mapping and a record missing a required field are reported to
-    ``diagnostics`` and left out.
+    ``diagnostics`` and left out. A kept record's unknown keys are reported
+    at the record's first required field -- its `id`, or a collaborator's
+    `name` -- and the record is kept without them.
     """
     yaml_invalid, not_a_list, field_missing = codes
     fail = diagnostics.append
@@ -87,6 +100,11 @@ def _records(path: str, codes, required, diagnostics) -> List[dict]:
             fail(diagnostic(field_missing, path, entry.get('id'), missing[0],
                             f"entry {number} has no {missing[0]}"))
             continue
+        for key in entry:
+            if key not in known:
+                diagnostics.append(diagnostic(
+                    RECORD_KEY_UNKNOWN, path, entry[required[0]], key,
+                    f"'{key}' is not a key sslabdata reads, and is ignored"))
         records.append(entry)
     return records
 
@@ -119,7 +137,8 @@ def load_people(path: str, diagnostics: List[Diagnostic]) -> List[Person]:
     warn = diagnostics.append
     people = []
     records = _records(path, (PEOPLE_YAML_INVALID, PEOPLE_NOT_A_LIST,
-                              PEOPLE_FIELD_MISSING), ('id', 'name'), diagnostics)
+                              PEOPLE_FIELD_MISSING), ('id', 'name'), PERSON_KEYS,
+                       diagnostics)
     _repeated_ids(records, path, PEOPLE_ID_DUPLICATE, diagnostics.append)
     for entry in records:
         role = entry.get('role')
@@ -168,7 +187,8 @@ def load_projects(path: str, diagnostics: List[Diagnostic]) -> List[Project]:
     """
     warn = diagnostics.append
     records = _records(path, (PROJECTS_YAML_INVALID, PROJECTS_NOT_A_LIST,
-                              PROJECTS_FIELD_MISSING), ('id', 'title'), diagnostics)
+                              PROJECTS_FIELD_MISSING), ('id', 'title'), PROJECT_KEYS,
+                       diagnostics)
     _repeated_ids(records, path, PROJECTS_ID_DUPLICATE, diagnostics.append)
     projects = []
     for entry in records:
@@ -213,7 +233,8 @@ def load_collaborators(path: str, diagnostics: List[Diagnostic]
     """
     records = _records(path, (COLLABORATORS_YAML_INVALID,
                               COLLABORATORS_NOT_A_LIST,
-                              COLLABORATORS_FIELD_MISSING), ('name',), diagnostics)
+                              COLLABORATORS_FIELD_MISSING), ('name',),
+                       COLLABORATOR_KEYS, diagnostics)
     return [DeclaredCollaborator(name=entry['name'],
                                  aliases=entry.get('aliases', []))
             for entry in records]
