@@ -100,10 +100,12 @@ def _records(path: str, codes, required, known, diagnostics) -> List[dict]:
             fail(diagnostic(field_missing, path, entry.get('id'), missing[0],
                             f"entry {number} has no {missing[0]}"))
             continue
+        # A YAML key need not be a string (`0:`, `true:`); it is named as
+        # text so that every unknown key has a location, even a falsy one.
         for key in entry:
             if key not in known:
                 diagnostics.append(diagnostic(
-                    RECORD_KEY_UNKNOWN, path, entry[required[0]], key,
+                    RECORD_KEY_UNKNOWN, path, entry[required[0]], str(key),
                     f"'{key}' is not a key sslabdata reads, and is ignored"))
         records.append(entry)
     return records

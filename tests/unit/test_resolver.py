@@ -5,7 +5,7 @@ import pytest
 from sslabdata.models import Author, Contributor, Work, Person, Project, LabData
 from sslabdata.loaders import load_collaborators, load_people, load_projects
 from sslabdata.diagnostics import (
-    CLASSES, FATAL, VALIDATION_ERROR, WARNING, code_of,
+    CLASSES, FATAL, VALIDATION_ERROR, WARNING, code_of, record,
 )
 from sslabdata.resolver import (
     Candidates,
@@ -688,6 +688,14 @@ class TestPeopleAndProjectsFiles:
             tmp_path, load_people, f"- {{id: p, name: P, role: r, status: {status}}}\n")
         assert [w.startswith("PEOPLE-STATUS-INVALID f.yaml:p:status:")
                 for w in warnings] == ([True] if reported else [])
+
+    def test_a_key_that_is_not_a_string_is_named_as_text(self, tmp_path):
+        path = tmp_path / "records.yaml"
+        path.write_text("- {id: p, name: P, role: r, 0: a, 1: b}\n",
+                        encoding="utf-8")
+        found = []
+        load_people(str(path), found)
+        assert [record(w, "warning")["field"] for w in found] == ["0", "1"]
 
 
 class TestSharedDeclarations:
