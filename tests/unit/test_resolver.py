@@ -31,6 +31,9 @@ class TestNormalizeName:
     def test_whitespace(self):
         assert normalize_name("  A.  Adams  ") == "a adams"
 
+    def test_superscript(self):
+        assert normalize_name("A. Adams<sup>*</sup>") == "a adams"
+
 
 class TestIsAbbreviated:
     def test_single_initial_surname(self):
@@ -353,6 +356,15 @@ class TestRunTogetherInitials:
         people = [Person(id="ssr", name="S.S. Robotics")]
         assert _resolved(people, name="S.S. Robotics",
                          literal="S.S. Robotics") == "ssr"
+
+    def test_a_declaration_whose_words_normalise_apart_is_read_whole(self):
+        """A `<sup>` span across two words is removed from the whole string
+        only, so the words do not line up with it; the declaration is then
+        compared as normalised, without spacing any initials."""
+        people = [Person(id="sivers", name="Stella Sky Ivers",
+                         aliases=["S.S. Ivers<sup>1 2</sup>"])]
+        assert _resolved(people, given="S. S.", family="Ivers") is None
+        assert _resolved(people, given="SS", family="Ivers") == "sivers"
 
     @pytest.mark.parametrize("written", ["\u0160.S.", "S\u030c.S."])
     @pytest.mark.parametrize("declared", ["\u0160. S.", "S\u030c. S."])

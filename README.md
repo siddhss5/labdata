@@ -217,7 +217,7 @@ von, family, suffix — to lab members, in this order:
 
 1. **The full name**, against each person's `name` and any alias written in
    full, after normalising both sides: lowercase, strip accents, remove
-   periods, collapse whitespace. Other
+   periods, strip `<sup>…</sup>` tags, collapse whitespace. Other
    punctuation — apostrophes, hyphens, a `*` that is not an equal-contribution
    marker — is kept, so `O'Neill` and `Zhang-Smith` must match on those
    characters, and `Davis{*}` is not `Davis`. `Kim, Alan`

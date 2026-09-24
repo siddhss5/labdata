@@ -110,6 +110,8 @@ def normalize_name(name: str) -> str:
     )
     # Remove periods
     name = name.replace('.', '')
+    # Remove superscript HTML tags
+    name = re.sub(r'<sup>.*?</sup>', '', name)
     # Collapse whitespace
     name = re.sub(r'\s+', ' ', name).strip()
     return name

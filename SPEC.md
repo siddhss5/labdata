@@ -774,10 +774,17 @@ function does exactly this, in this order:
    are kept, and the result stays decomposed: `각` comes out as three jamo.
 3. Deletes every ASCII full stop (U+002E). Other full stops, such as the
    fullwidth `．`, stay.
-4. Replaces each run of whitespace with one space and strips both ends.
+4. Deletes each non-overlapping match of the regular expression
+   `<sup>.*?</sup>`. Because it runs after lower-casing, it matches the tags
+   in any letter case. The `.` matches any character except a line feed, so
+   a span containing `\n` is not removed but one containing `\r` is. The
+   match is non-greedy and ends at the first `</sup>`, so nested tags are
+   not handled: `<sup>outer<sup>inner</sup>tail</sup>X` becomes
+   `tail</sup>x`.
+5. Replaces each run of whitespace with one space and strips both ends.
 
 Nothing else is changed. A `*` that is not an equal-contribution marker
-stays part of the name, and so does any markup such as a `<sup>` tag.
+stays part of the name unless step 4 removed it with a `<sup>` span.
 
 **Run-together initials in a given name.** A given-name part written as two
 or more letters, each but the last followed by a full stop and the last
