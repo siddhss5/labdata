@@ -508,6 +508,7 @@ rule does not apply to the input itself — only to whatever it produces.
 | `isbn`, `issn` | Become `identifiers.isbn` and `identifiers.issn` (`build_identifiers()`). |
 | `project` | Parsed into the list `project_ids` (`parse_project_ids()`). |
 | `url` | Becomes a link of kind `video` when it names youtube.com, youtu.be or vimeo.com, and of kind `url` otherwise, with `origin: input` (`is_video_url()`, `build_links()`). |
+| `video` | Becomes a link of kind `video` whatever its host, with `origin: input`, after any video link `url` gave (`build_links()`). |
 | `author` | Parsed into the `authors` list (`parse_author_list()`); the name parts are converted under heading 1. |
 | `editor` | Parsed into the `editors` list (`parse_editor_list()`), resolved by the same machinery, and excluded from `work_count`, from `person.work_ids`, from a project's people and from `collaborators`. |
 | `year` | Emitted as the integer `year` — not a string — or `null` with a `BIB-YEAR-MISSING` diagnostic when the entry supplied none. It drives the works order (§3). |
@@ -745,7 +746,7 @@ sslabdata's own output as input, and a wrong derivation becomes permanent.
 | `work.venue` | **Derived** — the first of `journal`, `booktitle`, `school` and `institution` the entry wrote, as `name`, with the `kind` that field and the entry type imply; a preprint's repository when the entry has only an `eprint`; `null` when it names no container (`sslabdata.parsers.bibtex.build_venue()`). See below. |
 | `work.volume`, `number`, `pages`, `series`, `edition`, `publisher`, `address`, `organization`, `chapter`, `month`, `howpublished`, `type` | Input — the BibTeX fields of those names, under BibTeX's names and with BibTeX's meanings (`FLAT_FIELDS`, read in `entry_to_work()`). Those in `TEXT_FIELDS` are converted from LaTeX (§2); the rest are emitted as written. |
 | `work.identifiers` | **Derived** — a map from scheme to identifiers, built from `doi`, `eprint` with `archivePrefix`, `isbn` and `issn` (`build_identifiers()`). A `doi` written as a resolver URL has that prefix taken off. An `eprint`'s scheme is the repository `archivePrefix` named, **lower-cased**, as `entry_type` is: the scheme is a vocabulary token rather than display text, so a round trip recovers the repository and not the spelling the entry used. |
-| `work.links` | **Derived** — a map from kind to link records, built from the entry's `url`, from `pdf_base_url` and from the identifiers above (`build_links()`). See below. |
+| `work.links` | **Derived** — a map from kind to link records, built from the entry's `url` and `video`, from `pdf_base_url` and from the identifiers above (`build_links()`). See below. |
 | `work.project_ids` | Input — the `project` field, split on commas (`parse_project_ids()`). |
 | `work.bibtex` | **Derived** — the entry re-serialized as BibTeX, or `null` when that failed (`format_bibtex()`). See below. |
 | `author.given`, `von`, `family`, `suffix`, `literal` | Input — the parts BibTeX split the name into, converted from LaTeX, with an equal-contribution marker removed (`person_name_parts()`). An entry writing `Brown, B.` yields `given: "B."`, and that is correct, not a gap. |
@@ -870,7 +871,7 @@ Schema enum, so a new work type (#31) needs no version bump.
 
 **`work.links` keeps a link that failed verification, and says so.**
 `build_links()` files links by kind — `url` and `video` from the entry's own
-`url` field, with `origin: input`; `pdf` from `pdf_base_url`; `doi` and
+`url` field and `video` from its `video` field, with `origin: input`; `pdf` from `pdf_base_url`; `doi` and
 `arxiv` built from the identifiers — and each record carries
 `{url, label, origin, verification}`. `origin` is an open string over
 `input`, `sidecar`, `enrichment`, `inferred` and `derived`, and only `input`

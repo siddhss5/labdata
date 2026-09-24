@@ -5,10 +5,13 @@ one field of one exported publication. Rows with a strict xfail
 mark describe the intended behavior, which the issue in the reason delivers.
 """
 
+import json
+
 import pytest
 
 from .support import (
-    VALID, AllOf, Contains, Excludes, assert_field, case, item, work,
+    VALID, AllOf, Contains, Excludes, assert_field, case, export, item,
+    run_sslabdata, work, write_variant,
 )
 
 
@@ -429,6 +432,31 @@ LINKS = [
 @pytest.mark.parametrize("case_id, bib_key, path, expected", LINKS)
 def test_links(valid_output, case_id, bib_key, path, expected):
     check_work(valid_output, bib_key, path, expected)
+
+
+# Covers links.video_field
+def test_video_field_beside_a_website_url(tmp_path):
+    """`url` stays the website and `video` becomes the video link; the field
+    is carried in `bibtex` as written and draws no diagnostic."""
+    variant = write_variant(tmp_path, pdf_base_url=None, bib_files=[
+        {"name": "video.bib", "category": "Links"}])
+    run, data = export(VALID, tmp_path, variant)
+    assert run.code == 0 and run.crash is None, run.output
+    found = work(data, "link-video-field")
+    input_link = {"label": None, "origin": "input",
+                  "verification": {"status": "unchecked", "checked_at": None}}
+    assert found["links"] == {
+        "url": [{"url": "https://example.org/projects/link-video-field",
+                 **input_link}],
+        "video": [{"url": "https://example.org/videos/link-video-field.mp4",
+                   **input_link}],
+    }
+    assert ('video = "https://example.org/videos/link-video-field.mp4"'
+            in found["bibtex"])
+    report = run_sslabdata(["--config", variant, "--validate", "--format", "json"],
+                           VALID)
+    assert report.code == 0 and report.crash is None, report.output
+    assert json.loads(report.stdout) == []
 
 
 # --- BibTeX structure, entry types and fields -------------------------------
