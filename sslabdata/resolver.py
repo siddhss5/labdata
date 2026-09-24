@@ -29,10 +29,9 @@ FUZZY_THRESHOLD = 0.85
 # After normalization (no periods): "a kim", "h zhang", etc.
 _ABBREVIATED_NAME_RE = re.compile(r'^[a-z] [a-z]+$')
 
-# How a contributor's `resolution.status` reads, and how it resolved. Both are
-# open strings: `ambiguous` is a name that fits more than one person, and #25
-# fills the method with an explicit override or an ORCID, and neither is a
-# breaking change.
+# How a contributor's `resolution.status` reads, and how it resolved.
+# `ambiguous` is a name that fits more than one person. Both are open strings,
+# so a new status or method is not a breaking change.
 RESOLVED, UNRESOLVED, AMBIGUOUS = "resolved", "unresolved", "ambiguous"
 BY_NAME = "exact"
 
@@ -101,18 +100,13 @@ def normalize_name(name: str) -> str:
     Lowercases, strips accents, removes periods and extra whitespace,
     and standardizes initial formats.
     """
-    # Lowercase
     name = name.lower().strip()
-    # Remove accents (é → e, ü → u, etc.)
     name = ''.join(
         c for c in unicodedata.normalize('NFD', name)
         if unicodedata.category(c) != 'Mn'
     )
-    # Remove periods
     name = name.replace('.', '')
-    # Remove superscript HTML tags
     name = re.sub(r'<sup>.*?</sup>', '', name)
-    # Collapse whitespace
     name = re.sub(r'\s+', ' ', name).strip()
     return name
 
@@ -549,25 +543,21 @@ def compute_backlinks(data: LabData) -> None:
     projects_by_id = {p.id: p for p in data.projects}
 
     for work in data.works:
-        # Back-link people
         for author in work.authors:
             if author.person_id and author.person_id in people_by_id:
                 person = people_by_id[author.person_id]
                 if work.bib_id not in person.work_ids:
                     person.work_ids.append(work.bib_id)
 
-        # Back-link projects
         for pid in work.project_ids:
             if pid in projects_by_id:
                 project = projects_by_id[pid]
                 if work.bib_id not in project.work_ids:
                     project.work_ids.append(work.bib_id)
 
-    # Update work counts
     for person in data.people:
         person.work_count = len(person.work_ids)
 
-    # Infer project people from works
     for project in data.projects:
         people_set: Set[str] = set()
         for work_id in project.work_ids:

@@ -49,7 +49,6 @@ _DOCUMENTED = frozenset({"textsuperscript", "*"})
 # pylatexenc 2.11 raises IndexError on every \href, so the link is rewritten
 # to "text (url)" before conversion. The URL itself is set aside first: it is
 # not LaTeX, and characters such as _ or % would not survive the converter.
-# Carrying the link content into explicit fields is #27.
 _HREF_URL_TEXT = re.compile(r'\\href\s*\{([^{}]*)\}\s*\{((?:[^{}]|\{[^{}]*\})*)\}')
 _HREF_URL_ONLY = re.compile(r'\\href\s*\{([^{}]*)\}')
 

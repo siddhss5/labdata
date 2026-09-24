@@ -5,7 +5,7 @@
 
 Standard library only. Reads the document named on the command line and
 nothing else. See README.md in this directory for the rule this probe exists
-to test, and for the one identity question it still cannot answer.
+to test, and for the identity questions it answers.
 
 Output is tab separated, one record per line:
 
@@ -28,11 +28,13 @@ two -- the same external person written two ways is one node with an edge to
 each of their works, two different people who write their names alike are two
 authorships of one work that must stay apart, and two people who merely share
 an initial and a surname are two nodes. The tests in
-tests/conformance/test_consumer_probes.py put those cases to this probe. It
-It answers two of them from what the document declares, and it does not
-guess at the third: joining two spellings of one external person needs a
-grouping the document does not yet make, and keying a node on a name would be
-exactly the merge the document itself warns against.
+tests/conformance/test_consumer_probes.py put those cases to this probe, and
+it answers all three from what the document declares, never from a name. Two
+spellings of one external person are one node when the document gives both
+authorships one `collaborator_key`, which it does when `collaborators_file`
+declares the spelling that joins them; spellings the document leaves in two
+groupings stay two nodes, because keying a node on a name would be exactly
+the merge the document itself warns against.
 
 Two namespaces, never one. `people` is a list of humans; `collaborators` is a
 *grouping over unresolved authorships*, which is not the same kind of thing

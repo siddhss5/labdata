@@ -34,7 +34,7 @@ from .resolver import (
 
 
 # The policy that built a collaborator key. It is a declared, open string, so
-# #25 can emit `explicit` or `orcid` without a schema version bump.
+# a new policy can be emitted without a schema version bump.
 # `declared` is a grouping `collaborators_file` asked for: its name and
 # aliases joined the spellings, and it is still a grouping, never a person.
 GROUPED_BY_NORMALIZED_NAME = "normalized_name"
@@ -65,15 +65,14 @@ GROUPING_INITIALS_AMBIGUOUS = "ID-GROUPING-INITIALS-AMBIGUOUS"
 # An unresolved authorship that fits more than one `collaborators_file`
 # entry, or an entry and a lab member it did not resolve to, so it is grouped
 # by its own name. A warning in every mode, including under `--strict`: an
-# author who matched no lab member is never an error (#26 decisions 6 and
-# 10). Until decision 6 it was reported under `RESOLVE-AMBIGUOUS-NAME`, which
-# now means lab members only and is still reported, as an error under
-# `--strict`, when the name also fits more than one member.
+# author who matched no lab member is never an error (SPEC.md section 1).
+# `RESOLVE-AMBIGUOUS-NAME` is about lab members only; it is reported as well,
+# as an error under `--strict`, when the name also fits more than one member.
 GROUPING_AMBIGUOUS_DECLARED = "ID-GROUPING-AMBIGUOUS-DECLARED"
 
 # One author name that matched no person, as `--unresolved --format json`
 # lists it. A warning in every mode, including under `--strict`: an author who
-# matched no lab member is never an error (#26 decision 10).
+# matched no lab member is never an error (SPEC.md section 1).
 UNRESOLVED_NAME = "RESOLVE-UNRESOLVED-NAME"
 
 # A `collaborators_file` name or alias that a lab member already declares.
@@ -326,10 +325,10 @@ def group_collaborators(works: List[Work], bib_dir: str,
 
     diagnostics.extend(_grouping_warnings(groups))
 
-    # `name` stays the tie-break it was, with `key` appended after it: two
-    # keys can carry the same readable name -- a parsed and a brace-protected
-    # spelling of one string are two keys -- so the name alone is no longer
-    # total, but it is still what a reader sees and it still decides.
+    # The readable name breaks ties, because it is what a reader sees, and
+    # `key` breaks the rest: two keys can carry the same readable name -- a
+    # parsed and a brace-protected spelling of one string are two keys -- so
+    # the name alone is not a total order.
     ordered = sorted(groups.values(),
                      key=lambda g: (g.last_year is None, -(g.last_year or 0),
                                     -len(g.work_ids), g.author.name, g.key))
@@ -451,7 +450,6 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
             f"'{path}' does not exist"))
         return False
 
-    # Parse works
     bib_files = [{'name': bf.name, 'category': bf.category}
                  for bf in config.bib_files
                  if present(f"{config.bib_dir}/{bf.name}", 'bib_files', 'name')]
@@ -466,7 +464,6 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
         pdf_base_url=config.pdf_base_url,
     )
 
-    # Load people and projects
     people = (load_people(config.people_file, found)
               if config.people_file and people_found else [])
     projects = (load_projects(config.projects_file, found)
@@ -474,14 +471,11 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
     if people:
         found.extend(shared_declarations(people, config.people_file))
 
-    # Resolve
     unresolved_authors = resolve_authors(works, people, diagnostics=found,
                                          bib_dir=config.bib_dir)
     unknown_projects = resolve_projects(works, projects, found,
                                         bib_dir=config.bib_dir)
 
-    # Group the authorships that resolved to nobody, joining the spellings
-    # `collaborators_file` declares
     declared = None
     if config.collaborators_file and collaborators_found:
         declared = declared_collaborators(
@@ -500,7 +494,6 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
                 LAB_NAME_MISSING, config.path or 'lab.yaml', "lab", "name",
                 "the lab header declares no name"))
 
-    # Assemble
     data = LabData(
         works=works,
         people=people,
@@ -509,7 +502,6 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
         lab=config.lab,
     )
 
-    # Back-link
     compute_backlinks(data)
 
     return AssemblyResult(

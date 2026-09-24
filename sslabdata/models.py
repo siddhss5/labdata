@@ -22,15 +22,8 @@ from .config import reject_absolute_name
 
 
 # Version of the output format (see schema/v4/output.schema.json). Bump it when
-# a change to to_dict() output could break a consumer.
-#
-# 2: authors carry their structured name parts (#23). The schema is closed,
-#    so a consumer validating against version 1 would reject the new keys.
-# 3: authors carry equal_contribution (#46), for the same reason.
-# 4: one consolidated breaking change (#56): `publications` becomes `works`,
-#    the bibliography is structured, links and identifiers are open registries,
-#    `collaborators` is a declared grouping over unresolved authorships, and
-#    every closed object declares every property it can carry.
+# a change to to_dict() output could break a consumer. SPEC.md section 6 says
+# what each version changed.
 SCHEMA_VERSION = 4
 
 # The name of the compiler, as the document's `generator` record reports it.
@@ -268,7 +261,6 @@ class Person:
     co_advisor: Optional[str] = None
     start_year: Optional[int] = None
 
-    # Alumni-specific
     end_year: Optional[int] = None
     degree: Optional[str] = None
     thesis_title: Optional[str] = None
@@ -313,7 +305,8 @@ class Collaborator:
     ``key`` is a lookup key and explicitly not an assertion about a human:
     a readable slug of the normalised name plus a short digest, so that
     adding an unrelated collaborator can never change an existing key.
-    ``grouped_by`` names the policy that built it, ``normalized_name`` in v4.
+    ``grouped_by`` names the policy that built it: ``normalized_name``, or
+    ``declared`` for a grouping `collaborators_file` declares.
 
     ``name_kind`` is ``personal`` or ``literal``. It is not ``organization``:
     brace protection in BibTeX means "do not parse this", which covers
@@ -403,9 +396,10 @@ class LabData:
         """Convert to dictionary for serialization.
 
         ``generator`` carries no timestamp: a build timestamp would make every
-        run differ and cost the determinism the project has already paid for.
-        Git records when. The version is read here rather than at import time
-        because the package imports this module while defining it.
+        run differ, and two runs over the same inputs must produce the same
+        bytes (SPEC.md section 3). Git records when. The version is read here
+        rather than at import time because the package imports this module
+        while defining it.
         """
         from . import __version__
 

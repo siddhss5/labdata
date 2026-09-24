@@ -16,10 +16,9 @@ from typing import Dict, List, Optional
 class Diagnostic(str):
     """One coded diagnostic: the line itself, with its parts kept alongside.
 
-    A ``str``, so every list that has always carried diagnostics as strings
-    carries these unchanged; the parts are there for a caller that would
-    otherwise have to split the line, which a citation key containing a
-    colon would defeat.
+    A ``str``, so it goes wherever a diagnostic line is expected; the parts
+    are there for a caller that would otherwise have to split the line,
+    which a citation key containing a colon would defeat.
     """
 
     code: str
@@ -104,12 +103,13 @@ CLASSES: Dict[str, str] = {
     "CONFIG-BIB-FILES-MISSING": WARNING,
 }
 
-# The codes `--strict` leaves as warnings. `BIB-STRING-REDEFINED` is decided
-# on #26 (decision 5). Every other one is about an author who matched no lab
-# member, and such an author is never an error under `--strict` (decision 10):
-# sslabdata cannot tell an outside co-author from a possible member until #25
-# lets an author be declared external. The known cost is that a misspelt
-# member's name passes `--strict`, reported as a `RESOLVE-SUGGESTION` warning.
+# The codes `--strict` leaves as warnings (SPEC.md section 1). A redefined
+# `@string` macro is settled by BibTeX's own last-wins rule. Every other one is
+# about an author who matched no lab member, and such an author is never an
+# error under `--strict`: `collaborators_file` declares a grouping, not an
+# identity, so sslabdata cannot tell an outside co-author from a possible
+# member. The known cost is that a misspelt member's name passes `--strict`,
+# reported as a `RESOLVE-SUGGESTION` warning.
 NEVER_AN_ERROR = frozenset({
     "BIB-STRING-REDEFINED",
     "ID-GROUPING-SPANS-SPELLINGS",
