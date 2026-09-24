@@ -1,9 +1,11 @@
-"""Each known-key list names exactly the keys its loader reads.
+"""Each known-key list names exactly the keys its loader reads, except that
+`site` is known in lab.yaml without being read.
 
 A key a loader reads but its list lacks makes valid data warn as unknown; a
-key the list names but no loader reads is accepted and silently dropped. Each
-test hands the loader mappings that record every key looked up in them, and
-compares what was looked up with the list.
+key the list names but no loader reads is accepted and silently dropped. The
+loaders read keys with ``[]`` and ``.get()``, so each test hands the loader a
+mapping that records every key looked up that way, and compares what was
+looked up with the list.
 """
 
 import yaml
@@ -69,4 +71,3 @@ def test_lab_yaml_keys_are_the_keys_from_yaml_reads(monkeypatch, tmp_path):
     path.write_text("", encoding="utf-8")
     LabDataConfig.from_yaml(str(path))
     assert data.read == set(KNOWN_KEYS) - {"site"}
-
