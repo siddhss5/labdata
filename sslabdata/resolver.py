@@ -29,10 +29,9 @@ FUZZY_THRESHOLD = 0.85
 # After normalization (no periods): "a kim", "h zhang", etc.
 _ABBREVIATED_NAME_RE = re.compile(r'^[a-z] [a-z]+$')
 
-# How a contributor's `resolution.status` reads, and how it resolved. Both are
-# open strings: `ambiguous` is a name that fits more than one person, and #25
-# fills the method with an explicit override or an ORCID, and neither is a
-# breaking change.
+# How a contributor's `resolution.status` reads, and how it resolved.
+# `ambiguous` is a name that fits more than one person. Both are open strings,
+# so a new status or method is not a breaking change.
 RESOLVED, UNRESOLVED, AMBIGUOUS = "resolved", "unresolved", "ambiguous"
 BY_NAME = "exact"
 

@@ -1107,8 +1107,7 @@ name to the new one. v3's `blob/main` `$id` still does not resolve, as above.
 The first schema published under the new name will be
 the next one, set up by #37.
 
-**Version history**, as recorded in the comment above
-`sslabdata.models.SCHEMA_VERSION`:
+**Version history** of `sslabdata.models.SCHEMA_VERSION`:
 
 | `schema_version` | Change |
 |---|---|

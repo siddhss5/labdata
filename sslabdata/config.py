@@ -2,7 +2,6 @@
 Configuration for sslabdata.
 
 Single-layer configuration loaded from a YAML file (lab.yaml).
-Replaces the old two-layer LibraryConfig → PublicationsConfig system.
 
 Copyright (c) 2024 Personal Robotics Laboratory, University of Washington
 Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
@@ -132,8 +131,8 @@ class LabDataConfig:
     # name the file the user would edit. Never emitted.
     path: Optional[str] = None
 
-    # External co-authors whose spellings should be grouped together. Last,
-    # so the positional order of the fields above is unchanged.
+    # External co-authors whose spellings should be grouped together. After
+    # `path`, so the fields above keep their positions in the constructor.
     collaborators_file: Optional[str] = None
 
     # Keys `lab.yaml` held that sslabdata does not read, in file order, so the
@@ -174,8 +173,9 @@ class LabDataConfig:
                    f"bib_files is {_kind(entries)}; it must be a list of "
                    "{name, category} mappings")
         # An entry that is not a mapping, or whose name or category is not a
-        # string, is not checked here: no contract row covers it yet, and it
-        # fails or passes as it always has.
+        # string, is not checked here, as no contract row covers it. One that
+        # is not a mapping fails when `BibFile` is built from it below; a name
+        # or category that is not a string is passed through.
         for number, bf in enumerate(entries, start=1):
             if not isinstance(bf, dict):
                 continue

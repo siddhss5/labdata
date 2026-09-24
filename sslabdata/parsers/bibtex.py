@@ -48,15 +48,14 @@ OTHERS = "others"
 # elsewhere, so severity is not part of it. See "Diagnostic codes" in SPEC.md.
 DUPLICATE_CITATION_KEY = "BIB-DUPLICATE-KEY"
 
-# An entry that cross-refers to another is rejected rather than resolved
-# (#65). Partial inheritance dropped every author of the child entry and said
-# nothing about it; a hard error costs one edit, and going from "rejected" to
-# "supported" later is additive.
+# An entry that cross-refers to another is rejected rather than resolved, so
+# no work carries a field its own entry did not write. A hard error costs one
+# edit, and going from "rejected" to "supported" later is additive.
 CROSSREF_UNSUPPORTED = "BIB-CROSSREF-UNSUPPORTED"
 
 # An entry with no year is emitted with `year: null` and says so, rather than
-# claiming year 0 — a value indistinguishable from a real year 0 that also
-# put the entry somewhere meaningless in the order.
+# claiming year 0 — a value indistinguishable from a real year 0 that would
+# also put the entry somewhere meaningless in the order.
 YEAR_MISSING = "BIB-YEAR-MISSING"
 
 # A year that is present but is not a number is treated as no year, and says
@@ -115,7 +114,7 @@ LATEX_COMMAND_UNKNOWN = "LATEX-COMMAND-UNKNOWN"
 # ordinary LaTeX conversion then consumes the escaped star, so the name reads
 # `Brown` (tests/COVERAGE.md row `names.equal_contribution_escaped`). The
 # accent in `C{\^o}t{\'e}$^{*}$` is escaped the same way, and the marker after
-# it is not, which is how that name keeps working.
+# it is not, which is why that name reads `Côté` and is marked.
 _WRITTEN = r"\$\^\{\*\}\$|\^\{\*\}|\\textsuperscript\s*\{\*\}"
 _MARKER = rf"(?<!\\)(?:{_WRITTEN}|\*)"
 
@@ -201,7 +200,7 @@ class _CommentSkippingParser(LowLevelParser):
 
     Only a *balanced* group is consumed. Prose that merely mentions
     ``@comment{`` does not close, so the position is put back and pybtex reads
-    the file as it always would: at worst a commented-out entry stays visible,
+    the rest of the file itself: at worst a commented-out entry stays visible,
     never a real entry disappears.
     """
 
@@ -251,8 +250,7 @@ class _Parser(PybtexParser):
 
     ``Parser.parse_string`` names ``LowLevelParser`` directly, so swapping the
     tokenizer means restating that loop. It is the one place sslabdata touches a
-    pybtex internal; ``pybtex~=0.26`` is pinned, which is the mitigation #23
-    already names for this.
+    pybtex internal, which is why ``pybtex~=0.26`` is pinned.
     """
 
     def __init__(self, *args, duplicate_keys=None, **kwargs):
@@ -335,8 +333,8 @@ def _on_comment_line(text: str, position: Optional[int]) -> bool:
     a command, so prose on a `%` line that mentions `@article` fails to parse.
     That failure is not reported: the prose was never meant as BibTeX
     (`tests/COVERAGE.md` row `structure.comment_lines`). Only the report is
-    suppressed. A well-formed command on such a line is still read, as the
-    library reads it; whether it should be is #78.
+    suppressed. A well-formed command on such a line is read, as the library
+    reads it.
     """
     if position is None:
         return False
@@ -659,7 +657,7 @@ def entry_fields(bib_id: str, entry: Entry, unknown_in) -> Dict[str, str]:
 
     ``ENTRYTYPE`` and ``ID`` are included so the rules below read one plain
     dictionary and know nothing about pybtex. No field is filled in from any
-    other entry: ``crossref`` is rejected rather than resolved (#65).
+    other entry: ``crossref`` is rejected rather than resolved.
     """
     fields = {name.lower(): value for name, value in entry.fields.items()}
     read = {
@@ -709,8 +707,8 @@ BOOKTITLE_KINDS = {"inproceedings": "conference", "conference": "conference",
 OTHER_KIND = "other"
 
 # A preprint's venue is the repository it sits in, which is what
-# `archivePrefix` names. arXiv is the default because `construct_arxiv_url`
-# already reads a bare `eprint` as an arXiv identifier.
+# `archivePrefix` names. arXiv is the default, because a bare `eprint` is
+# read as an arXiv identifier (`build_identifiers`) and linked as one.
 ARXIV = "arXiv"
 REPOSITORY_KIND = "repository"
 
@@ -724,7 +722,7 @@ FLAT_FIELDS = ("volume", "number", "pages", "series", "edition", "publisher",
 
 # The identifier schemes sslabdata reads out of an entry, and the field each
 # comes from. The registry is open: a scheme is documented, never enumerated
-# in the schema, so #25 and #27 can add one without a version bump.
+# in the schema, so one can be added without a version bump.
 IDENTIFIER_FIELDS = {"doi": "doi", "isbn": "isbn", "issn": "issn"}
 
 # A DOI written as a URL is the resolver plus the DOI; the identifier is the
@@ -880,9 +878,9 @@ def parse_project_ids(entry: dict) -> List[str]:
 def entry_year(entry: dict, source: str, report) -> Optional[int]:
     """The entry's year, or None with a diagnostic when it has none.
 
-    A work with no year sorts last, exactly where the old ``year: 0`` put it,
-    but a consumer can now tell "no year" from "the year zero". A year that
-    is not a number is reported and read as no year.
+    A work with no year sorts last, and its year is None rather than 0, so a
+    consumer can tell "no year" from "the year zero". A year that is not a
+    number is reported and read as no year.
     """
     raw = str(entry.get("year", "")).strip()
     if not raw:
@@ -1039,11 +1037,10 @@ def parse_all_works(
                 report(_duplicate_key_error(path, bib_id, previous_path, previous_key))
             else:
                 first_source[normalized] = (path, bib_id)
-            # Rejected on presence, not on value, and not emitted: a child
-            # that inherited part of a parent lost every author of its own
-            # and said nothing about it. An empty `crossref = {}` is a field
-            # the entry carries, so it is an error too -- letting it through
-            # would put the silent path back under a different spelling.
+            # Rejected on presence, not on value, and not emitted. An empty
+            # `crossref = {}` is a field the entry carries, so it is an error
+            # too: otherwise an entry could cross-refer without a diagnostic
+            # under a different spelling.
             crossref = [value for field_name, value in entry.fields.items()
                         if field_name.lower() == "crossref"]
             if crossref:

@@ -34,7 +34,7 @@ from .resolver import (
 
 
 # The policy that built a collaborator key. It is a declared, open string, so
-# #25 can emit `explicit` or `orcid` without a schema version bump.
+# a new policy can be emitted without a schema version bump.
 # `declared` is a grouping `collaborators_file` asked for: its name and
 # aliases joined the spellings, and it is still a grouping, never a person.
 GROUPED_BY_NORMALIZED_NAME = "normalized_name"
@@ -65,15 +65,14 @@ GROUPING_INITIALS_AMBIGUOUS = "ID-GROUPING-INITIALS-AMBIGUOUS"
 # An unresolved authorship that fits more than one `collaborators_file`
 # entry, or an entry and a lab member it did not resolve to, so it is grouped
 # by its own name. A warning in every mode, including under `--strict`: an
-# author who matched no lab member is never an error (#26 decisions 6 and
-# 10). Until decision 6 it was reported under `RESOLVE-AMBIGUOUS-NAME`, which
-# now means lab members only and is still reported, as an error under
-# `--strict`, when the name also fits more than one member.
+# author who matched no lab member is never an error (SPEC.md section 1).
+# `RESOLVE-AMBIGUOUS-NAME` is about lab members only; it is reported as well,
+# as an error under `--strict`, when the name also fits more than one member.
 GROUPING_AMBIGUOUS_DECLARED = "ID-GROUPING-AMBIGUOUS-DECLARED"
 
 # One author name that matched no person, as `--unresolved --format json`
 # lists it. A warning in every mode, including under `--strict`: an author who
-# matched no lab member is never an error (#26 decision 10).
+# matched no lab member is never an error (SPEC.md section 1).
 UNRESOLVED_NAME = "RESOLVE-UNRESOLVED-NAME"
 
 # A `collaborators_file` name or alias that a lab member already declares.
@@ -326,10 +325,10 @@ def group_collaborators(works: List[Work], bib_dir: str,
 
     diagnostics.extend(_grouping_warnings(groups))
 
-    # `name` stays the tie-break it was, with `key` appended after it: two
-    # keys can carry the same readable name -- a parsed and a brace-protected
-    # spelling of one string are two keys -- so the name alone is no longer
-    # total, but it is still what a reader sees and it still decides.
+    # The readable name breaks ties, because it is what a reader sees, and
+    # `key` breaks the rest: two keys can carry the same readable name -- a
+    # parsed and a brace-protected spelling of one string are two keys -- so
+    # the name alone is not a total order.
     ordered = sorted(groups.values(),
                      key=lambda g: (g.last_year is None, -(g.last_year or 0),
                                     -len(g.work_ids), g.author.name, g.key))
