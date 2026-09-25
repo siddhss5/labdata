@@ -121,7 +121,7 @@ nothing else:
 | `doi`, `isbn`, `issn`, `eprint` + `archivePrefix` | `identifiers`, an open map from scheme to a list of identifiers, plus the links built from them. An `eprint`'s scheme is the repository `archivePrefix` named, lower-cased, so that field needs no property of its own — and an `eprint` in a repository other than arXiv gets no arXiv link |
 | `abstract` | `abstract` |
 | `note` | `note` |
-| `url` | A link of kind `video` when it points at YouTube or Vimeo, otherwise of kind `url` |
+| `url` | A link of kind `video` when its host is YouTube or Vimeo (or a subdomain of either), otherwise of kind `url` |
 | `video` | A link of kind `video`, whatever its host, so `url` can hold the work's website |
 | `pdf` | The work's one link of kind `pdf`. An entry without it gets `pdf_base_url` plus its citation key, when `pdf_base_url` is set |
 | `project` | `project_ids` (see below) |

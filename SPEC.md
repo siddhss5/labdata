@@ -510,7 +510,7 @@ rule does not apply to the input itself — only to whatever it produces.
 | `archivePrefix` (or `archiveprefix`) | Becomes the **scheme** of the `eprint` identifier, **lower-cased**, and the `venue.name` of a preprint, as written (`_archive_prefix()`). It has no property of its own, because naming the repository is what a scheme does. An entry that names no prefix is read as an arXiv one, which is the only case the default covers; an entry that names `HAL` is filed under `hal` and gets no arXiv link. |
 | `isbn`, `issn` | Become `identifiers.isbn` and `identifiers.issn` (`build_identifiers()`). |
 | `project` | Parsed into the list `project_ids` (`parse_project_ids()`). |
-| `url` | Becomes a link of kind `video` when it names youtube.com, youtu.be or vimeo.com, and of kind `url` otherwise, with `origin: input` (`is_video_url()`, `build_links()`). |
+| `url` | Becomes a link of kind `video` when its host is youtube.com, youtu.be or vimeo.com or a subdomain of one, and of kind `url` otherwise, with `origin: input` (`is_video_url()`, `build_links()`). |
 | `video` | Becomes a link of kind `video` whatever its host, with `origin: input`, after any video link `url` gave (`build_links()`). |
 | `pdf` | Becomes the work's one link of kind `pdf`, with `origin: input`, in place of the one `pdf_base_url` would give (`build_links()`). Empty or whitespace-only is read as absent. |
 | `author` | Parsed into the `authors` list (`parse_author_list()`); the name parts are converted under heading 1. |

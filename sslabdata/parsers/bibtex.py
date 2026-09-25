@@ -18,6 +18,7 @@ MIT License - see LICENSE file for details.
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlsplit
 
 import pybtex.errors
 from pybtex.database import Entry, Person
@@ -798,8 +799,19 @@ def build_identifiers(entry: dict) -> Dict[str, List[str]]:
 
 
 def is_video_url(url: str) -> bool:
-    """True when a URL names one of the video hosts sslabdata files separately."""
-    return any(host in url for host in VIDEO_HOSTS)
+    """True when a URL's host is a video host, or a subdomain of one.
+
+    Only the parsed hostname counts: a lookalike domain, or a host named in
+    the path, query or fragment, does not. A URL that cannot be parsed, or has
+    no host, is not a video.
+    """
+    try:
+        hostname = urlsplit(url).hostname
+    except ValueError:
+        return False
+    return hostname is not None and any(
+        hostname == host or hostname.endswith("." + host)
+        for host in VIDEO_HOSTS)
 
 
 def pdf_link(bib_id: str, pdf_base_url: Optional[str]) -> Optional[Link]:

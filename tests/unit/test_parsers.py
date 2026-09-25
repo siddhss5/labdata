@@ -66,6 +66,25 @@ class TestBuildLinks:
     def test_no_base_and_no_fields(self):
         assert build_links({}, "k", {}, None) == {}
 
+    @pytest.mark.parametrize("url, kind", [
+        ("https://www.youtube.com/watch?v=abc", "video"),
+        ("https://youtu.be/abc", "video"),
+        ("https://vimeo.com/123", "video"),
+        ("https://player.vimeo.com/video/123", "video"),
+        ("https://WWW.YouTube.COM:443/watch?v=abc", "video"),
+        ("https://notyoutube.com/paper", "url"),
+        ("https://youtube.com.example.org/paper", "url"),
+        ("https://example.org/youtube.com/paper", "url"),
+        ("https://example.org/?next=youtube.com", "url"),
+        ("https://example.org/#vimeo.com", "url"),
+        ("https://youtube.com@example.org/paper", "url"),
+        ("https://[youtube.com/paper", "url"),
+    ])
+    def test_url_is_a_video_only_when_its_host_is_a_video_host(self, url, kind):
+        links = build_links({"url": url}, "k", {}, None)
+        assert [link.url for link in links[kind]] == [url]
+        assert list(links) == [kind]
+
 
 class TestPdfLink:
     def test_a_remote_base_is_never_fetched(self):
