@@ -170,6 +170,21 @@ def test_a_name_outside_bib_dir_is_rejected_before_anything_is_parsed(tmp_path, 
 
 
 # Covers config.bib_files.name_outside_bib_dir
+def test_a_name_is_checked_where_the_reader_opens_it_when_bib_dir_is_empty(tmp_path):
+    """With `bib_dir: ""` the reader opens `/<name>`, not `<cwd>/<name>`, so a
+    name that is under the working directory as written still leaves it."""
+    where = outside_tree(tmp_path, [])
+    outside = (where / "outside.bib").resolve()
+    name = outside.relative_to(outside.anchor).as_posix()
+    (where / "lab.yaml").write_text(yaml.safe_dump(
+        {"bib_dir": "", "bib_files": [{"name": name, "category": "Papers"}]}),
+        encoding="utf-8")
+    run = run_sslabdata(["--config", "../lab.yaml", "--validate"], where / "bib")
+    assert run.crash is None and run.code == 1, run.output
+    assert f"CONFIG-BIB-FILE-OUTSIDE-BIB-DIR ../lab.yaml:bib_files:name: '{name}'" in run.stderr
+
+
+# Covers config.bib_files.name_outside_bib_dir
 def test_a_nested_name_under_bib_dir_is_accepted_and_emitted_as_written(tmp_path):
     """The document is the artifact: `works[].source.file` is `conference/2026.bib`.
     To reproduce, list that name in the fixture's lab.yaml and run

@@ -114,7 +114,10 @@ def reject_name_outside_bib_dir(name, bib_dir, file: Optional[str] = None) -> No
     escapes = bool(parts.drive) or ".." in parts.parts
     if not escapes:
         root = Path(os.path.realpath(bib_dir))
-        escapes = not Path(os.path.realpath(root / name)).is_relative_to(root)
+        # The path the readers open, built the way they build it: with an
+        # empty bib_dir it is rooted, not relative to the working directory.
+        target = Path(os.path.realpath(f"{bib_dir}/{name}"))
+        escapes = not target.is_relative_to(root)
     if escapes:
         raise ConfigurationError(diagnostic(
             BIB_FILE_OUTSIDE, file, "bib_files", "name",
