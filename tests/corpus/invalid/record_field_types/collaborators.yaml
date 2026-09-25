@@ -1,0 +1,5 @@
+# CASE records.optional_type_invalid
+# Aliases that are not all non-empty strings.
+
+- name: "Priya Patel"
+  aliases: ["P. Patel", ""]

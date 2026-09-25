@@ -1,0 +1,9 @@
+# CASE records.optional_type_invalid
+# Optional fields of the wrong type on a project.
+
+- id: "homebot"
+  title: "Household Manipulation"
+  status: 7
+  description: ["Robots at home"]
+  website: 7
+  image: {path: "homebot.png"}

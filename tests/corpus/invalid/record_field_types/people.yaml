@@ -1,0 +1,20 @@
+# CASE records.optional_type_invalid
+# Optional fields of the wrong type: each is reported, read as empty and
+# emitted as null (a status that is not a string reads as `current`), and the
+# person is kept.
+
+- id: "aadams"
+  name: "Alice Adams"
+  aliases: "A. Adams"
+  role: "professor"
+  status: 7
+  photo: 7
+  website: ["https://example.org/aadams"]
+  start_year: "2020"
+
+- id: "bbrown"
+  name: "Bob Brown"
+  aliases: ["B. Brown", 3]
+  role: "student"
+  email: {address: "bbrown@example.org"}
+  end_year: true

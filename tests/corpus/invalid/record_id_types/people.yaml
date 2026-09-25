@@ -1,0 +1,10 @@
+# CASE records.required_type_invalid
+# A person whose id and name are numbers, and one whose name is a list.
+
+- id: 42
+  name: 99
+  aliases: "not a list"
+  role: "pi"
+
+- id: "bbrown"
+  name: ["Bob", "Brown"]

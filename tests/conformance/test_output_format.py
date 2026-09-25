@@ -18,7 +18,8 @@ import pytest
 import yaml
 
 from .support import (
-    EXPECTED, PREVIOUS_SCHEMA_PATHS, REPO_ROOT, SCHEMA_PATH, VALID, export, item,
+    EXPECTED, INVALID, PREVIOUS_SCHEMA_PATHS, REPO_ROOT, SCHEMA_PATH, VALID, export,
+    item,
 )
 
 DEMO_CONFIG = "examples/demo/lab.yaml"
@@ -95,6 +96,41 @@ def test_demo_matches_schema(validator, demo_exports):
     for data in demo_exports:
         assert schema_errors(validator, data) == []
         check_references(data)
+
+
+# Covers output.schema
+def test_every_document_sslabdata_writes_matches_the_schema(validator, tmp_path):
+    """Whatever input a run accepts, the document it writes is schema v5.
+
+    Runs `sslabdata --format json --output` over the valid corpus, the demo
+    and every invalid-corpus case. A case that exits non-zero writes nothing
+    and is not checked; every other one must write a document the schema
+    accepts, and none may crash. To reproduce, run
+
+        pytest tests/conformance/test_output_format.py -k every_document --basetemp=DIR
+
+    and read DIR/test_every_document*/schema-conformance.json (case -> exit
+    status and schema errors) and the `<case>/lab.json` beside it, which can
+    be validated against schema/v5/output.schema.json by any JSON Schema tool.
+    """
+    cases = {"valid": (VALID, "lab.yaml"), "demo": (REPO_ROOT, DEMO_CONFIG)}
+    cases.update({f"invalid/{d.name}": (d, "lab.yaml")
+                  for d in sorted(INVALID.iterdir()) if d.is_dir()})
+    report = {}
+    for name, (cwd, config) in cases.items():
+        out = tmp_path / name
+        run, data = export(cwd, out, config)
+        assert run.crash is None, f"{name}: {run.crash}"
+        report[name] = {"exit": run.code,
+                        "schema_errors": [] if data is None
+                        else schema_errors(validator, data)}
+    (tmp_path / "schema-conformance.json").write_text(
+        json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    assert {n: r["schema_errors"] for n, r in report.items()
+            if r["schema_errors"]} == {}
+    # Not vacuous: documents were written from all three kinds of input.
+    assert report["valid"]["exit"] == report["demo"]["exit"] == 0
+    assert report["invalid/invalid_person_role"]["exit"] == 0
 
 
 def test_demo_header_and_equal_contribution_markers(demo_exports):

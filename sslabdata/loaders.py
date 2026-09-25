@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import List
 from pathlib import Path
 
+from .config import _kind
 from .diagnostics import Diagnostic, diagnostic
 from .models import Person, Project
 
@@ -20,7 +21,8 @@ from .models import Person, Project
 # check is the same in each. A file that is not valid YAML or not a list of
 # records, and a record missing a field it cannot be emitted without, fail
 # every mode; a repeated id fails `--validate`, as a repeated citation key
-# does; the rest are warnings.
+# does; the rest are warnings. A required field that is not a string is as
+# unusable as a missing one, and is reported under the same code.
 PEOPLE_YAML_INVALID = "PEOPLE-YAML-INVALID"
 PEOPLE_NOT_A_LIST = "PEOPLE-NOT-A-LIST"
 PEOPLE_FIELD_MISSING = "PEOPLE-FIELD-MISSING"
@@ -36,6 +38,7 @@ PEOPLE_STATUS_INVALID = "PEOPLE-STATUS-INVALID"
 PROJECTS_ID_DUPLICATE = "PROJECTS-ID-DUPLICATE"
 PROJECTS_STATUS_INVALID = "PROJECTS-STATUS-INVALID"
 RECORD_KEY_UNKNOWN = "RECORD-KEY-UNKNOWN"
+RECORD_TYPE_INVALID = "RECORD-TYPE-INVALID"
 
 # The keys each file's records are read for. Any other key is reported and
 # ignored, so a misspelt `webiste` is not silently dropped from the document.
@@ -45,26 +48,53 @@ PERSON_KEYS = ("id", "name", "aliases", "role", "status", "photo", "website",
 PROJECT_KEYS = ("id", "title", "description", "website", "image", "status")
 COLLABORATOR_KEYS = ("name", "aliases")
 
+# The YAML type each optional field of a record accepts, beyond `role` and
+# `status`, which have codes of their own. The required fields (`id`, `name`,
+# `title`) are strings. A value of any other type is reported and read as
+# empty, so it is emitted as null (or, for aliases, declares none) and never
+# reaches the document as the wrong type.
+STRING, INTEGER, ALIASES = ("a string", "an integer",
+                            "a list of non-empty strings")
+PERSON_TYPES = {**dict.fromkeys(("photo", "website", "email", "co_advisor",
+                                 "degree", "thesis_title",
+                                 "current_position"), STRING),
+                "start_year": INTEGER, "end_year": INTEGER,
+                "aliases": ALIASES}
+PROJECT_TYPES = dict.fromkeys(("description", "website", "image"), STRING)
+COLLABORATOR_TYPES = {"aliases": ALIASES}
+
 # A person's `status` is one of these. A `role` is any non-empty string, so
 # that any lab's roles fit (SPEC.md, *The people and projects files*).
 PERSON_STATUSES = ("current", "alumni")
 PROJECT_STATUSES = ("active", "completed")
 
 
-def _records(path: str, codes, required, known, diagnostics) -> List[dict]:
+def _has_type(value, expected: str) -> bool:
+    if expected == STRING:
+        return isinstance(value, str)
+    if expected == INTEGER:
+        return isinstance(value, int) and not isinstance(value, bool)
+    return isinstance(value, list) and all(
+        isinstance(v, str) and v.strip() for v in value)
+
+
+def _records(path: str, codes, required, known, optional,
+             diagnostics) -> List[dict]:
     """The records of one people, projects or collaborators file that can be
     emitted, every file checked the same way.
 
     ``codes`` are the file's YAML-invalid, not-a-list and field-missing
-    codes, ``required`` the fields a record cannot be emitted without, and
-    ``known`` the keys the file's records are read for.
+    codes, ``required`` the fields a record cannot be emitted without --
+    each a non-empty string -- ``known`` the keys the file's records are read
+    for and ``optional`` the type each optional field accepts.
     A missing file is not this function's to report (the assembler names the
     configuration key instead) and reads as no records, as does an empty one.
     A file that is not valid YAML or not a list, a record that is not a
     mapping and a record missing a required field are reported to
     ``diagnostics`` and left out. A kept record's unknown keys are reported
     at the record's first required field -- its `id`, or a collaborator's
-    `name` -- and the record is kept without them.
+    `name` -- and the record is kept without them, as it is with an optional
+    field of the wrong type, which is set to ``None``.
     """
     yaml_invalid, not_a_list, field_missing = codes
     fail = diagnostics.append
@@ -74,7 +104,7 @@ def _records(path: str, codes, required, known, diagnostics) -> List[dict]:
     try:
         with open(path, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f)
-    except yaml.YAMLError as error:
+    except (yaml.YAMLError, UnicodeDecodeError) as error:
         fail(diagnostic(yaml_invalid, path, None, None,
                         " ".join(str(error).split())))
         return []
@@ -95,10 +125,17 @@ def _records(path: str, codes, required, known, diagnostics) -> List[dict]:
                             "not a record"))
             continue
         missing = [name for name in required
-                   if entry.get(name) is None or str(entry[name]).strip() == ""]
+                   if not isinstance(entry.get(name), str)
+                   or not entry[name].strip()]
         if missing:
-            fail(diagnostic(field_missing, path, entry.get('id'), missing[0],
-                            f"entry {number} has no {missing[0]}"))
+            name, value = missing[0], entry.get(missing[0])
+            key = entry.get('id')
+            fail(diagnostic(
+                field_missing, path, key if isinstance(key, str) else None,
+                name, f"entry {number} has no {name}"
+                if value is None or isinstance(value, str) else
+                f"entry {number}'s {name} is {_kind(value)}; it must be a "
+                "string"))
             continue
         # A YAML key need not be a string (`0:`, `true:`); it is named as
         # text so that every unknown key has a location, even a falsy one.
@@ -107,6 +144,14 @@ def _records(path: str, codes, required, known, diagnostics) -> List[dict]:
                 diagnostics.append(diagnostic(
                     RECORD_KEY_UNKNOWN, path, entry[required[0]], str(key),
                     f"'{key}' is not a key sslabdata reads, and is ignored"))
+        for name, expected in optional.items():
+            if entry.get(name) is not None and not _has_type(entry[name],
+                                                             expected):
+                fail(diagnostic(
+                    RECORD_TYPE_INVALID, path, entry[required[0]], name,
+                    f"{name} is {_kind(entry[name])}; it must be {expected}, "
+                    "and is read as empty"))
+                entry[name] = None
         records.append(entry)
     return records
 
@@ -140,7 +185,7 @@ def load_people(path: str, diagnostics: List[Diagnostic]) -> List[Person]:
     people = []
     records = _records(path, (PEOPLE_YAML_INVALID, PEOPLE_NOT_A_LIST,
                               PEOPLE_FIELD_MISSING), ('id', 'name'), PERSON_KEYS,
-                       diagnostics)
+                       PERSON_TYPES, diagnostics)
     _repeated_ids(records, path, PEOPLE_ID_DUPLICATE, diagnostics.append)
     for entry in records:
         role = entry.get('role')
@@ -153,11 +198,15 @@ def load_people(path: str, diagnostics: List[Diagnostic]) -> List[Person]:
             warn(diagnostic(PEOPLE_STATUS_INVALID, path, entry['id'], 'status',
                             f"'{status}' is not one of "
                             f"{', '.join(PERSON_STATUSES)}"))
+            # A status that is not a string reads as the absent default: the
+            # schema requires a string, and the warning has said why.
+            if not isinstance(status, str):
+                status = 'current'
         person = Person(
             id=entry['id'],
             name=entry['name'],
-            aliases=entry.get('aliases', []),
-            role=entry.get('role'),
+            aliases=entry.get('aliases') or [],
+            role=role if isinstance(role, str) else None,
             status=status,
             photo=entry.get('photo'),
             website=entry.get('website'),
@@ -190,7 +239,7 @@ def load_projects(path: str, diagnostics: List[Diagnostic]) -> List[Project]:
     warn = diagnostics.append
     records = _records(path, (PROJECTS_YAML_INVALID, PROJECTS_NOT_A_LIST,
                               PROJECTS_FIELD_MISSING), ('id', 'title'), PROJECT_KEYS,
-                       diagnostics)
+                       PROJECT_TYPES, diagnostics)
     _repeated_ids(records, path, PROJECTS_ID_DUPLICATE, diagnostics.append)
     projects = []
     for entry in records:
@@ -199,6 +248,8 @@ def load_projects(path: str, diagnostics: List[Diagnostic]) -> List[Project]:
             warn(diagnostic(PROJECTS_STATUS_INVALID, path, entry['id'],
                             'status', f"'{status}' is not one of "
                             f"{', '.join(PROJECT_STATUSES)}"))
+            if not isinstance(status, str):
+                status = 'active'
         project = Project(
             id=entry['id'],
             title=entry['title'],
@@ -237,7 +288,7 @@ def load_collaborators(path: str, diagnostics: List[Diagnostic]
     records = _records(path, (COLLABORATORS_YAML_INVALID,
                               COLLABORATORS_NOT_A_LIST,
                               COLLABORATORS_FIELD_MISSING), ('name',),
-                       COLLABORATOR_KEYS, diagnostics)
+                       COLLABORATOR_KEYS, COLLABORATOR_TYPES, diagnostics)
     return [DeclaredCollaborator(name=entry['name'],
-                                 aliases=entry.get('aliases', []))
+                                 aliases=entry.get('aliases') or [])
             for entry in records]

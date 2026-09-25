@@ -7,6 +7,7 @@ wording or at parser-library messages.
 """
 
 import json
+import shutil
 
 import pytest
 import yaml
@@ -16,7 +17,7 @@ from sslabdata import (
 )
 
 from .support import (
-    EXPECTED, INVALID, case, export, run_sslabdata, working_dir,
+    EXPECTED, INVALID, case, export, item, run_sslabdata, working_dir,
 )
 
 with open(EXPECTED / "diagnostics.yaml", encoding="utf-8") as f:
@@ -197,6 +198,95 @@ def test_an_unknown_record_key_is_located(tmp_path):
     assert not [key for _, _, key in located if key in json.dumps(data)]
 
 
+# Covers records.required_type_invalid
+def test_a_required_field_that_is_not_a_string_is_fatal_and_located(tmp_path):
+    """An `id`, `name` or `title` is never coerced: a number, a list or a
+    boolean makes the record unusable, one located error per file, no
+    traceback and no document.
+
+    To inspect: `diagnostics.json` in the test's tmp directory is the
+    `--validate --format json` report; rerun the command in
+    tests/corpus/invalid/record_id_types to reproduce it.
+    """
+    where = INVALID / DIAGNOSTICS["records.required_type_invalid"]["dir"]
+    run = run_sslabdata(["--config", "lab.yaml", "--validate", "--format", "json"], where)
+    (tmp_path / "diagnostics.json").write_text(run.stdout, encoding="utf-8")
+    assert run.crash is None and run.code == 1 and run.stderr == "", run.output
+    assert [(r["code"], r["file"], r["key"], r["field"], r["severity"])
+            for r in json.loads(run.stdout)] == [
+        ("PEOPLE-FIELD-MISSING", "people.yaml", None, "id", "error"),
+        ("PEOPLE-FIELD-MISSING", "people.yaml", "bbrown", "name", "error"),
+        ("PROJECTS-FIELD-MISSING", "projects.yaml", None, "id", "error"),
+        ("COLLABORATORS-FIELD-MISSING", "collaborators.yaml", None, "name", "error"),
+    ]
+    out = tmp_path / "lab.json"
+    run = run_sslabdata(["--config", "lab.yaml", "--output", out], where)
+    assert run.crash is None and run.code == 1, run.output
+    assert not out.exists(), "a document was written despite a fatal diagnostic"
+
+
+# Covers records.optional_type_invalid
+def test_an_optional_field_of_the_wrong_type_is_reported_and_emitted_as_null(tmp_path):
+    """Each wrong-typed optional field is one located warning and a null in
+    the document (a status that is not a string reads as the default, and
+    the aliases that are not a list of strings declare none); the record
+    is kept. The document is `lab.json` in the test's tmp directory, and
+    `sslabdata --config lab.yaml --format json --output lab.json` in
+    tests/corpus/invalid/record_field_types writes the same bytes.
+    """
+    where = INVALID / DIAGNOSTICS["records.optional_type_invalid"]["dir"]
+    run = run_sslabdata(["--config", "lab.yaml", "--validate", "--format", "json"], where)
+    assert run.crash is None and run.code == 0, run.output
+    assert sorted((r["code"], r["severity"], r["file"], r["key"], r["field"])
+                  for r in json.loads(run.stdout)) == sorted(
+        [("RECORD-TYPE-INVALID", "warning", "people.yaml", key, field)
+         for key, field in (("aadams", "photo"), ("aadams", "website"),
+                            ("aadams", "start_year"), ("aadams", "aliases"),
+                            ("bbrown", "email"), ("bbrown", "end_year"),
+                            ("bbrown", "aliases"))]
+        + [("RECORD-TYPE-INVALID", "warning", "projects.yaml", "homebot", field)
+           for field in ("description", "website", "image")]
+        + [("RECORD-TYPE-INVALID", "warning", "collaborators.yaml", "Priya Patel",
+            "aliases"),
+           ("PEOPLE-STATUS-INVALID", "warning", "people.yaml", "aadams", "status"),
+           ("PROJECTS-STATUS-INVALID", "warning", "projects.yaml", "homebot", "status")])
+    run, data = export(where, tmp_path)
+    assert run.crash is None and run.code == 0, run.output
+    aadams, bbrown = item(data, "people", "id", "aadams"), item(data, "people", "id", "bbrown")
+    assert (aadams["status"], aadams["role"]) == ("current", "professor")
+    assert [aadams[f] for f in ("photo", "website", "start_year")] == [None] * 3
+    assert [bbrown[f] for f in ("email", "end_year")] == [None] * 2
+    homebot = item(data, "projects", "id", "homebot")
+    assert homebot["status"] == "active"
+    assert [homebot[f] for f in ("description", "website", "image")] == [None] * 3
+
+
+def test_an_input_file_the_system_will_not_open_is_coded_not_a_traceback(tmp_path):
+    """The one read failure the loaders leave to the CLI: a people file that
+    exists but cannot be opened. Coded `CONFIG-UNREADABLE`, naming the file
+    in the system's words, exit 1, nothing written.
+    """
+    where = tmp_path / "case"
+    shutil.copytree(INVALID / "record_unknown_key", where)
+    people = where / "people.yaml"
+    people.chmod(0)
+    try:
+        people.read_bytes()
+    except OSError:
+        pass
+    else:
+        pytest.skip("this account can read a file with no permissions")
+    try:
+        out = tmp_path / "lab.json"
+        run = run_sslabdata(["--config", "lab.yaml", "--output", out], where)
+    finally:
+        people.chmod(0o644)
+    assert run.crash is None and run.code == 1, run.output
+    assert run.stderr.startswith("Error loading configuration: CONFIG-UNREADABLE lab.yaml::: "), run.stderr
+    assert "people.yaml" in run.stderr
+    assert not out.exists()
+
+
 # Covers latex.text_macros
 def test_common_text_macros_are_converted(tmp_path):
     """Each macro becomes its text, and none is reported as unknown."""
@@ -248,7 +338,7 @@ FATAL = ["bib_file_not_found", "bib_not_utf8", "collaborators_file_not_found",
          "crossref_undefined_parent", "people_file_not_found",
          "people_invalid_yaml", "people_missing_name", "people_not_a_list",
          "projects_file_not_found", "projects_invalid_yaml",
-         "projects_missing_id"]
+         "projects_missing_id", "record_id_types"]
 
 
 def loads(name):
