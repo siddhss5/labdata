@@ -8,7 +8,6 @@ Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
 MIT License - see LICENSE file for details.
 """
 
-import errno
 import json
 import os
 import stat
@@ -31,7 +30,8 @@ def _write(output_path: str, text: str) -> None:
     """
     output_file = Path(output_path)
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    # An unwritable destination is refused, as a plain write would refuse it.
+    # An existing destination that cannot be opened for writing is refused, as
+    # a plain write would refuse it; nothing is created and it is left untouched.
     # The temporary file is never more permissive than the file it replaces,
     # and its name does not depend on the destination's, which may already be
     # as long as a name can be.
@@ -40,9 +40,8 @@ def _write(output_path: str, text: str) -> None:
     except FileNotFoundError:
         mode = None
     else:
-        if not os.access(output_file, os.W_OK):
-            raise PermissionError(errno.EACCES, os.strerror(errno.EACCES),
-                                  str(output_file))
+        with open(output_file, 'ab'):
+            pass
     temp = output_file.with_name(f".{uuid.uuid4().hex}.tmp")
     try:
         fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
