@@ -3,6 +3,7 @@
 import errno
 import json
 import os
+import stat
 import yaml
 import pytest
 from pathlib import Path
@@ -183,3 +184,47 @@ class TestAFailedWriteLeavesTheOutputAlone:
         with pytest.raises(OSError):
             export(sample_data, str(tmp_path / name))
         assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("export, suffix",
+                         [(export_to_json, ".json"), (export_to_yaml, ".yml")],
+                         ids=["json", "yaml"])
+def test_a_destination_name_of_the_longest_length_is_written(
+        tmp_path, sample_data, export, suffix):
+    """The temporary file's name must not add to the destination's."""
+    out = tmp_path / ("n" * (255 - len(suffix)) + suffix)
+    try:
+        out.write_bytes(b"")
+    except OSError:
+        pytest.skip("filesystem does not allow 255-byte names")
+    export(sample_data, str(out))
+    assert out.stat().st_size > 0
+    assert list(tmp_path.iterdir()) == [out]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+@pytest.mark.parametrize("export, name",
+                         [(export_to_json, "lab.json"),
+                          (export_to_yaml, "lab.yml")],
+                         ids=["json", "yaml"])
+def test_replacing_a_private_file_never_exposes_the_document(
+        tmp_path, sample_data, monkeypatch, export, name):
+    """A file kept at 0600 stays 0600, and the sibling the new document is
+    written to is no more readable than it while it is being populated."""
+    out = tmp_path / name
+    out.write_bytes(b"old\n")
+    out.chmod(0o600)
+    modes = []
+    real_fsync = os.fsync
+
+    def fsync(fd):
+        modes.extend(stat.S_IMODE(p.stat().st_mode)
+                     for p in tmp_path.iterdir() if p != out)
+        real_fsync(fd)
+    monkeypatch.setattr(os, "fsync", fsync)
+
+    export(sample_data, str(out))
+
+    assert modes == [0o600]
+    assert stat.S_IMODE(out.stat().st_mode) == 0o600
+    assert out.read_bytes() != b"old\n"

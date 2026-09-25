@@ -10,7 +10,7 @@ MIT License - see LICENSE file for details.
 
 import json
 import os
-import shutil
+import stat
 import uuid
 import yaml
 from pathlib import Path
@@ -30,14 +30,23 @@ def _write(output_path: str, text: str) -> None:
     """
     output_file = Path(output_path)
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    temp = output_file.with_name(f".{output_file.name}.{uuid.uuid4().hex}.tmp")
+    # The temporary file is never more permissive than the file it replaces,
+    # and its name does not depend on the destination's, which may already be
+    # as long as a name can be.
     try:
-        with open(temp, 'x', encoding='utf-8') as f:
+        mode = stat.S_IMODE(output_file.stat().st_mode)
+    except FileNotFoundError:
+        mode = None
+    temp = output_file.with_name(f".{uuid.uuid4().hex}.tmp")
+    try:
+        fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                     0o666 if mode is None else mode)
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            if mode is not None:
+                os.chmod(temp, mode)
             f.write(text)
             f.flush()
             os.fsync(f.fileno())
-        if output_file.exists():
-            shutil.copymode(output_file, temp)
         os.replace(temp, output_file)
     except BaseException:
         temp.unlink(missing_ok=True)
