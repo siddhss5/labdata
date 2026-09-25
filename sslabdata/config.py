@@ -143,7 +143,9 @@ class LabDataConfig:
     collaborators_file: Optional[str] = None
 
     # Keys `lab.yaml` held that sslabdata does not read, in file order, so the
-    # assembler can report them against `path`. Never emitted.
+    # assembler can report them against `path`. A YAML key need not be a
+    # string (`7:`, `2025-01-01:`); it is named as text, as a record's unknown
+    # key is, so that a diagnostic's `key` is always a string. Never emitted.
     unknown_keys: List[str] = field(default_factory=list)
 
     @classmethod
@@ -223,7 +225,7 @@ class LabDataConfig:
             lab=data.get('lab'),
             path=str(path),
             collaborators_file=data.get('collaborators_file'),
-            unknown_keys=[key for key in data if key not in KNOWN_KEYS],
+            unknown_keys=[str(key) for key in data if key not in KNOWN_KEYS],
         )
 
 

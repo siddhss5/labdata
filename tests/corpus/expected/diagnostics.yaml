@@ -353,7 +353,7 @@ config.unknown_key:
   dir: config_unknown_key
   exit: any
   reports: [people_fil]
-  locates: [lab.yaml, people_fil]
+  locates: [lab.yaml, people_fil, "2025-01-01"]
 
 config.not_a_mapping:
   dir: config_not_a_mapping
