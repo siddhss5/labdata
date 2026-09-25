@@ -65,8 +65,9 @@ collaborators_file: "data/collaborators.yaml"  # optional
 
 Each `bib_files` entry's `name` is a name under `bib_dir`, and must not be an
 absolute path: it is emitted as the work's `source.file`, so an absolute one
-would put your directory layout in a document you share. sslabdata rejects it
-rather than rewriting it.
+would put your directory layout in a document you share. Nor may it leave
+`bib_dir`, by `..` or through a symlink. sslabdata rejects such a name rather
+than rewriting it.
 
 Paths are relative to the directory you run `sslabdata` from.
 [`examples/demo/lab.yaml`](examples/demo/lab.yaml) is a complete example,

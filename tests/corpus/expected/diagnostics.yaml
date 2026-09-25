@@ -295,6 +295,12 @@ config.bib_files.name_absolute:
   reports: [CONFIG-BIB-FILE-ABSOLUTE, /etc/ok.bib]
   locates: [lab.yaml, bib_files, name]
 
+config.bib_files.name_outside_bib_dir:
+  dir: config_bib_file_outside
+  exit: error
+  reports: [CONFIG-BIB-FILE-OUTSIDE-BIB-DIR, ../outside.bib]
+  locates: [lab.yaml, bib_files, name]
+
 config.bib_files.name_wrong_type:
   dir: config_bib_file_name_type
   exit: error

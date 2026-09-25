@@ -16,7 +16,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from .config import LabDataConfig, reject_absolute_name
+from .config import (
+    LabDataConfig, reject_absolute_name, reject_name_outside_bib_dir,
+)
 from .diagnostics import (
     ERROR, Diagnostic, diagnostic, in_report_order, severity,
 )
@@ -418,13 +420,17 @@ def assemble_result(config: LabDataConfig) -> AssemblyResult:
     """
     # Every configured name, checked before anything is parsed, so a
     # configuration sslabdata will not compile from fails here rather than
-    # after the work of reading every file. This is not the check that holds
-    # -- `Work.to_dict()` is, at the boundary every emitted document passes
-    # through -- it is the one that fails soonest. The CLI never reaches it:
-    # `LabDataConfig.from_yaml()` rejects the same thing first, with the file
+    # after the work of reading every file. An absolute name is also checked
+    # again by `Work.to_dict()`, at the boundary every emitted document passes
+    # through, which is the check that holds; containment under `bib_dir` is
+    # checked only here and at load. The CLI never reaches these:
+    # `LabDataConfig.from_yaml()` rejects the same things first, with the file
     # the user would edit named.
     for bib_file in config.bib_files:
         reject_absolute_name(getattr(bib_file, 'name', None))
+    for bib_file in config.bib_files:
+        reject_name_outside_bib_dir(getattr(bib_file, 'name', None),
+                                    config.bib_dir)
 
     found: List[Diagnostic] = []
     source = config.path or 'lab.yaml'

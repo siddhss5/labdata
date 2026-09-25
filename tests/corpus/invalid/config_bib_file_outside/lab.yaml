@@ -1,0 +1,11 @@
+# A bib_files name that leaves bib_dir. It would be read from, and emitted as
+# source.file relative to, a directory the configuration never named, so the
+# configuration is rejected before any file is parsed: `crossref.bib` below
+# is fatal if it is read, and is not reported.
+# CASE config.bib_files.name_outside_bib_dir
+bib_dir: "bib"
+bib_files:
+  - name: "crossref.bib"
+    category: "Papers"
+  - name: "../outside.bib"
+    category: "Papers"

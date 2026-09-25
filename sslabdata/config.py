@@ -8,6 +8,7 @@ Author: Siddhartha Srinivasa <siddh@cs.washington.edu>
 MIT License - see LICENSE file for details.
 """
 
+import os
 import yaml
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -24,6 +25,12 @@ from .diagnostics import diagnostic
 # meant. Both path flavours are checked, so the same configuration is
 # accepted or rejected wherever it is compiled.
 BIB_FILE_ABSOLUTE = "CONFIG-BIB-FILE-ABSOLUTE"
+
+# A relative name can still leave `bib_dir`, by `..` or through a symlink:
+# it would read a file the configuration was never meant to reach, and emit a
+# name that exposes the layout above `bib_dir`. Fatal at load for the same
+# reason as the absolute name.
+BIB_FILE_OUTSIDE = "CONFIG-BIB-FILE-OUTSIDE-BIB-DIR"
 
 # A `lab.yaml` sslabdata cannot compile from, found while it is read. Each is
 # fatal at load, like the absolute name above: nothing is assembled from a
@@ -84,6 +91,36 @@ def reject_absolute_name(name, file: Optional[str] = None) -> None:
             f"'{name}' is an absolute path; a bib_files name is a name under "
             "bib_dir, and it is emitted as the work's source.file, which is "
             "never absolute"))
+
+
+def reject_name_outside_bib_dir(name, bib_dir, file: Optional[str] = None) -> None:
+    """Raise when a configured `.bib` name does not stay under ``bib_dir``.
+
+    Two checks. The lexical one reads ``name`` by Windows rules, which take
+    both ``/`` and ``\\`` as separators, on every host: a name with a ``..``
+    component, or a drive (``C:x.bib`` is relative to a drive's current
+    directory, so `is_absolute_path` lets it through), is rejected wherever
+    it is compiled. The filesystem one then resolves symlinks and requires
+    the file to lie inside the resolved ``bib_dir``. A file that does not
+    exist is not rejected here, so a missing one keeps its not-found
+    diagnostic; a dangling symlink whose target is outside is.
+
+    The diagnostic is located at `<file>:bib_files:name`, as for
+    `reject_absolute_name`.
+    """
+    if not isinstance(name, str) or "\0" in name:
+        return
+    parts = PureWindowsPath(name)
+    escapes = bool(parts.drive) or ".." in parts.parts
+    if not escapes:
+        root = Path(os.path.realpath(bib_dir))
+        escapes = not Path(os.path.realpath(root / name)).is_relative_to(root)
+    if escapes:
+        raise ConfigurationError(diagnostic(
+            BIB_FILE_OUTSIDE, file, "bib_files", "name",
+            f"'{name}' is not under bib_dir '{bib_dir}'; a bib_files name is "
+            "a name under bib_dir, with no '..' component and no symlink "
+            "leading out of it"))
 
 
 @dataclass
@@ -213,6 +250,8 @@ class LabDataConfig:
         # user would edit is known and the diagnostic can name it.
         for bf in entries:
             reject_absolute_name(bf['name'], str(path))
+        for bf in entries:
+            reject_name_outside_bib_dir(bf['name'], data['bib_dir'], str(path))
 
         bib_files = [BibFile(**bf) for bf in entries]
 
