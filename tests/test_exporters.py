@@ -1,6 +1,8 @@
 """Tests for the exporters: YAML and JSON output."""
 
+import errno
 import json
+import os
 import yaml
 import pytest
 from pathlib import Path
@@ -136,3 +138,48 @@ class TestARefusedDocumentLeavesTheOutputAlone:
         assert self.SENTINEL not in out.read_text(encoding="utf-8")
         with open(out, encoding="utf-8") as f:
             assert load(f) == sample_data.to_dict()
+        assert list(tmp_path.iterdir()) == [out]
+
+
+class TestAFailedWriteLeavesTheOutputAlone:
+    """A write that fails part way must not destroy the last good document.
+
+    Two failures are injected, at the stdlib calls that make a write durable:
+    the disk failing as the temporary file is flushed, and the final move onto
+    the destination failing. Each leaves the directory as inspectable
+    evidence: reproduce with
+    `pytest tests/test_exporters.py -k FailedWrite --basetemp=out` and read
+    `out/`, where a case's directory holds the old document, byte for byte,
+    or nothing.
+    """
+
+    OLD = b"the document from the last good run\n"
+
+    @pytest.fixture(params=["fsync", "replace"])
+    def failure(self, request, monkeypatch):
+        def fail(*args):
+            raise OSError(errno.EIO, "injected failure")
+        monkeypatch.setattr(os, request.param, fail)
+
+    @pytest.mark.parametrize("export, name",
+                             [(export_to_json, "lab.json"),
+                              (export_to_yaml, "lab.yml")],
+                             ids=["json", "yaml"])
+    def test_an_existing_file_is_byte_for_byte_unchanged(
+            self, tmp_path, sample_data, failure, export, name):
+        out = tmp_path / name
+        out.write_bytes(self.OLD)
+        with pytest.raises(OSError):
+            export(sample_data, str(out))
+        assert out.read_bytes() == self.OLD
+        assert list(tmp_path.iterdir()) == [out]
+
+    @pytest.mark.parametrize("export, name",
+                             [(export_to_json, "lab.json"),
+                              (export_to_yaml, "lab.yml")],
+                             ids=["json", "yaml"])
+    def test_no_file_is_created_where_there_was_none(
+            self, tmp_path, sample_data, failure, export, name):
+        with pytest.raises(OSError):
+            export(sample_data, str(tmp_path / name))
+        assert list(tmp_path.iterdir()) == []

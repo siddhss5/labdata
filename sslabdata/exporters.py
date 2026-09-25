@@ -9,6 +9,9 @@ MIT License - see LICENSE file for details.
 """
 
 import json
+import os
+import shutil
+import uuid
 import yaml
 from pathlib import Path
 
@@ -18,15 +21,27 @@ from .models import LabData
 def _write(output_path: str, text: str) -> None:
     """Write a serialized document, after it has been serialized.
 
-    The document is built in full before the file is opened, so a document
+    The document is built in full before anything is created, so a document
     sslabdata refuses to emit -- one whose `source.file` is absolute, say --
-    leaves no file behind, and an existing one is not truncated by a failure
-    part way through.
+    leaves no file behind. It is then written in full to a temporary sibling
+    and moved over the destination in one step, so a failure at any point
+    leaves an existing file as it was, creates none where there was none, and
+    leaves no temporary file behind.
     """
     output_file = Path(output_path)
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_file, 'w', encoding='utf-8') as f:
-        f.write(text)
+    temp = output_file.with_name(f".{output_file.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with open(temp, 'x', encoding='utf-8') as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        if output_file.exists():
+            shutil.copymode(output_file, temp)
+        os.replace(temp, output_file)
+    except BaseException:
+        temp.unlink(missing_ok=True)
+        raise
 
 
 def export_to_yaml(data: LabData, output_path: str):
