@@ -165,6 +165,16 @@ records.unknown_key:
   exit: ok
   reports: [RECORD-KEY-UNKNOWN, webiste, funding, affiliation]
 
+records.optional_type_invalid:
+  dir: record_field_types
+  exit: ok
+  reports: [RECORD-TYPE-INVALID]
+
+records.required_type_invalid:
+  dir: record_id_types
+  exit: error
+  reports: [PEOPLE-FIELD-MISSING, PROJECTS-FIELD-MISSING, COLLABORATORS-FIELD-MISSING]
+
 projects.invalid_status:
   dir: invalid_project_status
   exit: any
@@ -285,6 +295,30 @@ config.bib_files.name_absolute:
   reports: [CONFIG-BIB-FILE-ABSOLUTE, /etc/ok.bib]
   locates: [lab.yaml, bib_files, name]
 
+config.bib_files.name_wrong_type:
+  dir: config_bib_file_name_type
+  exit: error
+  reports: [CONFIG-TYPE-INVALID, name]
+  locates: [lab.yaml, bib_files, name]
+
+config.bib_files.category_wrong_type:
+  dir: config_bib_file_category_type
+  exit: error
+  reports: [CONFIG-TYPE-INVALID, category]
+  locates: [lab.yaml, bib_files, category]
+
+config.bib_files.entry_wrong_type:
+  dir: config_bib_file_entry_type
+  exit: error
+  reports: [CONFIG-TYPE-INVALID, mapping]
+  locates: [lab.yaml, bib_files]
+
+config.bib_files.entry_unknown_key:
+  dir: config_bib_file_unknown_key
+  exit: error
+  reports: [CONFIG-TYPE-INVALID, comment]
+  locates: [lab.yaml, bib_files]
+
 config.pdf_base_url.wrong_type:
   dir: config_pdf_base_url_type
   exit: error
@@ -309,11 +343,17 @@ config.lab.wrong_type:
   reports: [lab]
   locates: [lab.yaml]
 
+config.lab.value_wrong_type:
+  dir: config_lab_value_type
+  exit: error
+  reports: [CONFIG-TYPE-INVALID]
+  locates: [lab.yaml, lab, name]
+
 config.unknown_key:
   dir: config_unknown_key
   exit: any
   reports: [people_fil]
-  locates: [lab.yaml, people_fil]
+  locates: [lab.yaml, people_fil, "2025-01-01"]
 
 config.not_a_mapping:
   dir: config_not_a_mapping

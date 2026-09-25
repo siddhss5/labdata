@@ -1,0 +1,4 @@
+# CASE records.required_type_invalid
+# A collaborator whose name is a number.
+
+- name: 5

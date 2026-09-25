@@ -1,11 +1,11 @@
-# CASE config.unknown_key
+# CASE records.optional_type_invalid
 # Fictional invalid input for tests/COVERAGE.md.
+lab:
+  name: "Fictional Robotics Lab"
 bib_dir: "."
 bib_files:
   - name: "ok.bib"
     category: "Papers"
 people_file: "people.yaml"
 projects_file: "projects.yaml"
-people_fil: "people.yaml"
-7: "value"
-2025-01-01: "value"
+collaborators_file: "collaborators.yaml"

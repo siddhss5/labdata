@@ -1,0 +1,5 @@
+# CASE config.bib_files.entry_wrong_type
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - "ok.bib"

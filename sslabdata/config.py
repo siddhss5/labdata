@@ -42,6 +42,13 @@ KNOWN_KEYS = ("lab", "site", "bib_dir", "bib_files", "pdf_base_url",
 _STRING_KEYS = ("pdf_base_url", "people_file", "projects_file",
                 "collaborators_file")
 
+# The `lab` keys the schema types (`lab` is otherwise copied through open), by
+# accepted YAML type. An empty value is not one: `name:` with nothing after it
+# is null, and null is not a string.
+_LAB_TYPES = {**dict.fromkeys(("name", "description", "institution",
+                               "department", "website", "email", "address",
+                               "logo"), str), "links": dict}
+
 
 class ConfigurationError(ValueError):
     """A configuration sslabdata will not compile from.
@@ -136,7 +143,9 @@ class LabDataConfig:
     collaborators_file: Optional[str] = None
 
     # Keys `lab.yaml` held that sslabdata does not read, in file order, so the
-    # assembler can report them against `path`. Never emitted.
+    # assembler can report them against `path`. A YAML key need not be a
+    # string (`7:`, `2025-01-01:`); it is named as text, as a record's unknown
+    # key is, so that a diagnostic's `key` is always a string. Never emitted.
     unknown_keys: List[str] = field(default_factory=list)
 
     @classmethod
@@ -161,6 +170,12 @@ class LabDataConfig:
         if data.get('lab') is not None and not isinstance(data['lab'], dict):
             reject(TYPE_INVALID, 'lab', None,
                    f"lab is {_kind(data['lab'])}; it must be a mapping")
+        for key, expected in _LAB_TYPES.items():
+            if key in (data.get('lab') or {}) and not isinstance(
+                    data['lab'][key], expected):
+                reject(TYPE_INVALID, 'lab', key,
+                       f"lab.{key} is {_kind(data['lab'][key])}; it must be "
+                       f"{'a mapping' if expected is dict else 'a string'}")
         for key in _STRING_KEYS:
             if data.get(key) is not None and not isinstance(data[key], str):
                 reject(TYPE_INVALID, key, None,
@@ -172,23 +187,32 @@ class LabDataConfig:
             reject(TYPE_INVALID, 'bib_files', None,
                    f"bib_files is {_kind(entries)}; it must be a list of "
                    "{name, category} mappings")
-        # An entry that is not a mapping, or whose name or category is not a
-        # string, is not checked here, as no contract row covers it. One that
-        # is not a mapping fails when `BibFile` is built from it below; a name
-        # or category that is not a string is passed through.
+        # An entry is a mapping of exactly a string `name` and a string
+        # `category`: both reach the document as strings (`work.source.file`
+        # and `work.category`), so neither is coerced.
         for number, bf in enumerate(entries, start=1):
             if not isinstance(bf, dict):
-                continue
+                reject(TYPE_INVALID, 'bib_files', None,
+                       f"bib_files entry {number} is {_kind(bf)}; it must be "
+                       "a {name, category} mapping")
+            for key in bf:
+                if key not in ('name', 'category'):
+                    reject(TYPE_INVALID, 'bib_files', str(key),
+                           f"bib_files entry {number} has the key '{key}'; "
+                           "an entry holds only name and category")
             for required in ('name', 'category'):
                 if bf.get(required) is None:
                     reject(KEY_MISSING, 'bib_files', required,
                            f"bib_files entry {number} has no {required}")
+                if not isinstance(bf[required], str):
+                    reject(TYPE_INVALID, 'bib_files', required,
+                           f"bib_files entry {number} has a {required} that "
+                           f"is {_kind(bf[required])}; it must be a string")
 
         # Checked here as well as in `BibFile`, because here the file the
         # user would edit is known and the diagnostic can name it.
         for bf in entries:
-            if isinstance(bf, dict):
-                reject_absolute_name(bf.get('name'), str(path))
+            reject_absolute_name(bf['name'], str(path))
 
         bib_files = [BibFile(**bf) for bf in entries]
 
@@ -201,7 +225,7 @@ class LabDataConfig:
             lab=data.get('lab'),
             path=str(path),
             collaborators_file=data.get('collaborators_file'),
-            unknown_keys=[key for key in data if key not in KNOWN_KEYS],
+            unknown_keys=[str(key) for key in data if key not in KNOWN_KEYS],
         )
 
 

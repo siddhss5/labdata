@@ -1,0 +1,6 @@
+# CASE config.bib_files.category_wrong_type
+# Fictional invalid input for tests/COVERAGE.md.
+bib_dir: "."
+bib_files:
+  - name: "ok.bib"
+    category: 7

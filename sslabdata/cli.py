@@ -10,6 +10,8 @@ import argparse
 import json
 import sys
 
+import yaml
+
 from .config import ConfigurationError, LabDataConfig
 from .assembler import assemble_result, unresolved_name_diagnostics
 from .diagnostics import ERROR, diagnostic, record, severity
@@ -19,6 +21,11 @@ from .exporters import export_to_yaml, export_to_json
 # at load; the second keeps the reading library's words as its prose.
 CONFIG_NOT_FOUND = "CONFIG-NOT-FOUND"
 CONFIG_UNREADABLE = "CONFIG-UNREADABLE"
+
+# What reading a configuration can fail with for reasons of the input, not of
+# the program: a file that cannot be opened, is not UTF-8 or is not YAML. Any
+# other exception is a defect and is left to propagate.
+CONFIG_READ_ERRORS = (OSError, UnicodeDecodeError, yaml.YAMLError)
 
 
 def main(argv=None):
@@ -89,7 +96,7 @@ Examples:
                         "configuration file not found"), "Error: ", as_json)
     except ConfigurationError as e:
         stop(e.args[0], "Error loading configuration: ", as_json)
-    except Exception as e:  # noqa: BLE001 - reported, in the reader's words
+    except CONFIG_READ_ERRORS as e:
         stop(diagnostic(CONFIG_UNREADABLE, args.config, None, None, str(e)),
              "Error loading configuration: ", as_json)
 
@@ -97,7 +104,13 @@ Examples:
     # `bib_files` name, but `from_yaml()` above has already rejected that with
     # the file named, so it cannot happen here: the check is for callers who
     # built a configuration themselves.
-    result = assemble_result(config)
+    # An input file that exists but cannot be read (permissions, say) is the
+    # one failure the loaders leave for here; its message names the file.
+    try:
+        result = assemble_result(config)
+    except OSError as e:
+        stop(diagnostic(CONFIG_UNREADABLE, args.config, None, None, str(e)),
+             "Error loading configuration: ", as_json)
     data = result.data
     found = result.diagnostics
 
