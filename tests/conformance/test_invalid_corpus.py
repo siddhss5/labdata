@@ -113,6 +113,91 @@ def test_a_fatal_at_load_code_goes_to_standard_error_in_every_mode(tmp_path):
     assert not out.exists(), "a document was written despite a fatal diagnostic"
 
 
+OUTSIDE = INVALID / "config_bib_file_outside"
+
+# Names that leave bib_dir by their spelling alone. The backslash and drive
+# forms are rejected on every host, so Linux CI exercises the Windows syntax
+# rules (not the Windows filesystem).
+LEAVING_BY_SPELLING = ["../outside.bib", "../../outside.bib", "sub/../../outside.bib",
+                       "..\\outside.bib", "sub\\..\\..\\outside.bib", "C:outside.bib"]
+# Names that are spelt inside bib_dir and leave it through a symlink there:
+# to a file, to a sibling directory whose name begins with "bib", to nothing,
+# and to the directory above.
+SYMLINKS = {"link.bib": "../outside.bib", "lookalike.bib": "../bib_evil/x.bib",
+            "dangling.bib": "../missing.bib", "up": ".."}
+LEAVING_BY_SYMLINK = ["link.bib", "lookalike.bib", "dangling.bib", "up/outside.bib"]
+
+
+def outside_tree(tmp_path, names):
+    """The outside-bib_dir fixture, copied, with `crossref.bib` then `names`
+    listed as its bib_files and the symlinks above made in bib_dir."""
+    where = tmp_path / "case"
+    shutil.copytree(OUTSIDE, where)
+    config = yaml.safe_load((where / "lab.yaml").read_text(encoding="utf-8"))
+    config["bib_files"] = [{"name": n, "category": "Papers"}
+                           for n in ["crossref.bib", *names]]
+    (where / "lab.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
+    for link, target in SYMLINKS.items():
+        try:
+            (where / "bib" / link).symlink_to(target, target_is_directory=link == "up")
+        except (OSError, NotImplementedError):
+            pytest.skip("symlinks cannot be created here")
+    return where
+
+
+# Covers config.bib_files.name_outside_bib_dir
+@pytest.mark.parametrize("name", LEAVING_BY_SPELLING + LEAVING_BY_SYMLINK)
+def test_a_name_outside_bib_dir_is_rejected_before_anything_is_parsed(tmp_path, name):
+    """A name that leaves bib_dir is a coded error, in every mode, with nothing written.
+
+    `crossref.bib`, listed first, is fatal if it is read: the error being the
+    only one reported shows the whole configuration was checked before any
+    file was parsed. To reproduce one case, run `sslabdata --config lab.yaml
+    --validate` in tests/corpus/invalid/config_bib_file_outside (`../outside.bib`).
+    """
+    where = outside_tree(tmp_path, [name])
+    out = tmp_path / "written" / "lab.json"
+    out.parent.mkdir()
+    for args in (["--validate"], ["--format", "json", "--output", out]):
+        run = run_sslabdata(["--config", "lab.yaml", *args], where)
+        assert run.crash is None, (args, run.crash)
+        assert run.code == 1 and run.stdout == "", (args, run.output)
+        assert run.stderr.startswith("Error loading configuration: "), run.stderr
+        assert "CONFIG-BIB-FILE-OUTSIDE-BIB-DIR lab.yaml:bib_files:name: " in run.stderr
+        assert f"'{name}'" in run.stderr
+        assert "BIB-CROSSREF-UNSUPPORTED" not in run.output, "a file was parsed"
+    assert list(out.parent.iterdir()) == [], "something was written despite the error"
+
+
+# Covers config.bib_files.name_outside_bib_dir
+def test_a_name_is_checked_where_the_reader_opens_it_when_bib_dir_is_empty(tmp_path):
+    """With `bib_dir: ""` the reader opens `/<name>`, not `<cwd>/<name>`, so a
+    name that is under the working directory as written still leaves it."""
+    where = outside_tree(tmp_path, [])
+    outside = (where / "outside.bib").resolve()
+    name = outside.relative_to(outside.anchor).as_posix()
+    (where / "lab.yaml").write_text(yaml.safe_dump(
+        {"bib_dir": "", "bib_files": [{"name": name, "category": "Papers"}]}),
+        encoding="utf-8")
+    run = run_sslabdata(["--config", "../lab.yaml", "--validate"], where / "bib")
+    assert run.crash is None and run.code == 1, run.output
+    assert f"CONFIG-BIB-FILE-OUTSIDE-BIB-DIR ../lab.yaml:bib_files:name: '{name}'" in run.stderr
+
+
+# Covers config.bib_files.name_outside_bib_dir
+def test_a_nested_name_under_bib_dir_is_accepted_and_emitted_as_written(tmp_path):
+    """The document is the artifact: `works[].source.file` is `conference/2026.bib`.
+    To reproduce, list that name in the fixture's lab.yaml and run
+    `sslabdata --config lab.yaml --output lab.json`."""
+    where = outside_tree(tmp_path, [])
+    config = yaml.safe_load((where / "lab.yaml").read_text(encoding="utf-8"))
+    config["bib_files"] = [{"name": "conference/2026.bib", "category": "Papers"}]
+    (where / "lab.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
+    run, data = export(where, tmp_path)
+    assert run.code == 0 and run.crash is None, run.output
+    assert [w["source"]["file"] for w in data["works"]] == ["conference/2026.bib"]
+
+
 # Covers structure.crossref
 def test_a_fatal_diagnostic_stops_a_normal_compile(tmp_path):
     """A user cannot produce a document by skipping --validate.

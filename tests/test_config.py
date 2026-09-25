@@ -50,7 +50,7 @@ class TestBibFileNameIsNeverAbsolute:
                 "C:\\data\\journal.bib", "C:/data/journal.bib",
                 "\\\\server\\share\\journal.bib", "\\journal.bib"]
     RELATIVE = ["journal.bib", "sub/journal.bib", "sub\\journal.bib",
-                "../shared/journal.bib", "./journal.bib"]
+                "./journal.bib"]
 
     # The code, restated here rather than imported: it is a published,
     # permanent interface (SPEC.md, "Diagnostic codes"), so a test may depend

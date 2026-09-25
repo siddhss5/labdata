@@ -100,10 +100,10 @@ Examples:
         stop(diagnostic(CONFIG_UNREADABLE, args.config, None, None, str(e)),
              "Error loading configuration: ", as_json)
 
-    # `assemble_result()` raises `ConfigurationError` for an absolute
-    # `bib_files` name, but `from_yaml()` above has already rejected that with
-    # the file named, so it cannot happen here: the check is for callers who
-    # built a configuration themselves.
+    # `assemble_result()` raises `ConfigurationError` for an absolute or
+    # escaping `bib_files` name, but `from_yaml()` above has already rejected
+    # that with the file named, so it cannot happen here: the check is for
+    # callers who built a configuration themselves.
     # An input file that exists but cannot be read (permissions, say) is the
     # one failure the loaders leave for here; its message names the file.
     try:
